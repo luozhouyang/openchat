@@ -158,6 +158,67 @@ export class ChannelDO extends DurableObject<Env> {
     return { messageId: msg.id, seq: msg.seq };
   }
 
+  async editMessage(
+    callerUserId: string,
+    body: { messageId: string; content: string },
+  ): Promise<{ error: string; status: 404 | 410 | 403 | 422 } | { ok: true }> {
+    const rows = await this.db
+      .select()
+      .from(schema.messages)
+      .where(eq(schema.messages.id, body.messageId))
+      .limit(1);
+    if (rows.length === 0) return { error: "not found", status: 404 };
+    const msg = rows[0];
+    if (msg.deletedAt !== null) return { error: "deleted", status: 410 };
+    const caller = await this.db
+      .select()
+      .from(schema.memberState)
+      .where(eq(schema.memberState.userId, callerUserId))
+      .limit(1);
+    const isAdmin = caller[0]?.role === "admin";
+    if (msg.userId !== callerUserId && !isAdmin) return { error: "forbidden", status: 403 };
+    if (!body.content || body.content.length > 16384) return { error: "invalid", status: 422 };
+    const editedAt = Date.now();
+    await this.db
+      .update(schema.messages)
+      .set({ content: body.content, editedAt })
+      .where(eq(schema.messages.id, body.messageId));
+    await this.broadcast({
+      type: "message.edit",
+      messageId: body.messageId,
+      content: body.content,
+      editedAt,
+    });
+    return { ok: true };
+  }
+
+  async deleteMessage(
+    callerUserId: string,
+    body: { messageId: string },
+  ): Promise<{ error: string; status: 404 | 403 } | { ok: true }> {
+    const rows = await this.db
+      .select()
+      .from(schema.messages)
+      .where(eq(schema.messages.id, body.messageId))
+      .limit(1);
+    if (rows.length === 0) return { error: "not found", status: 404 };
+    const msg = rows[0];
+    if (msg.deletedAt !== null) return { ok: true };
+    const caller = await this.db
+      .select()
+      .from(schema.memberState)
+      .where(eq(schema.memberState.userId, callerUserId))
+      .limit(1);
+    const isAdmin = caller[0]?.role === "admin";
+    if (msg.userId !== callerUserId && !isAdmin) return { error: "forbidden", status: 403 };
+    await this.db
+      .update(schema.messages)
+      .set({ deletedAt: Date.now() })
+      .where(eq(schema.messages.id, body.messageId));
+    await this.broadcast({ type: "message.delete", messageId: body.messageId });
+    return { ok: true };
+  }
+
   async history(params: {
     limit?: number;
     beforeSeq?: number;
@@ -290,7 +351,7 @@ export class ChannelDO extends DurableObject<Env> {
       userId: r.userId,
       parentId: r.parentId,
       type: r.type,
-      content: r.content,
+      content: r.deletedAt !== null ? "" : r.content,
       attachments: r.attachments ? JSON.parse(r.attachments) : null,
       mentions: r.mentions ? JSON.parse(r.mentions) : null,
       editedAt: r.editedAt,
