@@ -1,8 +1,10 @@
 import { DurableObject } from "cloudflare:workers";
 import { drizzle } from "drizzle-orm/durable-sqlite";
 import { migrate } from "drizzle-orm/durable-sqlite/migrator";
+import { count } from "drizzle-orm";
 import { helloEvent, parseClientFrame, verifyInternalToken } from "protocol";
 import migrations from "../../migrations/user-do/migrations";
+import * as schema from "../db/schema-user-do.ts";
 
 export class UserDO extends DurableObject<Env> {
   db: ReturnType<typeof drizzle>;
@@ -10,7 +12,7 @@ export class UserDO extends DurableObject<Env> {
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
-    this.db = drizzle(ctx.storage, { logger: false });
+    this.db = drizzle(ctx.storage, { schema, logger: false });
     void ctx.blockConcurrencyWhile(async () => {
       await migrate(this.db, migrations);
       this.disconnectUntil = (await ctx.storage.get<number>("disconnectUntil")) ?? 0;
@@ -30,10 +32,8 @@ export class UserDO extends DurableObject<Env> {
   }
 
   async channelsSubscribe(channelIds: string[]): Promise<void> {
-    this.ctx.storage.sql.exec("DELETE FROM channels_cache");
-    for (const id of channelIds) {
-      this.ctx.storage.sql.exec("INSERT INTO channels_cache (channel_id) VALUES (?)", id);
-    }
+    await this.db.delete(schema.channelsCache);
+    await this.db.insert(schema.channelsCache).values(channelIds.map((id) => ({ channelId: id })));
   }
 
   async forceDisconnect(): Promise<void> {
@@ -46,9 +46,8 @@ export class UserDO extends DurableObject<Env> {
 
   async health(): Promise<{ ok: boolean; devices: number; channels: number }> {
     const devices = this.ctx.getWebSockets().length;
-    const channels = Number(
-      this.ctx.storage.sql.exec("SELECT count(*) AS n FROM channels_cache").toArray()[0]?.n ?? 0,
-    );
+    const rows = await this.db.select({ n: count() }).from(schema.channelsCache);
+    const channels = Number(rows[0]?.n ?? 0);
     return { ok: true, devices, channels };
   }
 
