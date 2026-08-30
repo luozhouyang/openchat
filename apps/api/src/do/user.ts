@@ -45,4 +45,12 @@ export class UserDO extends DurableObject<Env> {
     const data = typeof message === "string" ? message : new TextDecoder().decode(message);
     ws.send(JSON.stringify({ type: "echo", data }));
   }
+
+  async webSocketClose(ws: WebSocket, code: number, reason: string, _wasClean: boolean) {
+    ws.close(code, reason);
+  }
+
+  async webSocketError(_ws: WebSocket, error: unknown) {
+    console.error("WebSocket error:", error);
+  }
 }
