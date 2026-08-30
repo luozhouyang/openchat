@@ -46,7 +46,7 @@ test("channelsSubscribe then health reflects channel count", async () => {
 test("push with no device connected leaves health unchanged", async () => {
   const stub = anyDoStub();
   const before = await stub.health();
-  await stub.push({ channelId: "c1", event: { type: "message.new" } });
+  await stub.push({ channelId: "c1", events: [{ type: "message.new" }] });
   const after = await stub.health();
   expect(after).toEqual(before);
 });
@@ -67,7 +67,7 @@ test("push forwards channel event to connected device", async () => {
   expect(JSON.parse(String(hello.data))).toMatchObject({ type: "hello" });
 
   const pushed = nextMessage(ws!);
-  await stub.push({ channelId: "c1", event: { type: "message.new" } });
+  await stub.push({ channelId: "c1", events: [{ type: "message.new" }] });
   const event = await pushed;
   expect(JSON.parse(String(event.data))).toEqual({
     type: "channel.event",

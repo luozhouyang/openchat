@@ -5,11 +5,21 @@ import { and, eq } from "drizzle-orm";
 import { newId } from "protocol";
 import migrations from "../../migrations/channel-do/migrations";
 import * as schema from "../db/schema-channel-do.ts";
+import { createBroadcaster } from "./broadcast.ts";
 
 export class ChannelDO extends DurableObject<Env> {
   db: ReturnType<typeof drizzle>;
+  channelId = (this.ctx.id.name ?? "").slice("channel:".length);
   subscribers = new Map<string, { userId: string }>();
   rates = new Map<string, number[]>();
+  failedPush = new Map<string, number>();
+  broadcaster = createBroadcaster({
+    env: { ...this.env, channelId: this.channelId },
+    subscribers: () => this.subscribers.keys(),
+    onPushFailed: (userId) => {
+      this.failedPush.set(userId, (this.failedPush.get(userId) ?? 0) + 1);
+    },
+  });
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -152,7 +162,9 @@ export class ChannelDO extends DurableObject<Env> {
     };
   }
 
-  private async broadcast(_event: unknown): Promise<void> {}
+  private async broadcast(event: { type: string; [k: string]: unknown }) {
+    await this.broadcaster.broadcast(event);
+  }
 
   async fetch(_request: Request): Promise<Response> {
     return new Response("not found", { status: 404 });

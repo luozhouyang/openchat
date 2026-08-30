@@ -20,14 +20,16 @@ export class UserDO extends DurableObject<Env> {
     ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair("ping", "pong"));
   }
 
-  async push(body: { channelId: string; event: unknown }): Promise<void> {
-    const payload = JSON.stringify({
-      type: "channel.event",
-      channelId: body.channelId,
-      event: body.event,
-    });
-    for (const ws of this.ctx.getWebSockets()) {
-      if (ws.readyState === WebSocket.OPEN) ws.send(payload);
+  async push(body: { channelId?: string; events: unknown[] }): Promise<void> {
+    for (const ev of body.events) {
+      const payload = JSON.stringify({
+        type: "channel.event",
+        channelId: body.channelId,
+        event: ev,
+      });
+      for (const ws of this.ctx.getWebSockets()) {
+        if (ws.readyState === WebSocket.OPEN) ws.send(payload);
+      }
     }
   }
 
