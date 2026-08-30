@@ -14,7 +14,8 @@
     "noUnusedParameters": true,
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true,
-    "strict": true
+    "strict": true,
+    "allowJs": true
   },
   "include": ["src", "test", "better-auth.config.ts", "worker-configuration.d.ts"]
 }
