@@ -10,6 +10,13 @@ catalog:
   typescript: ^7.0.2
   vite: npm:@voidzero-dev/vite-plus-core@0.2.9
   vite-plus: 0.2.9
+  hono: ^4
+  drizzle-orm: ^0.44
+  drizzle-kit: ^0.31
+  wrangler: ^4
+  "@cloudflare/workers-types": ^4
+  zod: ^4
+  ulid: ^3
 overrides:
   vite: "catalog:"
 peerDependencyRules:
