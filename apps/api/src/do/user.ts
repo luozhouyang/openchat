@@ -240,11 +240,16 @@ export class UserDO extends DurableObject<Env> {
     await this.ctx.storage.put("disconnectUntil", this.disconnectUntil);
   }
 
-  async health(): Promise<{ ok: boolean; devices: number; channels: number }> {
+  async health(): Promise<{
+    ok: boolean;
+    devices: number;
+    channels: number;
+    disconnectUntil: number;
+  }> {
     const devices = this.ctx.getWebSockets().length;
     const rows = await this.db.select({ n: count() }).from(schema.channelsCache);
     const channels = Number(rows[0]?.n ?? 0);
-    return { ok: true, devices, channels };
+    return { ok: true, devices, channels, disconnectUntil: this.disconnectUntil };
   }
 
   async presenceSubscribe(body: { subscriberId: string; expiresAt: number }): Promise<void> {
