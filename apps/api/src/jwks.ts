@@ -15,7 +15,10 @@ async function getKeySet(env: Env, force: boolean): Promise<jose.JSONWebKeySet> 
   return cachedKeys;
 }
 
-export async function verifyAuthJwt(token: string, env: Env): Promise<{ sub: string } | null> {
+export async function verifyAuthJwt(
+  token: string,
+  env: Env,
+): Promise<{ sub: string; email?: string; name?: string } | null> {
   let decode: jose.ProtectedHeaderParameters;
   try {
     decode = jose.decodeProtectedHeader(token);
@@ -34,7 +37,11 @@ export async function verifyAuthJwt(token: string, env: Env): Promise<{ sub: str
         audience: env.BETTER_AUTH_URL,
       });
       if (typeof payload.sub !== "string") return null;
-      return { sub: payload.sub };
+      return {
+        sub: payload.sub,
+        email: typeof payload.email === "string" ? payload.email : undefined,
+        name: typeof payload.name === "string" ? payload.name : undefined,
+      };
     } catch {
       if (!attempt) continue;
       return null;
