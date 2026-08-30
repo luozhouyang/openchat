@@ -9,8 +9,12 @@
     "test": "vp test",
     "deploy:dry": "wrangler deploy --dry-run"
   },
+  "dependencies": {
+    "web-push": "catalog:"
+  },
   "devDependencies": {
     "@cloudflare/workers-types": "catalog:",
+    "@types/web-push": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vite-plus": "catalog:",

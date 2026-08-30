@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { channelDoName } from "protocol";
+import { channelDoName, userDoName } from "protocol";
 import { getDb } from "../db/client.ts";
 import { getUpload } from "../db/repos/uploads.ts";
 
@@ -19,5 +19,24 @@ internalRoutes.post("/internal/thumbnail", async (c) => {
     thumbUrl: `/files/${body.channelId}/${body.uploadId}?thumb=1`,
     thumbKey: body.thumbKey,
   });
+  return c.json({ ok: true });
+});
+
+internalRoutes.get("/internal/push-user/:userId/subscriptions", async (c) => {
+  if (c.req.header("x-internal-token") !== c.env.INTERNAL_TOKEN_KEY) {
+    return c.json({ error: "forbidden" }, 403);
+  }
+  const id = c.env.USER_DO.idFromName(userDoName(c.req.param("userId")));
+  const res = await c.env.USER_DO.get(id).listPushSubscriptions();
+  return c.json(res);
+});
+
+internalRoutes.delete("/internal/push-user/:userId/subscriptions", async (c) => {
+  if (c.req.header("x-internal-token") !== c.env.INTERNAL_TOKEN_KEY) {
+    return c.json({ error: "forbidden" }, 403);
+  }
+  const body = (await c.req.json()) as { deviceId: string };
+  const id = c.env.USER_DO.idFromName(userDoName(c.req.param("userId")));
+  await c.env.USER_DO.get(id).pushUnsubscribe({ deviceId: body.deviceId });
   return c.json({ ok: true });
 });

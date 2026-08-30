@@ -1,4 +1,5 @@
 import { handleR2Event } from "./thumbnail.ts";
+import { handlePushTask } from "./push.ts";
 
 export default {
   async queue(batch: MessageBatch<unknown>, env?: Env): Promise<void> {
@@ -9,6 +10,8 @@ export default {
       };
       if (body.type === "r2-thumbnail" && body.event) {
         await handleR2Event(body.event, env as Env);
+      } else if (body.type === "push-notification") {
+        await handlePushTask(message.body as never, env as never);
       } else {
         console.log("push message", message.id, message.body);
       }

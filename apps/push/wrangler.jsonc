@@ -28,5 +28,7 @@
   ],
   "vars": {
     "THUMBNAIL_API_BASE": "http://localhost:8787",
+    "API_BASE": "http://localhost:8787",
+    "VAPID_SUBJECT": "mailto:dev@openchat.local",
   },
 }
