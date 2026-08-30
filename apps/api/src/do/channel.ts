@@ -316,7 +316,7 @@ export class ChannelDO extends DurableObject<Env> {
     const rows = await this.db
       .select({
         id: schema.messages.id,
-        seq: schema.messages.seq,
+        content: schema.messages.content,
         attachments: schema.messages.attachments,
       })
       .from(schema.messages);
@@ -338,7 +338,7 @@ export class ChannelDO extends DurableObject<Env> {
         await this.broadcast({
           type: "message.edit",
           messageId: r.id,
-          content: "",
+          content: r.content,
           editedAt: Date.now(),
         });
       }
