@@ -22,6 +22,33 @@ const clientFrameSchema = z.discriminatedUnion("type", [
       .array(z.object({ channelId: z.string().min(1), lastSeq: z.number().int().nonnegative() }))
       .max(500),
   }),
+  z.object({
+    type: z.literal("react"),
+    channelId: z.string().min(1),
+    messageSeq: z.number().int().positive(),
+    emoji: z.string().min(1).max(8),
+  }),
+  z.object({
+    type: z.literal("edit_message"),
+    channelId: z.string().min(1),
+    messageId: z.string().min(1),
+    content: z.string().min(1).max(16384),
+  }),
+  z.object({
+    type: z.literal("delete_message"),
+    channelId: z.string().min(1),
+    messageId: z.string().min(1),
+  }),
+  z.object({
+    type: z.literal("typing"),
+    channelId: z.string().min(1),
+  }),
+  z.object({
+    type: z.literal("subscribe_thread"),
+    channelId: z.string().min(1),
+    parentId: z.string().min(1),
+    subscribe: z.boolean(),
+  }),
 ]);
 
 export type ClientFrame = z.infer<typeof clientFrameSchema>;

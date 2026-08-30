@@ -17,7 +17,10 @@ export type ChannelEvent =
   | { type: "message.edit"; messageId: string; content: string; editedAt: number }
   | { type: "message.delete"; messageId: string }
   | { type: "typing"; userId: string; expiresAt: number }
-  | { type: "presence"; userId: string; status: "online" | "away" | "offline" };
+  | { type: "presence"; userId: string; status: "online" | "away" | "offline" }
+  | { type: "reaction.update"; messageSeq: number; reactions: Record<string, string[]> }
+  | { type: "thread.reply"; parentId: string; message: Message }
+  | { type: "typing.start"; userId: string; expiresAt: number };
 
 export function messageNewEvent(
   channelId: string,
