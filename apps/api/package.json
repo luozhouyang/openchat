@@ -16,6 +16,7 @@
     "better-auth": "catalog:",
     "drizzle-orm": "catalog:",
     "hono": "catalog:",
+    "jose": "catalog:",
     "protocol": "workspace:*"
   },
   "devDependencies": {
