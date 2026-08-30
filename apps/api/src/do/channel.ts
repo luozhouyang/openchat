@@ -63,6 +63,20 @@ export class ChannelDO extends DurableObject<Env> {
     this.subscribers.delete(body.userId);
   }
 
+  async typing(callerUserId: string): Promise<{ error: string; status: 403 } | void> {
+    const member = await this.db
+      .select()
+      .from(schema.memberState)
+      .where(eq(schema.memberState.userId, callerUserId))
+      .limit(1);
+    if (member.length === 0) return { error: "not a member", status: 403 };
+    await this.broadcast({
+      type: "typing.start",
+      userId: callerUserId,
+      expiresAt: Date.now() + 5000,
+    });
+  }
+
   async subscribe(body: { userId: string }): Promise<{ ok: boolean }> {
     const member = await this.db
       .select()

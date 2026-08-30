@@ -11,6 +11,7 @@ import * as schema from "../db/schema-user-do.ts";
 export class UserDO extends DurableObject<Env> {
   db: ReturnType<typeof drizzle>;
   disconnectUntil = 0;
+  private lastTyping = new Map<string, number>();
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -159,6 +160,16 @@ export class UserDO extends DurableObject<Env> {
           }),
         );
       }
+    }
+    if (frame.type === "typing") {
+      const attachment = ws.deserializeAttachment() as { userId?: string } | null;
+      const userId = attachment?.userId;
+      if (!userId) return;
+      const now = Date.now();
+      if ((this.lastTyping.get(frame.channelId) ?? 0) > now - 3000) return;
+      this.lastTyping.set(frame.channelId, now);
+      const id = this.env.CHANNEL_DO.idFromName(channelDoName(frame.channelId));
+      void this.env.CHANNEL_DO.get(id).typing(userId);
     }
   }
 
