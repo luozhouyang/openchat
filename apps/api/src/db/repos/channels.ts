@@ -1,8 +1,8 @@
 import { eq, and, inArray } from "drizzle-orm";
-import type { DrizzleD1Database } from "drizzle-orm/d1";
+import { getDb } from "../client.ts";
 import { channels, channelMembers } from "../schema-d1.ts";
 
-type Db = DrizzleD1Database;
+type Db = ReturnType<typeof getDb>;
 
 export async function createChannel(
   db: Db,

@@ -1,5 +1,4 @@
 import { createMiddleware } from "hono/factory";
-import type { DrizzleD1Database } from "drizzle-orm/d1";
 import { getDb } from "../db/client.ts";
 import { getTeamMember, getTeam } from "../db/repos/teams.ts";
 import { getChannelMember, getChannel } from "../db/repos/channels.ts";
@@ -27,7 +26,7 @@ export function requireTeamRole(min: "member" | "admin") {
     if (!teamId) return c.json({ error: "team not found" }, 404);
     const session = c.get("session");
     if (!session) return c.json({ error: "unauthorized" }, 401);
-    const db = getDb(c.env.DB) as unknown as DrizzleD1Database;
+    const db = getDb(c.env.DB);
     const team = await getTeam(db, teamId);
     if (!team) return c.json({ error: "team not found" }, 404);
     const member = await getTeamMember(db, teamId, session.user.id);
@@ -44,7 +43,7 @@ export function requireChannelRole(min: "member" | "admin") {
     if (!channelId) return c.json({ error: "channel not found" }, 404);
     const session = c.get("session");
     if (!session) return c.json({ error: "unauthorized" }, 401);
-    const db = getDb(c.env.DB) as unknown as DrizzleD1Database;
+    const db = getDb(c.env.DB);
     const channel = await getChannel(db, channelId);
     if (!channel) return c.json({ error: "channel not found" }, 404);
     const member = await getChannelMember(db, channelId, session.user.id);

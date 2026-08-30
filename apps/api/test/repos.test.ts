@@ -1,6 +1,5 @@
 import { expect, test } from "vite-plus/test";
 import { env } from "cloudflare:test";
-import type { DrizzleD1Database } from "drizzle-orm/d1";
 import { getDb } from "../src/db/client.ts";
 import {
   createTeam,
@@ -25,7 +24,7 @@ import {
   listChannelsByIds,
 } from "../src/db/repos/channels.ts";
 
-const db = getDb(env.DB) as unknown as DrizzleD1Database;
+const db = getDb(env.DB);
 
 test("structure tables exist after migration", async () => {
   const { results } = await env.DB.prepare(
