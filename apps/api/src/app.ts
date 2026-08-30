@@ -5,6 +5,7 @@ import { channelsRoutes } from "./routes/channels.ts";
 import { workspacesRoutes } from "./routes/workspaces.ts";
 import { sidebarRoutes } from "./routes/sidebar.ts";
 import { uploadsRoutes } from "./routes/uploads.ts";
+import { filesRoutes } from "./routes/files.ts";
 import { makeAuth } from "./auth.ts";
 import { requireSession } from "./auth/session.ts";
 
@@ -16,6 +17,7 @@ export function createApp() {
   app.route("/", workspacesRoutes);
   app.route("/", sidebarRoutes);
   app.route("/", uploadsRoutes);
+  app.route("/", filesRoutes);
   app.get("/me", requireSession, (c) => {
     const session = c.get("session");
     return c.json({ user: session?.user });
