@@ -1,5 +1,5 @@
 import { expect, test } from "vite-plus/test";
-import { env, runInDurableObject } from "cloudflare:test";
+import { env } from "cloudflare:test";
 
 test("UserDO health reports devices and channels", async () => {
   const id = env.USER_DO.idFromName("user:anonymous");
@@ -10,16 +10,13 @@ test("UserDO health reports devices and channels", async () => {
   expect(body.channels).toBe(0);
 });
 
-test("ChannelDO health reports migrated schema", async () => {
+test("ChannelDO health reports migrated member state", async () => {
   const id = env.CHANNEL_DO.idFromName("channel:anonymous");
   const stub = env.CHANNEL_DO.get(id);
-  const res = await runInDurableObject(stub, (instance) =>
-    instance.fetch(new Request("http://localhost/health")),
-  );
-  expect(res.status).toBe(200);
-  const body = (await res.json()) as { ok: boolean; migrated: boolean };
+  const body = await stub.health();
   expect(body.ok).toBe(true);
-  expect(body.migrated).toBe(true);
+  expect(body.members).toBe(0);
+  expect(body.subscribers).toBe(0);
 });
 
 test("UserDO rejects upgrade without valid internal token", async () => {

@@ -1,56 +1,58 @@
 import { DurableObject } from "cloudflare:workers";
 import { drizzle } from "drizzle-orm/durable-sqlite";
 import { migrate } from "drizzle-orm/durable-sqlite/migrator";
-import { verifyInternalToken } from "protocol";
+import { eq } from "drizzle-orm";
 import migrations from "../../migrations/channel-do/migrations";
+import * as schema from "../db/schema-channel-do.ts";
 
 export class ChannelDO extends DurableObject<Env> {
   db: ReturnType<typeof drizzle>;
+  subscribers = new Map<string, { userId: string }>();
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
-    this.db = drizzle(ctx.storage, { logger: false });
+    this.db = drizzle(ctx.storage, { schema, logger: false });
     void ctx.blockConcurrencyWhile(async () => {
       await migrate(this.db, migrations);
     });
-    ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair("ping", "pong"));
   }
 
-  async fetch(request: Request): Promise<Response> {
-    const url = new URL(request.url);
+  async membersAdd(body: { userId: string; role: string }): Promise<void> {
+    await this.db
+      .insert(schema.memberState)
+      .values({ userId: body.userId, role: body.role ?? "member", joinedAt: Date.now() })
+      .onConflictDoUpdate({
+        target: schema.memberState.userId,
+        set: { role: body.role ?? "member" },
+      });
+  }
 
-    if (url.pathname === "/ws" && request.headers.get("Upgrade") === "websocket") {
-      const token = request.headers.get("x-internal-token") ?? "";
-      if (!(await verifyInternalToken(token, this.env.INTERNAL_TOKEN_KEY))) {
-        return new Response("forbidden", { status: 403 });
-      }
-      const pair = new WebSocketPair();
-      const [client, server] = Object.values(pair);
-      server.serializeAttachment({ connectedAt: Date.now() });
-      this.ctx.acceptWebSocket(server);
-      return new Response(null, { status: 101, webSocket: client });
-    }
+  async membersRemove(body: { userId: string }): Promise<void> {
+    await this.db.delete(schema.memberState).where(eq(schema.memberState.userId, body.userId));
+    this.subscribers.delete(body.userId);
+  }
 
-    if (url.pathname === "/health") {
-      const rows = this.ctx.storage.sql
-        .exec("SELECT name FROM sqlite_master WHERE type='table' AND name='schema_version'")
-        .toArray();
-      return Response.json({ ok: true, migrated: rows.length > 0 });
-    }
+  async subscribe(body: { userId: string }): Promise<{ ok: boolean }> {
+    const member = await this.db
+      .select()
+      .from(schema.memberState)
+      .where(eq(schema.memberState.userId, body.userId))
+      .limit(1);
+    if (member.length === 0) return { ok: false };
+    this.subscribers.set(body.userId, { userId: body.userId });
+    return { ok: true };
+  }
 
+  async unsubscribe(body: { userId: string }): Promise<void> {
+    this.subscribers.delete(body.userId);
+  }
+
+  async health(): Promise<{ ok: boolean; members: number; subscribers: number }> {
+    const members = (await this.db.select().from(schema.memberState)).length;
+    return { ok: true, members, subscribers: this.subscribers.size };
+  }
+
+  async fetch(_request: Request): Promise<Response> {
     return new Response("not found", { status: 404 });
-  }
-
-  async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer) {
-    const data = typeof message === "string" ? message : new TextDecoder().decode(message);
-    ws.send(JSON.stringify({ type: "echo", data }));
-  }
-
-  async webSocketClose(ws: WebSocket, code: number, reason: string, _wasClean: boolean) {
-    ws.close(code, reason);
-  }
-
-  async webSocketError(_ws: WebSocket, error: unknown) {
-    console.error("WebSocket error:", error);
   }
 }
