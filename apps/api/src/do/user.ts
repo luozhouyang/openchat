@@ -1,17 +1,31 @@
 import { DurableObject } from "cloudflare:workers";
 import { drizzle } from "drizzle-orm/durable-sqlite";
 import { migrate } from "drizzle-orm/durable-sqlite/migrator";
-import { count } from "drizzle-orm";
+import { count, eq } from "drizzle-orm";
 import { channelDoName, helloEvent, parseClientFrame, verifyInternalToken } from "protocol";
 import migrations from "../../migrations/user-do/migrations";
 import { getDb } from "../db/client.ts";
 import { getChannel } from "../db/repos/channels.ts";
 import * as schema from "../db/schema-user-do.ts";
 
+interface SidebarEntry {
+  channelId: string;
+  maxSeq: number;
+  lastReadSeq: number;
+  unread: number;
+  mentions: number;
+  preview: string | null;
+  lastMessageAt: number | null;
+}
+
 export class UserDO extends DurableObject<Env> {
   db: ReturnType<typeof drizzle>;
   disconnectUntil = 0;
   private lastTyping = new Map<string, number>();
+
+  get userId(): string {
+    return this.ctx.id.name?.replace(/^user:/, "") ?? "";
+  }
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -24,16 +38,119 @@ export class UserDO extends DurableObject<Env> {
   }
 
   async push(body: { channelId?: string; events: unknown[] }): Promise<void> {
+    const sockets = this.ctx.getWebSockets().filter((ws) => ws.readyState === WebSocket.OPEN);
     for (const ev of body.events) {
+      const e = ev as {
+        type?: string;
+        message?: {
+          seq: number;
+          userId: string;
+          content: string;
+          mentions?: string[];
+          createdAt?: number;
+        };
+      };
+      if (e.type === "channel.read") {
+        const readEvent = e as { channelId: string; lastReadSeq: number };
+        await this.db
+          .update(schema.sidebarCache)
+          .set({ lastReadSeq: readEvent.lastReadSeq, mentionCount: 0, updatedAt: Date.now() })
+          .where(eq(schema.sidebarCache.channelId, readEvent.channelId));
+        const payload = JSON.stringify({
+          type: "channel.read",
+          channelId: readEvent.channelId,
+          lastReadSeq: readEvent.lastReadSeq,
+        });
+        for (const ws of sockets) ws.send(payload);
+        continue;
+      }
       const payload = JSON.stringify({
         type: "channel.event",
         channelId: body.channelId,
         event: ev,
       });
-      for (const ws of this.ctx.getWebSockets()) {
-        if (ws.readyState === WebSocket.OPEN) ws.send(payload);
+      for (const ws of sockets) ws.send(payload);
+      if (body.channelId && e.type === "message.new" && e.message) {
+        const existing = await this.db
+          .select()
+          .from(schema.sidebarCache)
+          .where(eq(schema.sidebarCache.channelId, body.channelId))
+          .limit(1);
+        const row = existing[0];
+        const unread = row ? Math.max(0, e.message.seq - row.lastReadSeq) : e.message.seq;
+        const mentions = e.message.mentions?.includes(this.userId)
+          ? (row?.mentionCount ?? 0) + 1
+          : (row?.mentionCount ?? 0);
+        await this.db
+          .insert(schema.sidebarCache)
+          .values({
+            channelId: body.channelId,
+            maxSeq: e.message.seq,
+            lastMessagePreview: e.message.content.slice(0, 100),
+            lastMessageUserId: e.message.userId,
+            lastMessageAt: e.message.createdAt ?? Date.now(),
+            lastReadSeq: row?.lastReadSeq ?? 0,
+            mentionCount: mentions,
+            updatedAt: Date.now(),
+          })
+          .onConflictDoUpdate({
+            target: schema.sidebarCache.channelId,
+            set: {
+              maxSeq: e.message.seq,
+              lastMessagePreview: e.message.content.slice(0, 100),
+              lastMessageUserId: e.message.userId,
+              lastMessageAt: e.message.createdAt ?? Date.now(),
+              mentionCount: mentions,
+              updatedAt: Date.now(),
+            },
+          });
+        const update = {
+          type: "sidebar.update",
+          channelId: body.channelId,
+          unread,
+          mentions,
+          lastMessage: {
+            preview: e.message.content.slice(0, 100),
+            userId: e.message.userId,
+            at: e.message.createdAt ?? Date.now(),
+          },
+        };
+        for (const ws of sockets) ws.send(JSON.stringify(update));
       }
     }
+  }
+
+  async sidebar(): Promise<{ channels: SidebarEntry[] }> {
+    const channelRows = await this.db.select().from(schema.channelsCache);
+    const results: SidebarEntry[] = [];
+    const queue = [...channelRows];
+    while (queue.length > 0) {
+      const batch = queue.splice(0, 8);
+      await Promise.all(
+        batch.map(async (row) => {
+          try {
+            const stub = this.env.CHANNEL_DO.get(
+              this.env.CHANNEL_DO.idFromName(channelDoName(row.channelId)),
+            );
+            const unreadInfo = await stub.unread(this.userId);
+            if ("error" in unreadInfo) return;
+            const metaInfo = await stub.meta();
+            results.push({
+              channelId: row.channelId,
+              maxSeq: unreadInfo.maxSeq,
+              lastReadSeq: unreadInfo.lastReadSeq,
+              unread: Math.max(0, unreadInfo.maxSeq - unreadInfo.lastReadSeq),
+              mentions: unreadInfo.mentionCount,
+              preview: metaInfo["last_message_preview"] ?? null,
+              lastMessageAt: metaInfo["last_message_at"]
+                ? Number(metaInfo["last_message_at"])
+                : null,
+            });
+          } catch {}
+        }),
+      );
+    }
+    return { channels: results };
   }
 
   async channelsSubscribe(channelIds: string[]): Promise<void> {
@@ -94,6 +211,13 @@ export class UserDO extends DurableObject<Env> {
     if (!frame) return;
     if (frame.type === "echo") {
       ws.send(JSON.stringify({ type: "echo", data: frame.data }));
+    }
+    if (frame.type === "mark_read") {
+      const attachment = ws.deserializeAttachment() as { userId?: string } | null;
+      const userId = attachment?.userId;
+      if (!userId) return;
+      const id = this.env.CHANNEL_DO.idFromName(channelDoName(frame.channelId));
+      void this.env.CHANNEL_DO.get(id).readMark({ userId, seq: frame.seq });
     }
     if (frame.type === "post_message") {
       const attachment = ws.deserializeAttachment() as { userId?: string } | null;
