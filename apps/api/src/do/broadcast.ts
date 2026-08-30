@@ -8,13 +8,17 @@ export interface BroadcastDeps {
 }
 
 export function createBroadcaster(deps: BroadcastDeps) {
-  let buffer: { userId: string; events: unknown[] }[] = [];
+  let buffer: { userId: string; events: unknown[]; pref?: "all" | "mention" | "none" }[] = [];
   let timer: ReturnType<typeof setTimeout> | null = null;
 
-  async function deliver(userId: string, events: unknown[]) {
+  async function deliver(userId: string, events: unknown[], pref?: "all" | "mention" | "none") {
     try {
       const id = deps.env.USER_DO.idFromName(userDoName(userId));
-      await deps.env.USER_DO.get(id).push({ channelId: deps.env.channelId, events });
+      await deps.env.USER_DO.get(id).push({
+        channelId: deps.env.channelId,
+        events,
+        notifPref: pref,
+      });
     } catch {
       deps.onPushFailed(userId);
     }
@@ -24,20 +28,20 @@ export function createBroadcaster(deps: BroadcastDeps) {
     const batch = buffer;
     buffer = [];
     timer = null;
-    await Promise.all(batch.map((b) => deliver(b.userId, b.events)));
+    await Promise.all(batch.map((b) => deliver(b.userId, b.events, b.pref)));
   }
 
   return {
-    async broadcast(event: unknown) {
+    async broadcast(event: unknown, prefs?: Map<string, "all" | "mention" | "none">) {
       const targets = [...deps.subscribers()];
       if (targets.length < 200) {
-        await Promise.all(targets.map((userId) => deliver(userId, [event])));
+        await Promise.all(targets.map((userId) => deliver(userId, [event], prefs?.get(userId))));
         return;
       }
       for (const userId of targets) {
         let entry = buffer.find((b) => b.userId === userId);
         if (!entry) {
-          entry = { userId, events: [] };
+          entry = { userId, events: [], pref: prefs?.get(userId) };
           buffer.push(entry);
         }
         entry.events.push(event);

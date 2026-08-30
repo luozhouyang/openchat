@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { eq } from "drizzle-orm";
-import { newId, CreateChannelInput, OpenDmInput, OpenGmInput } from "protocol";
+import { z } from "zod";
+import { newId, CreateChannelInput, OpenDmInput, OpenGmInput, channelDoName } from "protocol";
 import { requireSession } from "../auth/session.ts";
 import { requireTeamRole, requireChannelRole } from "../auth/guards.ts";
 import { getDb } from "../db/client.ts";
@@ -134,6 +135,23 @@ channelsRoutes.post(
       .update(channels)
       .set({ archivedAt: Date.now() })
       .where(eq(channels.id, c.req.param("channelId")));
+    return c.json({ ok: true });
+  },
+);
+
+channelsRoutes.post(
+  "/channels/:channelId/notify-pref",
+  requireSession,
+  requireChannelRole("member"),
+  async (c) => {
+    const body = z
+      .object({ pref: z.enum(["all", "mention", "none"]) })
+      .safeParse(await c.req.json());
+    if (!body.success) return c.json({ error: "invalid" }, 422);
+    const userId = c.get("session")!.user.id;
+    const id = c.env.CHANNEL_DO.idFromName(channelDoName(c.req.param("channelId")));
+    const res = await c.env.CHANNEL_DO.get(id).setNotifPref({ userId, pref: body.data.pref });
+    if ("error" in res) return c.json({ error: res.error }, res.status);
     return c.json({ ok: true });
   },
 );

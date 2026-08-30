@@ -52,7 +52,11 @@ export class UserDO extends DurableObject<Env> {
     ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair("ping", "pong"));
   }
 
-  async push(body: { channelId?: string; events: unknown[] }): Promise<void> {
+  async push(body: {
+    channelId?: string;
+    events: unknown[];
+    notifPref?: "all" | "mention" | "none";
+  }): Promise<void> {
     const sockets = this.ctx.getWebSockets().filter((ws) => ws.readyState === WebSocket.OPEN);
     for (const ev of body.events) {
       const e = ev as {

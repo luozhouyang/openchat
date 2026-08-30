@@ -120,6 +120,26 @@ export class ChannelDO extends DurableObject<Env> {
     return { lastReadSeq: newRead };
   }
 
+  async setNotifPref(body: {
+    userId: string;
+    pref: "all" | "mention" | "none";
+  }): Promise<{ ok: boolean } | { error: string; status: 403 | 422 }> {
+    if (body.pref !== "all" && body.pref !== "mention" && body.pref !== "none") {
+      return { error: "invalid", status: 422 };
+    }
+    const member = await this.db
+      .select()
+      .from(schema.memberState)
+      .where(eq(schema.memberState.userId, body.userId))
+      .limit(1);
+    if (member.length === 0) return { error: "not a member", status: 403 };
+    await this.db
+      .update(schema.memberState)
+      .set({ notifPref: body.pref })
+      .where(eq(schema.memberState.userId, body.userId));
+    return { ok: true };
+  }
+
   async unread(
     userId: string,
   ): Promise<
@@ -515,6 +535,18 @@ export class ChannelDO extends DurableObject<Env> {
   }
 
   private async broadcast(event: { type: string; [k: string]: unknown }) {
+    if (event.type === "message.new") {
+      const rows = await this.db
+        .select({
+          userId: schema.memberState.userId,
+          notifPref: schema.memberState.notifPref,
+        })
+        .from(schema.memberState);
+      const prefs = new Map<string, "all" | "mention" | "none">();
+      for (const row of rows) prefs.set(row.userId, row.notifPref as "all" | "mention" | "none");
+      await this.broadcaster.broadcast(event, prefs);
+      return;
+    }
     await this.broadcaster.broadcast(event);
   }
 
