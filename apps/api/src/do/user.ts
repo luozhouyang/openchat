@@ -33,6 +33,7 @@ export class UserDO extends DurableObject<Env> {
 
   async channelsSubscribe(channelIds: string[]): Promise<void> {
     await this.db.delete(schema.channelsCache);
+    if (channelIds.length === 0) return;
     await this.db.insert(schema.channelsCache).values(channelIds.map((id) => ({ channelId: id })));
   }
 
