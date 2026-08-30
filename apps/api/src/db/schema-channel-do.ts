@@ -1,23 +1,27 @@
-import { sqliteTable, text, integer, primaryKey } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, primaryKey, index } from "drizzle-orm/sqlite-core";
 
 export const schemaVersion = sqliteTable("schema_version", {
   version: integer("version").notNull(),
   appliedAt: text("applied_at").notNull(),
 });
 
-export const messages = sqliteTable("messages", {
-  seq: integer("seq").primaryKey({ autoIncrement: true }),
-  id: text("id").notNull().unique(),
-  userId: text("user_id").notNull(),
-  parentId: text("parent_id"),
-  type: text("type").notNull().default("text"),
-  content: text("content").notNull(),
-  attachments: text("attachments"),
-  mentions: text("mentions"),
-  editedAt: integer("edited_at"),
-  deletedAt: integer("deleted_at"),
-  createdAt: integer("created_at").notNull(),
-});
+export const messages = sqliteTable(
+  "messages",
+  {
+    seq: integer("seq").primaryKey({ autoIncrement: true }),
+    id: text("id").notNull().unique(),
+    userId: text("user_id").notNull(),
+    parentId: text("parent_id"),
+    type: text("type").notNull().default("text"),
+    content: text("content").notNull(),
+    attachments: text("attachments"),
+    mentions: text("mentions"),
+    editedAt: integer("edited_at"),
+    deletedAt: integer("deleted_at"),
+    createdAt: integer("created_at").notNull(),
+  },
+  (t) => [index("idx_msg_parent").on(t.parentId, t.seq)],
+);
 
 export const memberState = sqliteTable("member_state", {
   userId: text("user_id").primaryKey(),
@@ -43,3 +47,23 @@ export const meta = sqliteTable("meta", {
   key: text("key").primaryKey(),
   value: text("value").notNull(),
 });
+
+export const reactions = sqliteTable(
+  "reactions",
+  {
+    messageSeq: integer("message_seq").notNull(),
+    emoji: text("emoji").notNull(),
+    userId: text("user_id").notNull(),
+    createdAt: integer("created_at").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.messageSeq, t.emoji, t.userId] })],
+);
+
+export const threadSubscriptions = sqliteTable(
+  "thread_subscriptions",
+  {
+    parentId: text("parent_id").notNull(),
+    userId: text("user_id").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.parentId, t.userId] })],
+);
