@@ -6,7 +6,7 @@ import type { SessionContext } from "../auth/session.ts";
 import { getDb } from "../db/client.ts";
 import { teams, channels, teamMembers, channelMembers } from "../db/schema-d1.ts";
 import { listChannelsForTeam, listChannelMemberIds } from "../db/repos/channels.ts";
-import { removeChannelMemberFromDo } from "../user-do-sync.ts";
+import { removeChannelMemberFromDo, syncUserChannels } from "../user-do-sync.ts";
 import { auditLog } from "../audit.ts";
 
 export const adminRoutes = new Hono<{
@@ -76,6 +76,7 @@ adminRoutes.post("/teams/:teamId/members/remove", async (c) => {
   await db
     .delete(teamMembers)
     .where(and(eq(teamMembers.teamId, teamId), eq(teamMembers.userId, userId)));
+  await syncUserChannels(c.env, userId);
   auditLog({
     actor: c.get("adminUserId"),
     action: "team.member.remove",
