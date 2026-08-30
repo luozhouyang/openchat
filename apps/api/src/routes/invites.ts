@@ -116,6 +116,8 @@ inviteRoutes.post("/teams/invites/accept", requireSession, async (c) => {
   }
   if (normalizeEmail(user.email) !== invite.email)
     return c.json({ error: "invitation email mismatch" }, 403);
+  const team = await getTeam(db, invite.teamId);
+  if (!team || team.archivedAt) return c.json({ error: "invitation invalid" }, 400);
   if (await getTeamMember(db, invite.teamId, userId))
     return c.json({ ok: true, teamId: invite.teamId });
   if (!(await repo.consumeInvite(db, invite.tokenHash, userId)))
