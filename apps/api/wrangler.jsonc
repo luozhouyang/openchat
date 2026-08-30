@@ -54,5 +54,6 @@
   "vars": {
     "BETTER_AUTH_URL": "http://localhost:8787",
     "R2_BUCKET_NAME": "openchat-files",
+    "VAPID_PUBLIC_KEY": "local-vapid-public-key",
   },
 }

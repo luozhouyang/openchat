@@ -220,6 +220,50 @@ export class UserDO extends DurableObject<Env> {
     return { status: this.status() };
   }
 
+  async pushSubscribe(body: {
+    deviceId: string;
+    kind: "webpush" | "fcm" | "apns";
+    endpoint: string;
+    p256dh?: string;
+    auth?: string;
+  }): Promise<{ ok: boolean }> {
+    await this.db
+      .insert(schema.pushSubscriptions)
+      .values({
+        deviceId: body.deviceId,
+        kind: body.kind,
+        endpoint: body.endpoint,
+        p256dh: body.p256dh ?? null,
+        auth: body.auth ?? null,
+        updatedAt: Date.now(),
+      })
+      .onConflictDoUpdate({
+        target: schema.pushSubscriptions.deviceId,
+        set: {
+          kind: body.kind,
+          endpoint: body.endpoint,
+          p256dh: body.p256dh ?? null,
+          auth: body.auth ?? null,
+          updatedAt: Date.now(),
+        },
+      });
+    return { ok: true };
+  }
+
+  async pushUnsubscribe(body: { deviceId: string }): Promise<{ ok: boolean }> {
+    await this.db
+      .delete(schema.pushSubscriptions)
+      .where(eq(schema.pushSubscriptions.deviceId, body.deviceId));
+    return { ok: true };
+  }
+
+  async listPushSubscriptions(): Promise<{
+    subscriptions: (typeof schema.pushSubscriptions.$inferSelect)[];
+  }> {
+    const rows = await this.db.select().from(schema.pushSubscriptions);
+    return { subscriptions: rows };
+  }
+
   async alarm(): Promise<void> {
     if (this.ctx.getWebSockets().length > 0 && !this.awayNotified) {
       this.awayNotified = true;
