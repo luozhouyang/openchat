@@ -4,4 +4,4 @@ import { requireAdmin } from "../auth/admin-gate.ts";
 export const adminRoutes = new Hono<{ Bindings: Env }>();
 adminRoutes.use("*", requireAdmin);
 
-adminRoutes.get("/settings", (c) => c.json({ registrationMode: "open" }));
+adminRoutes.get("/settings", (c) => c.json({ openRegistration: true }));

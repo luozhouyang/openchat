@@ -18,6 +18,11 @@
       "bucket_name": "openchat-files",
     },
   ],
+  "send_email": [
+    {
+      "name": "EMAIL",
+    },
+  ],
   "queues": {
     "producers": [
       {
@@ -55,5 +60,6 @@
     "BETTER_AUTH_URL": "http://localhost:8787",
     "R2_BUCKET_NAME": "openchat-files",
     "VAPID_PUBLIC_KEY": "local-vapid-public-key",
+    "INVITE_FROM_EMAIL": "noreply@openchat.local",
   },
 }

@@ -9,6 +9,7 @@ import { filesRoutes } from "./routes/files.ts";
 import { internalRoutes } from "./routes/internal.ts";
 import { pushRoutes } from "./routes/push.ts";
 import { adminRoutes } from "./routes/admin.ts";
+import { inviteRoutes } from "./routes/invites.ts";
 import { makeAuth } from "./auth.ts";
 import { requireSession } from "./auth/session.ts";
 
@@ -24,6 +25,7 @@ export function createApp() {
   app.route("/", internalRoutes);
   app.route("/", pushRoutes);
   app.route("/admin", adminRoutes);
+  app.route("/", inviteRoutes);
   app.get("/me", requireSession, (c) => {
     const session = c.get("session");
     return c.json({ user: session?.user });

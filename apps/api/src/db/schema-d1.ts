@@ -82,3 +82,16 @@ export const uploads = sqliteTable("uploads", {
   createdAt: integer("created_at").notNull(),
   completedAt: integer("completed_at"),
 });
+
+export const invites = sqliteTable("invites", {
+  id: text("id").primaryKey(),
+  teamId: text("team_id").notNull(),
+  tokenHash: text("token_hash").notNull().unique(),
+  email: text("email").notNull(),
+  createdBy: text("created_by").notNull(),
+  createdAt: integer("created_at").notNull(),
+  expiresAt: integer("expires_at").notNull(),
+  consumedAt: integer("consumed_at"),
+  revokedAt: integer("revoked_at"),
+  acceptedBy: text("accepted_by"),
+});
