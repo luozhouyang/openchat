@@ -53,5 +53,6 @@
   ],
   "vars": {
     "BETTER_AUTH_URL": "http://localhost:8787",
+    "R2_BUCKET_NAME": "openchat-files",
   },
 }

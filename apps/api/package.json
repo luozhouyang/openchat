@@ -12,6 +12,8 @@
     "deploy:dry": "wrangler deploy --dry-run"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "catalog:",
+    "@aws-sdk/s3-request-presigner": "catalog:",
     "@better-auth/drizzle-adapter": "catalog:",
     "better-auth": "catalog:",
     "drizzle-orm": "catalog:",
