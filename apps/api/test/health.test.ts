@@ -1,7 +1,6 @@
 import { expect, test, beforeAll, afterAll } from "vite-plus/test";
 import { unstable_dev, type Unstable_DevWorker } from "wrangler";
 import workerHandler from "../src/index.ts";
-import type { Env } from "../src/env.ts";
 
 let worker: Unstable_DevWorker;
 

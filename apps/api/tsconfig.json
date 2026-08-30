@@ -16,5 +16,5 @@
     "noFallthroughCasesInSwitch": true,
     "strict": true
   },
-  "include": ["src", "test"]
+  "include": ["src", "test", "worker-configuration.d.ts"]
 }
