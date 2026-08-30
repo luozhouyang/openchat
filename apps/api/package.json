@@ -19,7 +19,8 @@
     "drizzle-orm": "catalog:",
     "hono": "catalog:",
     "jose": "catalog:",
-    "protocol": "workspace:*"
+    "protocol": "workspace:*",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@cloudflare/vitest-plugin": "catalog:",

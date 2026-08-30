@@ -142,12 +142,19 @@ export class ChannelDO extends DurableObject<Env> {
 
   async postMessage(
     senderUserId: string,
-    body: { content: string; parentId?: string; clientToken: string },
+    body: {
+      content: string;
+      parentId?: string;
+      clientToken: string;
+      type?: "text" | "file";
+      attachments?: unknown[];
+    },
   ): Promise<
     | { messageId: string; seq: number; deduplicated?: boolean }
     | { error: string; status: 403 | 422 | 429 }
   > {
-    if (!body.content || body.content.length > 16384) return { error: "invalid", status: 422 };
+    if (body.content.length > 16384 || (body.type !== "file" && !body.content))
+      return { error: "invalid", status: 422 };
     const member = await this.db
       .select()
       .from(schema.memberState)
@@ -208,8 +215,9 @@ export class ChannelDO extends DurableObject<Env> {
         id,
         userId: senderUserId,
         parentId: body.parentId ?? null,
-        type: "text",
-        content: body.content,
+        type: body.type === "file" ? "file" : "text",
+        content: body.type === "file" ? "" : body.content,
+        attachments: body.attachments ? JSON.stringify(body.attachments) : null,
         mentions: validMentions.length ? JSON.stringify(validMentions) : null,
         createdAt: now,
       })
