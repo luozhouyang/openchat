@@ -21,7 +21,7 @@ export async function handleWsUpgrade(request: Request, env: Env): Promise<Respo
   const id = env.USER_DO.idFromName(userDoName(claims.sub));
   return env.USER_DO.get(id).fetch(
     new Request(
-      `http://user-do/ws?deviceId=${url.searchParams.get("deviceId") ?? "unknown"}&platform=${url.searchParams.get("platform") ?? "web"}`,
+      `http://user-do/ws?deviceId=${url.searchParams.get("deviceId") ?? "unknown"}&platform=${url.searchParams.get("platform") ?? "web"}&sub=${claims.sub}`,
       {
         headers: upgraded.headers,
       },

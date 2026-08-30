@@ -16,7 +16,7 @@ import {
   listChannelMemberIds,
 } from "../db/repos/channels.ts";
 import { getTeamMember } from "../db/repos/teams.ts";
-import { syncUserChannels } from "../user-do-sync.ts";
+import { syncChannelMember, syncUserChannels, removeChannelMemberFromDo } from "../user-do-sync.ts";
 
 export const channelsRoutes = new Hono<{ Bindings: Env }>();
 
@@ -38,6 +38,9 @@ channelsRoutes.post(
         dedupKey: null,
         creatorId: c.get("session")!.user.id,
       });
+      if (ch) {
+        await syncChannelMember(c.env, ch.id, ch.creatorId!, "admin");
+      }
       return c.json({ id: ch?.id }, 201);
     } catch {
       return c.json({ error: "name taken" }, 409);
@@ -83,6 +86,7 @@ channelsRoutes.post("/channels/:channelId/join", requireSession, async (c) => {
     return c.json({ error: "forbidden" }, 403);
   if (!(await getChannelMember(db, ch.id, userId))) {
     await addChannelMember(db, { channelId: ch.id, userId, role: "member" });
+    await syncChannelMember(c.env, ch.id, userId, "member");
     await syncUserChannels(c.env, userId);
   }
   return c.json({ ok: true });
@@ -96,6 +100,7 @@ channelsRoutes.post(
     const db = getDb(c.env.DB);
     const userId = c.get("session")!.user.id;
     await removeChannelMember(db, c.req.param("channelId"), userId);
+    await removeChannelMemberFromDo(c.env, c.req.param("channelId"), userId);
     await syncUserChannels(c.env, userId);
     return c.json({ ok: true });
   },
@@ -162,6 +167,8 @@ channelsRoutes.post("/channels/dm", requireSession, async (c) => {
   });
   await addChannelMember(db, { channelId: ch!.id, userId: me, role: "member" });
   await addChannelMember(db, { channelId: ch!.id, userId: withUserId, role: "member" });
+  await syncChannelMember(c.env, ch!.id, me, "member");
+  await syncChannelMember(c.env, ch!.id, withUserId, "member");
   await syncUserChannels(c.env, me);
   await syncUserChannels(c.env, withUserId);
   return c.json({ id: ch!.id, existing: false }, 201);
@@ -187,6 +194,7 @@ channelsRoutes.post("/channels/gm", requireSession, async (c) => {
   });
   for (const userId of ids) {
     await addChannelMember(db, { channelId: ch!.id, userId, role: "member" });
+    await syncChannelMember(c.env, ch!.id, userId, "member");
     await syncUserChannels(c.env, userId);
   }
   return c.json({ id: ch!.id, existing: false }, 201);

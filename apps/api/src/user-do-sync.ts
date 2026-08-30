@@ -1,4 +1,4 @@
-import { userDoName } from "protocol";
+import { channelDoName, userDoName } from "protocol";
 import { getDb } from "./db/client.ts";
 import { listChannelsForUser } from "./db/repos/channels.ts";
 
@@ -8,4 +8,15 @@ export async function syncUserChannels(env: Env, userId: string) {
   const channelIds = rows.map((r) => r.channel.id);
   const id = env.USER_DO.idFromName(userDoName(userId));
   await env.USER_DO.get(id).channelsSubscribe(channelIds);
+}
+
+export async function syncChannelMember(env: Env, channelId: string, userId: string, role: string) {
+  const id = env.CHANNEL_DO.idFromName(channelDoName(channelId));
+  await env.CHANNEL_DO.get(id).membersAdd({ userId, role });
+  await env.CHANNEL_DO.get(id).subscribe({ userId });
+}
+
+export async function removeChannelMemberFromDo(env: Env, channelId: string, userId: string) {
+  const id = env.CHANNEL_DO.idFromName(channelDoName(channelId));
+  await env.CHANNEL_DO.get(id).membersRemove({ userId });
 }

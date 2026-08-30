@@ -2,8 +2,10 @@ import { DurableObject } from "cloudflare:workers";
 import { drizzle } from "drizzle-orm/durable-sqlite";
 import { migrate } from "drizzle-orm/durable-sqlite/migrator";
 import { count } from "drizzle-orm";
-import { helloEvent, parseClientFrame, verifyInternalToken } from "protocol";
+import { channelDoName, helloEvent, parseClientFrame, verifyInternalToken } from "protocol";
 import migrations from "../../migrations/user-do/migrations";
+import { getDb } from "../db/client.ts";
+import { getChannel } from "../db/repos/channels.ts";
 import * as schema from "../db/schema-user-do.ts";
 
 export class UserDO extends DurableObject<Env> {
@@ -75,6 +77,7 @@ export class UserDO extends DurableObject<Env> {
         deviceId,
         platform: url.searchParams.get("platform") ?? "web",
         connectedAt: Date.now(),
+        userId: url.searchParams.get("sub") ?? null,
       });
       this.ctx.acceptWebSocket(server, [`device:${deviceId}`]);
       server.send(JSON.stringify(helloEvent(this.ctx.id.toString())));
@@ -90,6 +93,72 @@ export class UserDO extends DurableObject<Env> {
     if (!frame) return;
     if (frame.type === "echo") {
       ws.send(JSON.stringify({ type: "echo", data: frame.data }));
+    }
+    if (frame.type === "post_message") {
+      const attachment = ws.deserializeAttachment() as { userId?: string } | null;
+      const userId = attachment?.userId;
+      if (!userId) return;
+      const channelId = frame.channelId;
+      const db = getDb(this.env.DB);
+      const ch = await getChannel(db, channelId);
+      if (!ch || ch.archivedAt) {
+        ws.send(
+          JSON.stringify({
+            type: "error",
+            clientToken: frame.clientToken,
+            code: "archived_or_not_found",
+            message: "channel unavailable",
+          }),
+        );
+        return;
+      }
+      const stub = this.env.CHANNEL_DO.get(
+        this.env.CHANNEL_DO.idFromName(channelDoName(channelId)),
+      );
+      const res = await stub.postMessage(userId, {
+        content: frame.content,
+        parentId: frame.parentId,
+        clientToken: frame.clientToken,
+      });
+      if ("error" in res) {
+        ws.send(
+          JSON.stringify({
+            type: "error",
+            clientToken: frame.clientToken,
+            code: `http_${res.status}`,
+            message: res.error,
+          }),
+        );
+      } else {
+        ws.send(
+          JSON.stringify({
+            type: "ack",
+            clientToken: frame.clientToken,
+            channelId,
+            messageId: res.messageId,
+            seq: res.seq,
+          }),
+        );
+      }
+    }
+    if (frame.type === "sync") {
+      for (const ch of frame.channels.slice(0, 8)) {
+        const stub = this.env.CHANNEL_DO.get(
+          this.env.CHANNEL_DO.idFromName(channelDoName(ch.channelId)),
+        );
+        const body = await stub.history({ afterSeq: ch.lastSeq, limit: 500 });
+        if (body.messages.length >= 500) {
+          ws.send(JSON.stringify({ type: "sync.gap", channelId: ch.channelId }));
+          continue;
+        }
+        ws.send(
+          JSON.stringify({
+            type: "sync.result",
+            channelId: ch.channelId,
+            messages: body.messages.reverse(),
+          }),
+        );
+      }
     }
   }
 
