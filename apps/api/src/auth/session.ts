@@ -19,7 +19,10 @@ export const requireSession = createMiddleware<{
     if (claims) {
       c.set("session", {
         user: { id: claims.sub, email: claims.email ?? "" },
-        session: { token: bearer, expiresAt: new Date() },
+        session: {
+          token: bearer,
+          expiresAt: claims.exp !== undefined ? new Date(claims.exp * 1000) : new Date(),
+        },
       });
       return next();
     }

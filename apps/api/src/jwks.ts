@@ -18,7 +18,7 @@ async function getKeySet(env: Env, force: boolean): Promise<jose.JSONWebKeySet> 
 export async function verifyAuthJwt(
   token: string,
   env: Env,
-): Promise<{ sub: string; email?: string; name?: string } | null> {
+): Promise<{ sub: string; email?: string; name?: string; exp?: number } | null> {
   let decode: jose.ProtectedHeaderParameters;
   try {
     decode = jose.decodeProtectedHeader(token);
@@ -41,6 +41,7 @@ export async function verifyAuthJwt(
         sub: payload.sub,
         email: typeof payload.email === "string" ? payload.email : undefined,
         name: typeof payload.name === "string" ? payload.name : undefined,
+        exp: typeof payload.exp === "number" ? payload.exp : undefined,
       };
     } catch {
       if (!attempt) continue;
