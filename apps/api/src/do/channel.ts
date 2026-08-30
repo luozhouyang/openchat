@@ -1,8 +1,8 @@
 import { DurableObject } from "cloudflare:workers";
 import { drizzle } from "drizzle-orm/durable-sqlite";
 import { migrate } from "drizzle-orm/durable-sqlite/migrator";
-import { and, desc, eq, gt, lt } from "drizzle-orm";
-import { newId } from "protocol";
+import { and, asc, desc, eq, gt, isNull, lt } from "drizzle-orm";
+import { newId, userDoName } from "protocol";
 import migrations from "../../migrations/channel-do/migrations";
 import * as schema from "../db/schema-channel-do.ts";
 import { createBroadcaster } from "./broadcast.ts";
@@ -115,6 +115,16 @@ export class ChannelDO extends DurableObject<Env> {
         .limit(1);
       return { messageId: msg[0].id, seq: msg[0].seq, deduplicated: true };
     }
+    if (body.parentId) {
+      const root = await this.db
+        .select({ id: schema.messages.id, deletedAt: schema.messages.deletedAt })
+        .from(schema.messages)
+        .where(eq(schema.messages.id, body.parentId))
+        .limit(1);
+      if (root.length === 0 || root[0].deletedAt !== null) {
+        return { error: "parent not found", status: 422 };
+      }
+    }
     const id = newId();
     const result = await this.db
       .insert(schema.messages)
@@ -135,7 +145,11 @@ export class ChannelDO extends DurableObject<Env> {
       createdAt: now,
     });
     await this.updateMeta(msg.id, senderUserId, body.content, now);
-    await this.broadcast({ type: "message.new", message: this.rowToMessage(msg) });
+    const fullMessage = this.rowToMessage(msg);
+    await this.broadcast({ type: "message.new", message: fullMessage });
+    if (body.parentId) {
+      await this.notifyThreadSubscribers(body.parentId, senderUserId, fullMessage);
+    }
     return { messageId: msg.id, seq: msg.seq };
   }
 
@@ -143,6 +157,8 @@ export class ChannelDO extends DurableObject<Env> {
     limit?: number;
     beforeSeq?: number;
     afterSeq?: number;
+    parentId?: string;
+    order?: "asc" | "desc";
   }): Promise<{ messages: HistoryMessage[]; oldestSeq: number | null }> {
     const limit = Math.min(params.limit ?? 30, 500);
     const rows = await this.db
@@ -150,14 +166,35 @@ export class ChannelDO extends DurableObject<Env> {
       .from(schema.messages)
       .where(
         and(
+          ...(params.parentId !== undefined
+            ? [eq(schema.messages.parentId, params.parentId)]
+            : [isNull(schema.messages.parentId)]),
           ...(params.beforeSeq !== undefined ? [lt(schema.messages.seq, params.beforeSeq)] : []),
           ...(params.afterSeq !== undefined ? [gt(schema.messages.seq, params.afterSeq)] : []),
         ),
       )
-      .orderBy(desc(schema.messages.seq))
+      .orderBy(params.order === "asc" ? asc(schema.messages.seq) : desc(schema.messages.seq))
       .limit(limit);
     const result = rows.map((r) => this.rowToMessage(r));
     return { messages: result, oldestSeq: result.length ? result[result.length - 1].seq : null };
+  }
+
+  async threadsSubscribe(body: { parentId: string; userId: string }): Promise<void> {
+    await this.db
+      .insert(schema.threadSubscriptions)
+      .values({ parentId: body.parentId, userId: body.userId })
+      .onConflictDoNothing();
+  }
+
+  async threadsUnsubscribe(body: { parentId: string; userId: string }): Promise<void> {
+    await this.db
+      .delete(schema.threadSubscriptions)
+      .where(
+        and(
+          eq(schema.threadSubscriptions.parentId, body.parentId),
+          eq(schema.threadSubscriptions.userId, body.userId),
+        ),
+      );
   }
 
   async meta(): Promise<Record<string, string>> {
@@ -198,6 +235,24 @@ export class ChannelDO extends DurableObject<Env> {
 
   private async broadcast(event: { type: string; [k: string]: unknown }) {
     await this.broadcaster.broadcast(event);
+  }
+
+  private async notifyThreadSubscribers(parentId: string, senderId: string, message: unknown) {
+    const subs = await this.db
+      .select()
+      .from(schema.threadSubscriptions)
+      .where(eq(schema.threadSubscriptions.parentId, parentId));
+    for (const sub of subs) {
+      if (sub.userId === senderId) continue;
+      await this.pushToUser(sub.userId, { type: "thread.reply", parentId, message });
+    }
+  }
+
+  private async pushToUser(userId: string, event: unknown) {
+    try {
+      const id = this.env.USER_DO.idFromName(userDoName(userId));
+      await this.env.USER_DO.get(id).push({ channelId: this.channelId, events: [event] });
+    } catch {}
   }
 
   async fetch(_request: Request): Promise<Response> {
