@@ -16,5 +16,5 @@
     "noFallthroughCasesInSwitch": true,
     "strict": true
   },
-  "include": ["src", "test", "worker-configuration.d.ts"]
+  "include": ["src", "test", "better-auth.config.ts", "worker-configuration.d.ts"]
 }

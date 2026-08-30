@@ -12,6 +12,8 @@
     "deploy:dry": "wrangler deploy --dry-run"
   },
   "dependencies": {
+    "@better-auth/drizzle-adapter": "catalog:",
+    "better-auth": "catalog:",
     "drizzle-orm": "catalog:",
     "hono": "catalog:",
     "protocol": "workspace:*"
