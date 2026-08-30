@@ -2,10 +2,11 @@ import { DurableObject } from "cloudflare:workers";
 import { drizzle } from "drizzle-orm/durable-sqlite";
 import { migrate } from "drizzle-orm/durable-sqlite/migrator";
 import { and, asc, desc, eq, gt, isNull, lt } from "drizzle-orm";
-import { newId, userDoName } from "protocol";
+import { newId, userDoName, isAllowedEmoji } from "protocol";
 import migrations from "../../migrations/channel-do/migrations";
 import * as schema from "../db/schema-channel-do.ts";
 import { createBroadcaster } from "./broadcast.ts";
+import { createReactionBatcher } from "./reaction-batch.ts";
 
 interface HistoryMessage {
   id: string;
@@ -33,6 +34,10 @@ export class ChannelDO extends DurableObject<Env> {
     onPushFailed: (userId) => {
       this.failedPush.set(userId, (this.failedPush.get(userId) ?? 0) + 1);
     },
+  });
+  reactionBatcher = createReactionBatcher({
+    getSnapshot: (seq) => this.reactionSnapshot(seq),
+    broadcast: (event) => this.broadcast(event),
   });
 
   constructor(ctx: DurableObjectState, env: Env) {
@@ -200,6 +205,67 @@ export class ChannelDO extends DurableObject<Env> {
   async meta(): Promise<Record<string, string>> {
     const rows = await this.db.select().from(schema.meta);
     return Object.fromEntries(rows.map((r) => [r.key, r.value]));
+  }
+
+  async reactionSnapshot(messageSeq: number): Promise<Record<string, string[]>> {
+    const rows = await this.db
+      .select()
+      .from(schema.reactions)
+      .where(eq(schema.reactions.messageSeq, messageSeq));
+    const out: Record<string, string[]> = {};
+    for (const r of rows) {
+      (out[r.emoji] ??= []).push(r.userId);
+    }
+    return out;
+  }
+
+  async toggleReaction(
+    callerUserId: string,
+    body: { messageSeq: number; emoji: string },
+  ): Promise<{ error: string; status: 403 | 404 | 422 } | void> {
+    if (!isAllowedEmoji(body.emoji)) return { error: "invalid emoji", status: 422 };
+    const member = await this.db
+      .select()
+      .from(schema.memberState)
+      .where(eq(schema.memberState.userId, callerUserId))
+      .limit(1);
+    if (member.length === 0) return { error: "not a member", status: 403 };
+    const msg = await this.db
+      .select()
+      .from(schema.messages)
+      .where(eq(schema.messages.seq, body.messageSeq))
+      .limit(1);
+    if (msg.length === 0) return { error: "message not found", status: 404 };
+    const existing = await this.db
+      .select()
+      .from(schema.reactions)
+      .where(
+        and(
+          eq(schema.reactions.messageSeq, body.messageSeq),
+          eq(schema.reactions.emoji, body.emoji),
+          eq(schema.reactions.userId, callerUserId),
+        ),
+      )
+      .limit(1);
+    if (existing.length > 0) {
+      await this.db
+        .delete(schema.reactions)
+        .where(
+          and(
+            eq(schema.reactions.messageSeq, body.messageSeq),
+            eq(schema.reactions.emoji, body.emoji),
+            eq(schema.reactions.userId, callerUserId),
+          ),
+        );
+    } else {
+      await this.db.insert(schema.reactions).values({
+        messageSeq: body.messageSeq,
+        emoji: body.emoji,
+        userId: callerUserId,
+        createdAt: Date.now(),
+      });
+    }
+    this.reactionBatcher.markDirty(body.messageSeq);
   }
 
   private async updateMeta(id: string, userId: string, content: string, at: number) {
