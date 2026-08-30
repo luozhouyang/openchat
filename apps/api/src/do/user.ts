@@ -31,6 +31,7 @@ export class UserDO extends DurableObject<Env> {
   private lastTyping = new Map<string, number>();
   private lastActiveAt = 0;
   private awayNotified = false;
+  private recentPush = new Map<string, number>();
 
   get userId(): string {
     return this.ctx.id.name?.replace(/^user:/, "") ?? "";
@@ -137,6 +138,59 @@ export class UserDO extends DurableObject<Env> {
         for (const ws of sockets) ws.send(JSON.stringify(update));
       }
     }
+    for (const ev of body.events) {
+      const e = ev as {
+        type?: string;
+        message?: { id: string; mentions?: string[] | null; content?: string };
+        notifPref?: "all" | "mention" | "none";
+      };
+      if (e.type !== "message.new" && e.type !== "thread.reply") continue;
+      if (!e.message) continue;
+      if (!body.channelId) continue;
+
+      const hasActiveForeground = this.ctx.getWebSockets().some((conn) => {
+        const att = conn.deserializeAttachment() as { lastActivity?: number } | null;
+        return att?.lastActivity !== undefined && Date.now() - att.lastActivity < 30_000;
+      });
+      if (hasActiveForeground) continue;
+
+      const pref = e.notifPref ?? "all";
+      if (pref === "none") continue;
+      const mentions = e.message.mentions ?? [];
+      if (
+        pref === "mention" &&
+        !mentions.includes(this.userId) &&
+        !this.isBroadcastMention(e.message)
+      )
+        continue;
+
+      const subs = await this.db.select().from(schema.pushSubscriptions);
+      if (subs.length === 0) continue;
+
+      const dedupeKey = `${body.channelId}:${e.message.id}`;
+      if ((this.recentPush.get(dedupeKey) ?? 0) > Date.now() - 60_000) continue;
+      this.recentPush.set(dedupeKey, Date.now());
+
+      const payload = {
+        type: "push-notification",
+        userId: this.userId,
+        channelId: body.channelId,
+        messageId: e.message.id,
+        title: body.channelId,
+        body: e.message.content?.slice(0, 100) ?? "",
+        mentions,
+        createdAt: Date.now(),
+      };
+      try {
+        await this.env.PUSH_Q.send(payload);
+      } catch (err) {
+        console.error("push enqueue failed", err);
+      }
+    }
+  }
+
+  private isBroadcastMention(message: { content?: string }): boolean {
+    return /@\[(channel|all)\]/.test(message.content ?? "");
   }
 
   async sidebar(): Promise<{ channels: SidebarEntry[] }> {
@@ -416,6 +470,8 @@ export class UserDO extends DurableObject<Env> {
       this.lastActiveAt = Date.now();
       this.awayNotified = false;
       await this.ctx.storage.setAlarm(this.lastActiveAt + 5 * 60_000);
+      const attachment = ws.deserializeAttachment() as { lastActivity?: number } | null;
+      ws.serializeAttachment({ ...attachment, lastActivity: Date.now() });
     }
     if (frame.type === "presence_subscribe" || frame.type === "presence_unsubscribe") {
       const attachment = ws.deserializeAttachment() as { userId?: string } | null;
