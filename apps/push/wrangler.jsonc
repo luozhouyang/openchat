@@ -12,6 +12,21 @@
         "max_batch_timeout": 5,
         "dead_letter_queue": "openchat-push-dlq",
       },
+      {
+        "queue": "openchat-thumbnails",
+        "max_batch_size": 5,
+        "max_batch_timeout": 10,
+        "dead_letter_queue": "openchat-push-dlq",
+      },
     ],
+  },
+  "r2_buckets": [
+    {
+      "binding": "FILES",
+      "bucket_name": "openchat-files",
+    },
+  ],
+  "vars": {
+    "THUMBNAIL_API_BASE": "http://localhost:8787",
   },
 }

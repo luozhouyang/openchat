@@ -286,6 +286,66 @@ export class ChannelDO extends DurableObject<Env> {
     return { ok: true };
   }
 
+  async updateAttachments(body: {
+    messageId: string;
+    attachments: unknown[];
+  }): Promise<{ error: string; status: 404 } | void> {
+    const rows = await this.db
+      .select()
+      .from(schema.messages)
+      .where(eq(schema.messages.id, body.messageId))
+      .limit(1);
+    if (rows.length === 0) return { error: "not found", status: 404 };
+    await this.db
+      .update(schema.messages)
+      .set({ attachments: JSON.stringify(body.attachments) })
+      .where(eq(schema.messages.id, body.messageId));
+    await this.broadcast({
+      type: "message.edit",
+      messageId: body.messageId,
+      content: rows[0].content,
+      editedAt: Date.now(),
+    });
+  }
+
+  async updateThumbByUpload(body: {
+    uploadId: string;
+    thumbUrl: string;
+    thumbKey: string;
+  }): Promise<{ ok: boolean }> {
+    const rows = await this.db
+      .select({
+        id: schema.messages.id,
+        seq: schema.messages.seq,
+        attachments: schema.messages.attachments,
+      })
+      .from(schema.messages);
+    for (const r of rows) {
+      if (!r.attachments) continue;
+      const atts = JSON.parse(r.attachments) as { fileId?: string; thumbUrl?: string }[];
+      let changed = false;
+      for (const a of atts) {
+        if (a.fileId === body.uploadId) {
+          a.thumbUrl = body.thumbUrl;
+          changed = true;
+        }
+      }
+      if (changed) {
+        await this.db
+          .update(schema.messages)
+          .set({ attachments: JSON.stringify(atts) })
+          .where(eq(schema.messages.id, r.id));
+        await this.broadcast({
+          type: "message.edit",
+          messageId: r.id,
+          content: "",
+          editedAt: Date.now(),
+        });
+      }
+    }
+    return { ok: true };
+  }
+
   async deleteMessage(
     callerUserId: string,
     body: { messageId: string },
