@@ -1,5 +1,6 @@
 import { expect, test, beforeAll } from "vite-plus/test";
 import { env } from "cloudflare:test";
+import { exports } from "cloudflare:workers";
 import { channelDoName, issueInternalToken, userDoName } from "protocol";
 
 const channelId = "c-side";
@@ -36,6 +37,28 @@ async function postMessage(userId: string, content: string, clientToken: string)
 beforeAll(async () => {
   await channel.membersAdd({ userId: "alice", role: "member" });
   await channel.membersAdd({ userId: "bob", role: "member" });
+});
+
+async function signup(email: string): Promise<string> {
+  const res = await exports.default.fetch("http://localhost/api/auth/sign-up/email", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ email, password: "sidebar-test-password", name: email.split("@")[0] }),
+  });
+  return res.headers.get("set-cookie") ?? "";
+}
+
+test("GET /me/sidebar requires session and returns channels", async () => {
+  const noAuth = await exports.default.fetch("http://localhost/me/sidebar");
+  expect(noAuth.status).toBe(401);
+
+  const cookie = await signup("sidebar-route@test.dev");
+  const res = await exports.default.fetch("http://localhost/me/sidebar", {
+    headers: { cookie },
+  });
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as { channels: unknown[] };
+  expect(Array.isArray(body.channels)).toBe(true);
 });
 
 test("sidebar aggregates unread across channels", async () => {
