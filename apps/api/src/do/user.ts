@@ -2,7 +2,14 @@ import { DurableObject } from "cloudflare:workers";
 import { drizzle } from "drizzle-orm/durable-sqlite";
 import { migrate } from "drizzle-orm/durable-sqlite/migrator";
 import { count, eq } from "drizzle-orm";
-import { channelDoName, helloEvent, parseClientFrame, verifyInternalToken } from "protocol";
+import {
+  channelDoName,
+  helloEvent,
+  parseClientFrame,
+  userDoName,
+  verifyInternalToken,
+} from "protocol";
+import type { PresenceStatus } from "protocol";
 import migrations from "../../migrations/user-do/migrations";
 import { getDb } from "../db/client.ts";
 import { getChannel } from "../db/repos/channels.ts";
@@ -22,9 +29,17 @@ export class UserDO extends DurableObject<Env> {
   db: ReturnType<typeof drizzle>;
   disconnectUntil = 0;
   private lastTyping = new Map<string, number>();
+  private lastActiveAt = 0;
+  private awayNotified = false;
 
   get userId(): string {
     return this.ctx.id.name?.replace(/^user:/, "") ?? "";
+  }
+
+  private status(): PresenceStatus {
+    if (this.ctx.getWebSockets().length === 0) return "offline";
+    if (Date.now() - this.lastActiveAt > 5 * 60_000) return "away";
+    return "online";
   }
 
   constructor(ctx: DurableObjectState, env: Env) {
@@ -174,6 +189,56 @@ export class UserDO extends DurableObject<Env> {
     return { ok: true, devices, channels };
   }
 
+  async presenceSubscribe(body: { subscriberId: string; expiresAt: number }): Promise<void> {
+    await this.db
+      .insert(schema.presenceSubscribers)
+      .values({ userId: body.subscriberId, expiresAt: body.expiresAt })
+      .onConflictDoUpdate({
+        target: schema.presenceSubscribers.userId,
+        set: { expiresAt: body.expiresAt },
+      });
+  }
+
+  async presenceUnsubscribe(body: { subscriberId: string }): Promise<void> {
+    await this.db
+      .delete(schema.presenceSubscribers)
+      .where(eq(schema.presenceSubscribers.userId, body.subscriberId));
+  }
+
+  async presenceNotify(body: { userId: string; status: PresenceStatus }): Promise<void> {
+    const payload = JSON.stringify({
+      type: "presence.update",
+      userId: body.userId,
+      status: body.status,
+    });
+    for (const conn of this.ctx.getWebSockets()) {
+      if (conn.readyState === WebSocket.OPEN) conn.send(payload);
+    }
+  }
+
+  async presenceStatus(): Promise<{ status: PresenceStatus }> {
+    return { status: this.status() };
+  }
+
+  async alarm(): Promise<void> {
+    if (this.ctx.getWebSockets().length > 0 && !this.awayNotified) {
+      this.awayNotified = true;
+      await this.notifySubscribers("away");
+    }
+  }
+
+  private async notifySubscribers(status: PresenceStatus) {
+    const subs = await this.db.select().from(schema.presenceSubscribers);
+    const now = Date.now();
+    for (const sub of subs) {
+      if (sub.expiresAt < now) continue;
+      try {
+        const id = this.env.USER_DO.idFromName(userDoName(sub.userId));
+        await this.env.USER_DO.get(id).presenceNotify({ userId: this.userId, status });
+      } catch {}
+    }
+  }
+
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
 
@@ -199,6 +264,10 @@ export class UserDO extends DurableObject<Env> {
       });
       this.ctx.acceptWebSocket(server, [`device:${deviceId}`]);
       server.send(JSON.stringify(helloEvent(this.ctx.id.toString())));
+      this.lastActiveAt = Date.now();
+      this.awayNotified = false;
+      await this.ctx.storage.setAlarm(this.lastActiveAt + 5 * 60_000);
+      void this.notifySubscribers("online");
       return new Response(null, { status: 101, webSocket: client });
     }
 
@@ -295,10 +364,53 @@ export class UserDO extends DurableObject<Env> {
       const id = this.env.CHANNEL_DO.idFromName(channelDoName(frame.channelId));
       void this.env.CHANNEL_DO.get(id).typing(userId);
     }
+    if (frame.type === "activity") {
+      this.lastActiveAt = Date.now();
+      this.awayNotified = false;
+      await this.ctx.storage.setAlarm(this.lastActiveAt + 5 * 60_000);
+    }
+    if (frame.type === "presence_subscribe" || frame.type === "presence_unsubscribe") {
+      const attachment = ws.deserializeAttachment() as { userId?: string } | null;
+      const subscriberId = attachment?.userId;
+      if (!subscriberId) return;
+      const expiresAt = Date.now() + 24 * 3600_000;
+      for (const targetId of frame.userIds) {
+        const targetStub = this.env.USER_DO.get(this.env.USER_DO.idFromName(userDoName(targetId)));
+        if (frame.type === "presence_subscribe") {
+          await this.db
+            .insert(schema.presenceSubscriptions)
+            .values({ userId: targetId, expiresAt })
+            .onConflictDoUpdate({
+              target: schema.presenceSubscriptions.userId,
+              set: { expiresAt },
+            });
+          await targetStub.presenceSubscribe({ subscriberId, expiresAt });
+        } else {
+          await this.db
+            .delete(schema.presenceSubscriptions)
+            .where(eq(schema.presenceSubscriptions.userId, targetId));
+          await targetStub.presenceUnsubscribe({ subscriberId });
+        }
+      }
+      const states: Record<string, PresenceStatus> = {};
+      for (const targetId of frame.userIds) {
+        try {
+          const targetStub = this.env.USER_DO.get(
+            this.env.USER_DO.idFromName(userDoName(targetId)),
+          );
+          const { status } = await targetStub.presenceStatus();
+          states[targetId] = status;
+        } catch {}
+      }
+      ws.send(JSON.stringify({ type: "presence.snapshot", states }));
+    }
   }
 
   async webSocketClose(ws: WebSocket, code: number, reason: string, _wasClean: boolean) {
     ws.close(code, reason);
+    if (this.ctx.getWebSockets().length === 0) {
+      void this.notifySubscribers("offline");
+    }
   }
 
   async webSocketError(_ws: WebSocket, error: unknown) {
