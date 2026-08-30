@@ -97,6 +97,49 @@ export class ChannelDO extends DurableObject<Env> {
     return { ok: true, members, subscribers: this.subscribers.size };
   }
 
+  async readMark(body: {
+    userId: string;
+    seq: number;
+  }): Promise<{ error: string; status: 403 } | { lastReadSeq: number }> {
+    const member = await this.db
+      .select()
+      .from(schema.memberState)
+      .where(eq(schema.memberState.userId, body.userId))
+      .limit(1);
+    if (member.length === 0) return { error: "not a member", status: 403 };
+    const newRead = Math.max(member[0].lastReadSeq, body.seq);
+    await this.db
+      .update(schema.memberState)
+      .set({ lastReadSeq: newRead, mentionCount: 0 })
+      .where(eq(schema.memberState.userId, body.userId));
+    await this.pushToUser(body.userId, {
+      type: "channel.read",
+      channelId: this.channelId,
+      lastReadSeq: newRead,
+    });
+    return { lastReadSeq: newRead };
+  }
+
+  async unread(
+    userId: string,
+  ): Promise<
+    { error: string; status: 403 } | { maxSeq: number; lastReadSeq: number; mentionCount: number }
+  > {
+    const member = await this.db
+      .select()
+      .from(schema.memberState)
+      .where(eq(schema.memberState.userId, userId))
+      .limit(1);
+    if (member.length === 0) return { error: "not a member", status: 403 };
+    const maxRow = await this.db
+      .select({ seq: schema.messages.seq })
+      .from(schema.messages)
+      .orderBy(desc(schema.messages.seq))
+      .limit(1);
+    const maxSeq = maxRow[0]?.seq ?? 0;
+    return { maxSeq, lastReadSeq: member[0].lastReadSeq, mentionCount: member[0].mentionCount };
+  }
+
   async postMessage(
     senderUserId: string,
     body: { content: string; parentId?: string; clientToken: string },
@@ -144,6 +187,20 @@ export class ChannelDO extends DurableObject<Env> {
         return { error: "parent not found", status: 422 };
       }
     }
+    const mentionPattern = /@\[([a-zA-Z0-9]+)\]/g;
+    const mentions: string[] = [];
+    for (const m of body.content.matchAll(mentionPattern)) {
+      if (!mentions.includes(m[1])) mentions.push(m[1]);
+    }
+    const validMentions: string[] = [];
+    for (const userId of mentions) {
+      const member = await this.db
+        .select()
+        .from(schema.memberState)
+        .where(eq(schema.memberState.userId, userId))
+        .limit(1);
+      if (member.length > 0) validMentions.push(userId);
+    }
     const id = newId();
     const result = await this.db
       .insert(schema.messages)
@@ -153,6 +210,7 @@ export class ChannelDO extends DurableObject<Env> {
         parentId: body.parentId ?? null,
         type: "text",
         content: body.content,
+        mentions: validMentions.length ? JSON.stringify(validMentions) : null,
         createdAt: now,
       })
       .returning();
@@ -164,6 +222,20 @@ export class ChannelDO extends DurableObject<Env> {
       createdAt: now,
     });
     await this.updateMeta(msg.id, senderUserId, body.content, now);
+    for (const userId of validMentions) {
+      if (userId === senderUserId) continue;
+      const member = await this.db
+        .select()
+        .from(schema.memberState)
+        .where(eq(schema.memberState.userId, userId))
+        .limit(1);
+      if (member.length > 0) {
+        await this.db
+          .update(schema.memberState)
+          .set({ mentionCount: member[0].mentionCount + 1 })
+          .where(eq(schema.memberState.userId, userId));
+      }
+    }
     const fullMessage = this.rowToMessage(msg);
     await this.broadcast({ type: "message.new", message: fullMessage });
     if (body.parentId) {
