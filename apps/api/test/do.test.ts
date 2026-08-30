@@ -10,16 +10,17 @@ test("/ws upgrade reaches UserDO and returns 101", async () => {
   expect(res.status).toBe(101);
 });
 
-test("UserDO health reports migrated schema", async () => {
+test("UserDO health reports devices and channels", async () => {
   const id = env.USER_DO.idFromName("user:anonymous");
   const stub = env.USER_DO.get(id);
   const res = await runInDurableObject(stub, (instance) =>
     instance.fetch(new Request("http://localhost/health")),
   );
   expect(res.status).toBe(200);
-  const body = (await res.json()) as { ok: boolean; migrated: boolean };
+  const body = (await res.json()) as { ok: boolean; devices: number; channels: number };
   expect(body.ok).toBe(true);
-  expect(body.migrated).toBe(true);
+  expect(body.devices).toBeGreaterThanOrEqual(0);
+  expect(body.channels).toBe(0);
 });
 
 test("ChannelDO health reports migrated schema", async () => {

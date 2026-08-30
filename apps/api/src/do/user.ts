@@ -1,7 +1,7 @@
 import { DurableObject } from "cloudflare:workers";
 import { drizzle } from "drizzle-orm/durable-sqlite";
 import { migrate } from "drizzle-orm/durable-sqlite/migrator";
-import { verifyInternalToken } from "protocol";
+import { helloEvent, parseClientFrame, verifyInternalToken } from "protocol";
 import migrations from "../../migrations/user-do/migrations";
 
 export class UserDO extends DurableObject<Env> {
@@ -24,18 +24,27 @@ export class UserDO extends DurableObject<Env> {
       if (!(await verifyInternalToken(token, this.env.INTERNAL_TOKEN_KEY))) {
         return new Response("forbidden", { status: 403 });
       }
+      const deviceId = url.searchParams.get("deviceId") ?? "unknown";
+      for (const old of this.ctx.getWebSockets(`device:${deviceId}`)) {
+        old.close(4000, "replaced");
+      }
       const pair = new WebSocketPair();
       const [client, server] = Object.values(pair);
-      server.serializeAttachment({ connectedAt: Date.now() });
-      this.ctx.acceptWebSocket(server);
+      server.serializeAttachment({
+        deviceId,
+        platform: url.searchParams.get("platform") ?? "web",
+        connectedAt: Date.now(),
+      });
+      this.ctx.acceptWebSocket(server, [`device:${deviceId}`]);
+      server.send(JSON.stringify(helloEvent(this.ctx.id.toString())));
       return new Response(null, { status: 101, webSocket: client });
     }
 
     if (url.pathname === "/health") {
-      const rows = this.ctx.storage.sql
-        .exec("SELECT name FROM sqlite_master WHERE type='table' AND name='schema_version'")
-        .toArray();
-      return Response.json({ ok: true, migrated: rows.length > 0 });
+      const devices = this.ctx.getWebSockets().length;
+      const channels =
+        this.ctx.storage.sql.exec("SELECT count(*) AS n FROM channels_cache").toArray()[0]?.n ?? 0;
+      return Response.json({ ok: true, devices, channels });
     }
 
     return new Response("not found", { status: 404 });
@@ -43,7 +52,11 @@ export class UserDO extends DurableObject<Env> {
 
   async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer) {
     const data = typeof message === "string" ? message : new TextDecoder().decode(message);
-    ws.send(JSON.stringify({ type: "echo", data }));
+    const frame = parseClientFrame(data);
+    if (!frame) return;
+    if (frame.type === "echo") {
+      ws.send(JSON.stringify({ type: "echo", data: frame.data }));
+    }
   }
 
   async webSocketClose(ws: WebSocket, code: number, reason: string, _wasClean: boolean) {
