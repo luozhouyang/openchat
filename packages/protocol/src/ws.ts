@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { Message } from "./events.ts";
+import type { Message, PresenceStatus } from "./events.ts";
 
 const clientFrameSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("echo"), data: z.string().max(4096) }),
@@ -49,6 +49,14 @@ const clientFrameSchema = z.discriminatedUnion("type", [
     parentId: z.string().min(1),
     subscribe: z.boolean(),
   }),
+  z.object({
+    type: z.literal("presence_subscribe"),
+    userIds: z.array(z.string().min(1)).min(1).max(200),
+  }),
+  z.object({
+    type: z.literal("presence_unsubscribe"),
+    userIds: z.array(z.string().min(1)).min(1).max(200),
+  }),
 ]);
 
 export type ClientFrame = z.infer<typeof clientFrameSchema>;
@@ -59,7 +67,17 @@ export type ServerEvent =
   | { type: "ack"; clientToken: string; channelId: string; messageId: string; seq: number }
   | { type: "error"; clientToken?: string; code: string; message: string }
   | { type: "sync.result"; channelId: string; messages: Message[] }
-  | { type: "sync.gap"; channelId: string };
+  | { type: "sync.gap"; channelId: string }
+  | {
+      type: "sidebar.update";
+      channelId: string;
+      unread: number;
+      mentions: number;
+      lastMessage: { preview: string; userId: string; at: number };
+    }
+  | { type: "channel.read"; channelId: string; lastReadSeq: number }
+  | { type: "presence.snapshot"; states: Record<string, PresenceStatus> }
+  | { type: "presence.update"; userId: string; status: PresenceStatus };
 
 export function parseClientFrame(raw: string): ClientFrame | null {
   try {

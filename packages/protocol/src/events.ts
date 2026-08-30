@@ -1,3 +1,5 @@
+export type PresenceStatus = "online" | "away" | "offline";
+
 export interface Message {
   id: string;
   seq: number;
