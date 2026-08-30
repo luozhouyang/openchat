@@ -69,3 +69,16 @@ export const systemSettings = sqliteTable("system_settings", {
   value: text("value").notNull(),
   updatedAt: integer("updated_at").notNull(),
 });
+
+export const uploads = sqliteTable("uploads", {
+  id: text("id").primaryKey(),
+  channelId: text("channel_id").notNull(),
+  userId: text("user_id").notNull(),
+  key: text("key").notNull(),
+  filename: text("filename").notNull(),
+  size: integer("size").notNull(),
+  contentType: text("content_type").notNull(),
+  status: text("status").notNull().default("pending"),
+  createdAt: integer("created_at").notNull(),
+  completedAt: integer("completed_at"),
+});
