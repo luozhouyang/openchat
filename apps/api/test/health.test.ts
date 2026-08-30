@@ -1,22 +1,9 @@
-import { expect, test, beforeAll, afterAll } from "vite-plus/test";
-import { unstable_dev, type Unstable_DevWorker } from "wrangler";
-import workerHandler from "../src/index.ts";
-
-let worker: Unstable_DevWorker;
-
-beforeAll(async () => {
-  worker = await unstable_dev("src/index.ts", {
-    config: "wrangler.jsonc",
-    experimental: { disableExperimentalWarning: true },
-  });
-});
-
-afterAll(async () => {
-  await worker.stop();
-});
+import { expect, test } from "vite-plus/test";
+import { env } from "cloudflare:test";
+import { exports } from "cloudflare:workers";
 
 test("GET /health returns ok", async () => {
-  const res = await worker.fetch("/health");
+  const res = await exports.default.fetch("http://localhost/health");
   expect(res.status).toBe(200);
   const body = (await res.json()) as { ok: boolean };
   expect(body.ok).toBe(true);
@@ -26,6 +13,13 @@ test("/ws upgrade without implementation returns 501", async () => {
   const req = new Request("http://localhost/ws", {
     headers: { Upgrade: "websocket" },
   });
-  const res = await workerHandler.fetch(req, {} as Env);
+  const res = await exports.default.fetch(req);
   expect(res.status).toBe(501);
+});
+
+test("d1 migrations applied: teams table exists", async () => {
+  const { results } = await env.DB.prepare(
+    "SELECT name FROM sqlite_master WHERE type='table' AND name='teams'",
+  ).all();
+  expect(results).toHaveLength(1);
 });

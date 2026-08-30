@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "wrangler dev",
     "types": "wrangler types",
-    "test": "vp test",
+    "test": "vitest run",
     "check": "vp check",
     "db:generate": "drizzle-kit generate --config=drizzle.d1.config.ts && drizzle-kit generate --config=drizzle.user-do.config.ts && drizzle-kit generate --config=drizzle.channel-do.config.ts",
     "deploy:dry": "wrangler deploy --dry-run"
@@ -17,11 +17,13 @@
     "protocol": "workspace:*"
   },
   "devDependencies": {
+    "@cloudflare/vitest-plugin": "catalog:",
     "@cloudflare/workers-types": "catalog:",
     "drizzle-kit": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vite-plus": "catalog:",
+    "vitest": "catalog:",
     "wrangler": "catalog:"
   }
 }
