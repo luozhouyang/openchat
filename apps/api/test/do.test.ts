@@ -4,11 +4,7 @@ import { env, runInDurableObject } from "cloudflare:test";
 test("UserDO health reports devices and channels", async () => {
   const id = env.USER_DO.idFromName("user:anonymous");
   const stub = env.USER_DO.get(id);
-  const res = await runInDurableObject(stub, (instance) =>
-    instance.fetch(new Request("http://localhost/health")),
-  );
-  expect(res.status).toBe(200);
-  const body = (await res.json()) as { ok: boolean; devices: number; channels: number };
+  const body = await stub.health();
   expect(body.ok).toBe(true);
   expect(body.devices).toBeGreaterThanOrEqual(0);
   expect(body.channels).toBe(0);

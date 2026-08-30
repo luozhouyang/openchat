@@ -6,20 +6,59 @@ import migrations from "../../migrations/user-do/migrations";
 
 export class UserDO extends DurableObject<Env> {
   db: ReturnType<typeof drizzle>;
+  disconnectUntil = 0;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     this.db = drizzle(ctx.storage, { logger: false });
     void ctx.blockConcurrencyWhile(async () => {
       await migrate(this.db, migrations);
+      this.disconnectUntil = (await ctx.storage.get<number>("disconnectUntil")) ?? 0;
     });
     ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair("ping", "pong"));
+  }
+
+  async push(body: { channelId: string; event: unknown }): Promise<void> {
+    const payload = JSON.stringify({
+      type: "channel.event",
+      channelId: body.channelId,
+      event: body.event,
+    });
+    for (const ws of this.ctx.getWebSockets()) {
+      if (ws.readyState === WebSocket.OPEN) ws.send(payload);
+    }
+  }
+
+  async channelsSubscribe(channelIds: string[]): Promise<void> {
+    this.ctx.storage.sql.exec("DELETE FROM channels_cache");
+    for (const id of channelIds) {
+      this.ctx.storage.sql.exec("INSERT INTO channels_cache (channel_id) VALUES (?)", id);
+    }
+  }
+
+  async forceDisconnect(): Promise<void> {
+    this.disconnectUntil = Date.now() + 30_000;
+    for (const ws of this.ctx.getWebSockets()) {
+      ws.close(4003, "banned");
+    }
+    await this.ctx.storage.put("disconnectUntil", this.disconnectUntil);
+  }
+
+  async health(): Promise<{ ok: boolean; devices: number; channels: number }> {
+    const devices = this.ctx.getWebSockets().length;
+    const channels = Number(
+      this.ctx.storage.sql.exec("SELECT count(*) AS n FROM channels_cache").toArray()[0]?.n ?? 0,
+    );
+    return { ok: true, devices, channels };
   }
 
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
 
     if (url.pathname === "/ws" && request.headers.get("Upgrade") === "websocket") {
+      if (Date.now() < this.disconnectUntil) {
+        return new Response("banned", { status: 403 });
+      }
       const token = request.headers.get("x-internal-token") ?? "";
       if (!(await verifyInternalToken(token, this.env.INTERNAL_TOKEN_KEY))) {
         return new Response("forbidden", { status: 403 });
@@ -38,13 +77,6 @@ export class UserDO extends DurableObject<Env> {
       this.ctx.acceptWebSocket(server, [`device:${deviceId}`]);
       server.send(JSON.stringify(helloEvent(this.ctx.id.toString())));
       return new Response(null, { status: 101, webSocket: client });
-    }
-
-    if (url.pathname === "/health") {
-      const devices = this.ctx.getWebSockets().length;
-      const channels =
-        this.ctx.storage.sql.exec("SELECT count(*) AS n FROM channels_cache").toArray()[0]?.n ?? 0;
-      return Response.json({ ok: true, devices, channels });
     }
 
     return new Response("not found", { status: 404 });
