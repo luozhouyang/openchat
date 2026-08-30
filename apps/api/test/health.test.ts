@@ -9,12 +9,12 @@ test("GET /health returns ok", async () => {
   expect(body.ok).toBe(true);
 });
 
-test("/ws upgrade reaches UserDO", async () => {
+test("/ws upgrade without token returns 401", async () => {
   const req = new Request("http://localhost/ws", {
     headers: { Upgrade: "websocket" },
   });
   const res = await exports.default.fetch(req);
-  expect(res.status).toBe(101);
+  expect(res.status).toBe(401);
 });
 
 test("d1 migrations applied: teams table exists", async () => {

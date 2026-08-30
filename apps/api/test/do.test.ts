@@ -1,14 +1,5 @@
 import { expect, test } from "vite-plus/test";
 import { env, runInDurableObject } from "cloudflare:test";
-import { exports } from "cloudflare:workers";
-
-test("/ws upgrade reaches UserDO and returns 101", async () => {
-  const req = new Request("http://localhost/ws", {
-    headers: { Upgrade: "websocket" },
-  });
-  const res = await exports.default.fetch(req);
-  expect(res.status).toBe(101);
-});
 
 test("UserDO health reports devices and channels", async () => {
   const id = env.USER_DO.idFromName("user:anonymous");

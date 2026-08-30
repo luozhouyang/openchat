@@ -16,7 +16,12 @@ async function getKeySet(env: Env, force: boolean): Promise<jose.JSONWebKeySet> 
 }
 
 export async function verifyAuthJwt(token: string, env: Env): Promise<{ sub: string } | null> {
-  const decode = jose.decodeProtectedHeader(token);
+  let decode: jose.ProtectedHeaderParameters;
+  try {
+    decode = jose.decodeProtectedHeader(token);
+  } catch {
+    return null;
+  }
   for (const attempt of [false, true]) {
     const keys = await getKeySet(env, attempt);
     if (decode.kid && !keys.keys.some((k) => k.kid === decode.kid)) {

@@ -1,10 +1,29 @@
-import { expect, test } from "vite-plus/test";
+import { expect, test, beforeAll } from "vite-plus/test";
 import { env, runInDurableObject } from "cloudflare:test";
 import { exports } from "cloudflare:workers";
 
+let sessionCookie = "";
+
+beforeAll(async () => {
+  const signup = await exports.default.fetch("http://localhost/api/auth/sign-up/email", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      email: "devices@test.dev",
+      password: "devices-test-password",
+      name: "Devices",
+    }),
+  });
+  sessionCookie = signup.headers.get("set-cookie") ?? "";
+});
+
 async function upgrade(deviceId: string): Promise<WebSocket> {
+  const tokenRes = await exports.default.fetch("http://localhost/api/auth/token", {
+    headers: { cookie: sessionCookie },
+  });
+  const { token } = (await tokenRes.json()) as { token: string };
   const req = new Request(`http://localhost/ws?deviceId=${deviceId}`, {
-    headers: { Upgrade: "websocket" },
+    headers: { Upgrade: "websocket", authorization: `Bearer ${token}` },
   });
   const res = await exports.default.fetch(req);
   expect(res.status).toBe(101);
