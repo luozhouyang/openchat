@@ -5,3 +5,4 @@ export * from "./rest.ts";
 export * from "./emoji.ts";
 export * from "./enums.ts";
 export * from "./events.ts";
+export * from "./client.ts";
