@@ -1,4 +1,7 @@
 import { issueInternalToken, userDoName } from "protocol";
+import { eq } from "drizzle-orm";
+import { getDb } from "../db/client.ts";
+import { users } from "../db/schema-d1.ts";
 import { verifyAuthJwt } from "../jwks.ts";
 
 export async function handleWsUpgrade(request: Request, env: Env): Promise<Response> {
@@ -8,6 +11,14 @@ export async function handleWsUpgrade(request: Request, env: Env): Promise<Respo
 
   const claims = await verifyAuthJwt(token, env);
   if (!claims) return new Response("invalid token", { status: 401 });
+
+  const db = getDb(env.DB);
+  const rows = await db
+    .select({ banned: users.banned })
+    .from(users)
+    .where(eq(users.id, claims.sub))
+    .limit(1);
+  if (rows[0]?.banned) return new Response("banned", { status: 403 });
 
   const url = new URL(request.url);
   const internal = await issueInternalToken({

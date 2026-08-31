@@ -144,6 +144,7 @@ test("post_message from non-member returns http_403 error frame", async () => {
   expect(JSON.parse(String(ev.data))).toEqual({
     type: "error",
     clientToken: "nm-1",
+    channelId,
     code: "http_403",
     message: "not a member",
   });
@@ -175,6 +176,7 @@ test("post_message on archived channel returns archived_or_not_found error frame
   expect(JSON.parse(String(ev.data))).toEqual({
     type: "error",
     clientToken: "arch-1",
+    channelId,
     code: "archived_or_not_found",
     message: "channel unavailable",
   });

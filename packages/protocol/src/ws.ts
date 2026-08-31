@@ -65,7 +65,7 @@ export type ServerEvent =
   | { type: "hello"; userId: string; serverTime: number }
   | { type: "channel.event"; channelId: string; event: unknown }
   | { type: "ack"; clientToken: string; channelId: string; messageId: string; seq: number }
-  | { type: "error"; clientToken?: string; code: string; message: string }
+  | { type: "error"; clientToken?: string; channelId?: string; code: string; message: string }
   | { type: "sync.result"; channelId: string; messages: Message[] }
   | { type: "sync.gap"; channelId: string }
   | {

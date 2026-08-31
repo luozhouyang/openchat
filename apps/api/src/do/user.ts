@@ -407,6 +407,7 @@ export class UserDO extends DurableObject<Env> {
           JSON.stringify({
             type: "error",
             clientToken: frame.clientToken,
+            channelId,
             code: "archived_or_not_found",
             message: "channel unavailable",
           }),
@@ -426,6 +427,7 @@ export class UserDO extends DurableObject<Env> {
           JSON.stringify({
             type: "error",
             clientToken: frame.clientToken,
+            channelId,
             code: `http_${res.status}`,
             message: res.error,
           }),
@@ -503,6 +505,7 @@ export class UserDO extends DurableObject<Env> {
       this.lastActiveAt = Date.now();
       this.awayNotified = false;
       await this.ctx.storage.setAlarm(this.lastActiveAt + 5 * 60_000);
+      await this.notifySubscribers("online");
       const attachment = ws.deserializeAttachment() as { lastActivity?: number } | null;
       ws.serializeAttachment({ ...attachment, lastActivity: Date.now() });
     }

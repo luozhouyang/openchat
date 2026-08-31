@@ -1,6 +1,9 @@
 import { createMiddleware } from "hono/factory";
+import { eq } from "drizzle-orm";
 import { makeAuth } from "../auth.ts";
 import { verifyAuthJwt } from "../jwks.ts";
+import { getDb } from "../db/client.ts";
+import { users } from "../db/schema-d1.ts";
 
 export type SessionContext = {
   user: { id: string; email: string };
@@ -17,6 +20,13 @@ export const requireSession = createMiddleware<{
   if (bearer) {
     const claims = await verifyAuthJwt(bearer, c.env);
     if (claims) {
+      const db = getDb(c.env.DB);
+      const rows = await db
+        .select({ banned: users.banned })
+        .from(users)
+        .where(eq(users.id, claims.sub))
+        .limit(1);
+      if (rows[0]?.banned) return c.json({ error: "banned" }, 403);
       c.set("session", {
         user: { id: claims.sub, email: claims.email ?? "" },
         session: {
