@@ -1,7 +1,7 @@
 import { DurableObject } from "cloudflare:workers";
 import { drizzle } from "drizzle-orm/durable-sqlite";
 import { migrate } from "drizzle-orm/durable-sqlite/migrator";
-import { and, asc, desc, eq, gt, isNull, lt } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, isNull, lt } from "drizzle-orm";
 import { newId, userDoName, isAllowedEmoji } from "protocol";
 import migrations from "../../migrations/channel-do/migrations";
 import * as schema from "../db/schema-channel-do.ts";
@@ -95,6 +95,11 @@ export class ChannelDO extends DurableObject<Env> {
   async health(): Promise<{ ok: boolean; members: number; subscribers: number }> {
     const members = (await this.db.select().from(schema.memberState)).length;
     return { ok: true, members, subscribers: this.subscribers.size };
+  }
+
+  async count(): Promise<{ count: number }> {
+    const rows = await this.db.select({ n: count() }).from(schema.messages);
+    return { count: Number(rows[0]?.n ?? 0) };
   }
 
   async readMark(body: {

@@ -1,10 +1,11 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { eq, and } from "drizzle-orm";
+import { channelDoName } from "protocol";
 import { requireAdmin } from "../auth/admin-gate.ts";
 import type { SessionContext } from "../auth/session.ts";
 import { getDb } from "../db/client.ts";
-import { teams, channels, teamMembers, channelMembers } from "../db/schema-d1.ts";
+import { users, teams, channels, teamMembers, channelMembers } from "../db/schema-d1.ts";
 import { listChannelsForTeam, listChannelMemberIds } from "../db/repos/channels.ts";
 import { removeChannelMemberFromDo, syncUserChannels } from "../user-do-sync.ts";
 import { auditLog } from "../audit.ts";
@@ -16,6 +17,41 @@ export const adminRoutes = new Hono<{
 adminRoutes.use("*", requireAdmin);
 
 adminRoutes.get("/settings", (c) => c.json({ openRegistration: true }));
+
+adminRoutes.get("/stats", async (c) => {
+  const db = getDb(c.env.DB);
+  const [userRows, teamRows, channelRows] = await Promise.all([
+    db.select({ id: users.id }).from(users),
+    db.select({ id: teams.id }).from(teams),
+    db.select({ id: channels.id }).from(channels),
+  ]);
+  const channelIds = channelRows.map((r) => r.id).slice(0, 200);
+  const truncated = channelRows.length > 200;
+  let messages = 0;
+  const queue = [...channelIds];
+  while (queue.length > 0) {
+    const batch = queue.splice(0, 8);
+    const results = await Promise.all(
+      batch.map(async (channelId) => {
+        try {
+          const stub = c.env.CHANNEL_DO.get(c.env.CHANNEL_DO.idFromName(channelDoName(channelId)));
+          const res = await stub.count();
+          return res.count;
+        } catch {
+          return 0;
+        }
+      }),
+    );
+    messages += results.reduce((a, b) => a + b, 0);
+  }
+  return c.json({
+    users: userRows.length,
+    teams: teamRows.length,
+    channels: channelRows.length,
+    messages,
+    truncated,
+  });
+});
 
 adminRoutes.post("/teams/:teamId/archive", async (c) => {
   const db = getDb(c.env.DB);
