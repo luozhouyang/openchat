@@ -19,9 +19,20 @@ interface HistoryMessage {
   content: string;
   attachments: Record<string, string | number | boolean>[] | null;
   mentions: string[] | null;
+  isPinned: boolean;
+  hasReactions: boolean;
   editedAt: number | null;
+  updatedAt: number | null;
   deletedAt: number | null;
   createdAt: number;
+}
+
+interface ThreadInfo {
+  postId: string;
+  replyCount: number;
+  lastReplyAt: number | null;
+  participants: string[];
+  channelId: string | null;
 }
 
 export class ChannelDO extends DurableObject<Env> {
@@ -272,11 +283,42 @@ export class ChannelDO extends DurableObject<Env> {
       }
     }
     const fullMessage = this.rowToMessage(msg);
+    if (body.parentId) {
+      await this.upsertThread(body.parentId, senderUserId, now);
+    }
     await this.broadcast({ type: "message.new", message: fullMessage });
     if (body.parentId) {
       await this.notifyThreadSubscribers(body.parentId, senderUserId, fullMessage);
     }
     return { messageId: msg.id, seq: msg.seq };
+  }
+
+  private async upsertThread(postId: string, senderUserId: string, at: number) {
+    const existing = await this.db
+      .select()
+      .from(schema.threads)
+      .where(eq(schema.threads.postId, postId))
+      .limit(1);
+    if (existing.length > 0) {
+      const participants = JSON.parse(existing[0].participants ?? "[]") as string[];
+      if (!participants.includes(senderUserId)) participants.push(senderUserId);
+      await this.db
+        .update(schema.threads)
+        .set({
+          replyCount: existing[0].replyCount + 1,
+          lastReplyAt: at,
+          participants: JSON.stringify(participants),
+        })
+        .where(eq(schema.threads.postId, postId));
+    } else {
+      await this.db.insert(schema.threads).values({
+        postId,
+        replyCount: 1,
+        lastReplyAt: at,
+        participants: JSON.stringify([senderUserId]),
+        channelId: this.channelId,
+      });
+    }
   }
 
   async editMessage(
@@ -407,6 +449,36 @@ export class ChannelDO extends DurableObject<Env> {
     return { ok: true };
   }
 
+  async pinMessage(
+    callerUserId: string,
+    body: { messageId: string; pinned: boolean },
+  ): Promise<{ error: string; status: 403 | 404 } | { ok: true }> {
+    const rows = await this.db
+      .select()
+      .from(schema.messages)
+      .where(eq(schema.messages.id, body.messageId))
+      .limit(1);
+    if (rows.length === 0) return { error: "not found", status: 404 };
+    const msg = rows[0];
+    const caller = await this.db
+      .select()
+      .from(schema.memberState)
+      .where(eq(schema.memberState.userId, callerUserId))
+      .limit(1);
+    const isAdmin = caller[0]?.role === "admin";
+    if (msg.userId !== callerUserId && !isAdmin) return { error: "forbidden", status: 403 };
+    await this.db
+      .update(schema.messages)
+      .set({ isPinned: body.pinned, updatedAt: Date.now() })
+      .where(eq(schema.messages.id, body.messageId));
+    await this.broadcast({
+      type: "message.pinned",
+      messageId: body.messageId,
+      pinned: body.pinned,
+    });
+    return { ok: true };
+  }
+
   async history(params: {
     limit?: number;
     beforeSeq?: number;
@@ -472,7 +544,28 @@ export class ChannelDO extends DurableObject<Env> {
     callerUserId: string,
     body: { messageSeq: number; emoji: string },
   ): Promise<{ error: string; status: 403 | 404 | 422 } | void> {
-    if (!isAllowedEmoji(body.emoji)) return { error: "invalid emoji", status: 422 };
+    return this.toggleReactionCore(callerUserId, body.messageSeq, body.emoji);
+  }
+
+  async toggleReactionByMessageId(
+    callerUserId: string,
+    body: { messageId: string; emoji: string },
+  ): Promise<{ error: string; status: 403 | 404 | 422 } | void> {
+    const rows = await this.db
+      .select({ seq: schema.messages.seq })
+      .from(schema.messages)
+      .where(eq(schema.messages.id, body.messageId))
+      .limit(1);
+    if (rows.length === 0) return { error: "message not found", status: 404 };
+    return this.toggleReactionCore(callerUserId, rows[0].seq, body.emoji);
+  }
+
+  private async toggleReactionCore(
+    callerUserId: string,
+    messageSeq: number,
+    emoji: string,
+  ): Promise<{ error: string; status: 403 | 404 | 422 } | void> {
+    if (!isAllowedEmoji(emoji)) return { error: "invalid emoji", status: 422 };
     const member = await this.db
       .select()
       .from(schema.memberState)
@@ -482,7 +575,7 @@ export class ChannelDO extends DurableObject<Env> {
     const msg = await this.db
       .select()
       .from(schema.messages)
-      .where(eq(schema.messages.seq, body.messageSeq))
+      .where(eq(schema.messages.seq, messageSeq))
       .limit(1);
     if (msg.length === 0) return { error: "message not found", status: 404 };
     const existing = await this.db
@@ -490,8 +583,8 @@ export class ChannelDO extends DurableObject<Env> {
       .from(schema.reactions)
       .where(
         and(
-          eq(schema.reactions.messageSeq, body.messageSeq),
-          eq(schema.reactions.emoji, body.emoji),
+          eq(schema.reactions.messageSeq, messageSeq),
+          eq(schema.reactions.emoji, emoji),
           eq(schema.reactions.userId, callerUserId),
         ),
       )
@@ -501,20 +594,50 @@ export class ChannelDO extends DurableObject<Env> {
         .delete(schema.reactions)
         .where(
           and(
-            eq(schema.reactions.messageSeq, body.messageSeq),
-            eq(schema.reactions.emoji, body.emoji),
+            eq(schema.reactions.messageSeq, messageSeq),
+            eq(schema.reactions.emoji, emoji),
             eq(schema.reactions.userId, callerUserId),
           ),
         );
     } else {
       await this.db.insert(schema.reactions).values({
-        messageSeq: body.messageSeq,
-        emoji: body.emoji,
+        messageSeq,
+        emoji,
         userId: callerUserId,
         createdAt: Date.now(),
+        updateAt: Date.now(),
       });
     }
-    this.reactionBatcher.markDirty(body.messageSeq);
+    const remaining = await this.db
+      .select({ n: count() })
+      .from(schema.reactions)
+      .where(eq(schema.reactions.messageSeq, messageSeq));
+    const hasReactions = Number(remaining[0]?.n ?? 0) > 0;
+    await this.db
+      .update(schema.messages)
+      .set({ hasReactions, updatedAt: Date.now() })
+      .where(eq(schema.messages.seq, messageSeq));
+    this.reactionBatcher.markDirty(messageSeq);
+  }
+
+  async getThread(
+    postId: string,
+  ): Promise<{ error: string; status: 404 } | { thread: ThreadInfo }> {
+    const rows = await this.db
+      .select()
+      .from(schema.threads)
+      .where(eq(schema.threads.postId, postId))
+      .limit(1);
+    if (rows.length === 0) return { error: "not found", status: 404 };
+    return {
+      thread: {
+        postId: rows[0].postId,
+        replyCount: rows[0].replyCount,
+        lastReplyAt: rows[0].lastReplyAt,
+        participants: JSON.parse(rows[0].participants ?? "[]") as string[],
+        channelId: rows[0].channelId,
+      },
+    };
   }
 
   private async updateMeta(id: string, userId: string, content: string, at: number) {
@@ -542,7 +665,10 @@ export class ChannelDO extends DurableObject<Env> {
       content: r.deletedAt !== null ? "" : r.content,
       attachments: r.attachments ? JSON.parse(r.attachments) : null,
       mentions: r.mentions ? JSON.parse(r.mentions) : null,
+      isPinned: r.isPinned,
+      hasReactions: r.hasReactions,
       editedAt: r.editedAt,
+      updatedAt: r.updatedAt,
       deletedAt: r.deletedAt,
       createdAt: r.createdAt,
     };

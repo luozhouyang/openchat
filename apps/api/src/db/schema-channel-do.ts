@@ -15,12 +15,18 @@ export const messages = sqliteTable(
     type: text("type").notNull().default("text"),
     content: text("content").notNull(),
     attachments: text("attachments"),
+    fileIds: text("file_ids"),
+    props: text("props"),
+    hashtags: text("hashtags"),
     mentions: text("mentions"),
+    isPinned: integer("is_pinned", { mode: "boolean" }).notNull().default(false),
+    hasReactions: integer("has_reactions", { mode: "boolean" }).notNull().default(false),
     editedAt: integer("edited_at"),
+    updatedAt: integer("updated_at"),
     deletedAt: integer("deleted_at"),
     createdAt: integer("created_at").notNull(),
   },
-  (t) => [index("idx_msg_parent").on(t.parentId, t.seq)],
+  (t) => [index("idx_msg_parent").on(t.parentId, t.seq), index("idx_msg_created").on(t.createdAt)],
 );
 
 export const memberState = sqliteTable("member_state", {
@@ -55,6 +61,8 @@ export const reactions = sqliteTable(
     emoji: text("emoji").notNull(),
     userId: text("user_id").notNull(),
     createdAt: integer("created_at").notNull(),
+    updateAt: integer("update_at"),
+    deleteAt: integer("delete_at"),
   },
   (t) => [primaryKey({ columns: [t.messageSeq, t.emoji, t.userId] })],
 );
@@ -66,4 +74,25 @@ export const threadSubscriptions = sqliteTable(
     userId: text("user_id").notNull(),
   },
   (t) => [primaryKey({ columns: [t.parentId, t.userId] })],
+);
+
+export const threads = sqliteTable("threads", {
+  postId: text("post_id").primaryKey(),
+  replyCount: integer("reply_count").notNull().default(0),
+  lastReplyAt: integer("last_reply_at"),
+  participants: text("participants"),
+  channelId: text("channel_id"),
+});
+
+export const threadMemberships = sqliteTable(
+  "thread_memberships",
+  {
+    postId: text("post_id").notNull(),
+    userId: text("user_id").notNull(),
+    following: integer("following", { mode: "boolean" }).notNull().default(true),
+    lastViewed: integer("last_viewed"),
+    lastUpdated: integer("last_updated"),
+    unreadMentions: integer("unread_mentions").notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.postId, t.userId] })],
 );
