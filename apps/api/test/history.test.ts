@@ -1,12 +1,6 @@
 import { expect, test, beforeAll } from "vite-plus/test";
 import { env } from "cloudflare:test";
-import { eq } from "drizzle-orm";
 import { channelDoName, issueInternalToken, userDoName } from "protocol";
-import { getDb } from "../src/db/client.ts";
-import { channels } from "../src/db/schema-d1.ts";
-import { createChannel } from "../src/db/repos/channels.ts";
-
-const db = getDb(env.DB);
 
 function channelStub(channelId: string) {
   return env.CHANNEL_DO.get(env.CHANNEL_DO.idFromName(channelDoName(channelId)));
@@ -86,101 +80,6 @@ test("meta returns last_message keys", async () => {
   ]);
   expect(metaMap.last_message_user_id).toBe("u1");
   expect(metaMap.last_message_preview).toBe("msg-4");
-});
-
-test("post_message frame acks end to end through user do", async () => {
-  const channelId = "c-ws-ack";
-  await createChannel(db, {
-    id: channelId,
-    teamId: null,
-    name: null,
-    displayName: "ack",
-    type: "dm",
-    dedupKey: "ack-1",
-    creatorId: null,
-  });
-  await channelStub(channelId).membersAdd({ userId: "u1", role: "member" });
-  const ws = await upgrade("u1", "d-ack");
-  ws.send(
-    JSON.stringify({
-      type: "post_message",
-      channelId,
-      content: "hello e2e",
-      clientToken: "e2e-1",
-    }),
-  );
-  const ev = await nextMessage(ws);
-  expect(JSON.parse(String(ev.data))).toMatchObject({
-    type: "ack",
-    clientToken: "e2e-1",
-    channelId,
-    messageId: expect.any(String),
-    seq: expect.any(Number),
-  });
-  ws.close(1000, "done");
-});
-
-test("post_message from non-member returns http_403 error frame", async () => {
-  const channelId = "c-ws-nm";
-  await createChannel(db, {
-    id: channelId,
-    teamId: null,
-    name: null,
-    displayName: "nm",
-    type: "dm",
-    dedupKey: "nm-1",
-    creatorId: null,
-  });
-  const ws = await upgrade("u1", "d-nm");
-  ws.send(
-    JSON.stringify({
-      type: "post_message",
-      channelId,
-      content: "nope",
-      clientToken: "nm-1",
-    }),
-  );
-  const ev = await nextMessage(ws);
-  expect(JSON.parse(String(ev.data))).toEqual({
-    type: "error",
-    clientToken: "nm-1",
-    channelId,
-    code: "http_403",
-    message: "not a member",
-  });
-  ws.close(1000, "done");
-});
-
-test("post_message on archived channel returns archived_or_not_found error frame", async () => {
-  const channelId = "c-ws-arch";
-  await createChannel(db, {
-    id: channelId,
-    teamId: null,
-    name: null,
-    displayName: "arch",
-    type: "dm",
-    dedupKey: "arch-1",
-    creatorId: null,
-  });
-  await db.update(channels).set({ archivedAt: Date.now() }).where(eq(channels.id, channelId));
-  const ws = await upgrade("u1", "d-arch");
-  ws.send(
-    JSON.stringify({
-      type: "post_message",
-      channelId,
-      content: "nope",
-      clientToken: "arch-1",
-    }),
-  );
-  const ev = await nextMessage(ws);
-  expect(JSON.parse(String(ev.data))).toEqual({
-    type: "error",
-    clientToken: "arch-1",
-    channelId,
-    code: "archived_or_not_found",
-    message: "channel unavailable",
-  });
-  ws.close(1000, "done");
 });
 
 test("sync frame returns sync.result with ascending messages", async () => {

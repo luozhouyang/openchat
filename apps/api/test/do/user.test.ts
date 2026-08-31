@@ -39,7 +39,9 @@ async function signup(email: string): Promise<{ cookie: string; userId: string }
     body: JSON.stringify({ email, password: "user-do-test-password", name: email.split("@")[0] }),
   });
   const c = res.headers.get("set-cookie") ?? "";
-  const me = await exports.default.fetch("http://localhost/me", { headers: { cookie: c } });
+  const me = await exports.default.fetch("http://localhost/api/v1/users/me", {
+    headers: { cookie: c },
+  });
   return { cookie: c, userId: ((await me.json()) as { user: { id: string } }).user.id };
 }
 

@@ -23,16 +23,21 @@ beforeAll(async () => {
   });
   aliceId = jwtSubject(((await tokenAlice.json()) as { token: string }).token);
 
-  const team = await exports.default.fetch("http://localhost/teams", {
+  const team = await exports.default.fetch("http://localhost/api/v1/teams", {
     method: "POST",
     headers: { cookie: aliceCookie, "content-type": "application/json" },
-    body: JSON.stringify({ name: "pd", displayName: "PD", type: "open" }),
+    body: JSON.stringify({ name: "pd", display_name: "PD", type: "open" }),
   });
   const teamId = ((await team.json()) as { id: string }).id;
-  const create = await exports.default.fetch(`http://localhost/teams/${teamId}/channels`, {
+  const create = await exports.default.fetch("http://localhost/api/v1/channels", {
     method: "POST",
     headers: { cookie: aliceCookie, "content-type": "application/json" },
-    body: JSON.stringify({ name: "general", displayName: "General", type: "public" }),
+    body: JSON.stringify({
+      team_id: teamId,
+      name: "general",
+      display_name: "General",
+      type: "public",
+    }),
   });
   channelId = ((await create.json()) as { id: string }).id;
 });
@@ -49,7 +54,7 @@ function userStub() {
 }
 
 async function subscribe() {
-  return exports.default.fetch("http://localhost/me/push-subscriptions", {
+  return exports.default.fetch("http://localhost/api/v1/users/me/push_subscriptions", {
     method: "POST",
     headers: { cookie: aliceCookie, "content-type": "application/json" },
     body: JSON.stringify({

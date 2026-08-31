@@ -15,7 +15,9 @@ async function signup(email: string): Promise<{ cookie: string; id: string }> {
     body: JSON.stringify({ email, password: "ban-flow-password", name: email.split("@")[0] }),
   });
   const cookie = res.headers.get("set-cookie") ?? "";
-  const me = await exports.default.fetch("http://localhost/me", { headers: { cookie } });
+  const me = await exports.default.fetch("http://localhost/api/v1/users/me", {
+    headers: { cookie },
+  });
   const { user } = (await me.json()) as { user: { id: string } };
   return { cookie, id: user.id };
 }
@@ -31,7 +33,7 @@ beforeAll(async () => {
 });
 
 test("victim session is valid before ban", async () => {
-  const me = await exports.default.fetch("http://localhost/me", {
+  const me = await exports.default.fetch("http://localhost/api/v1/users/me", {
     headers: { cookie: victimCookie },
   });
   expect(me.status).toBe(200);
@@ -51,7 +53,7 @@ test("admin bans victim", async () => {
 });
 
 test("victim /me is revoked after ban", async () => {
-  const me = await exports.default.fetch("http://localhost/me", {
+  const me = await exports.default.fetch("http://localhost/api/v1/users/me", {
     headers: { cookie: victimCookie },
   });
   expect(me.status).toBe(401);

@@ -23,10 +23,10 @@ async function createTeam(
   displayName: string,
   type: "open" | "invite",
 ) {
-  const res = await exports.default.fetch("http://localhost/teams", {
+  const res = await exports.default.fetch("http://localhost/api/v1/teams", {
     method: "POST",
     headers: { cookie, "content-type": "application/json" },
-    body: JSON.stringify({ name, displayName, type }),
+    body: JSON.stringify({ name, display_name: displayName, type }),
   });
   return { status: res.status, body: (await res.json()) as { id?: string; error?: string } };
 }
@@ -41,7 +41,7 @@ test("create and list team", async () => {
   expect(create.body.id).toBeTruthy();
   acmeId = create.body.id!;
 
-  const list = await exports.default.fetch("http://localhost/teams", {
+  const list = await exports.default.fetch("http://localhost/api/v1/users/me/teams", {
     headers: { cookie: ownerCookie },
   });
   const body = (await list.json()) as { teams: { id: string; name: string; roles: string }[] };
@@ -52,7 +52,7 @@ test("create and list team", async () => {
 test("open team joinable, invite team needs code", async () => {
   const joiner = await signup("joiner@test.dev");
 
-  const openJoin = await exports.default.fetch(`http://localhost/teams/${acmeId}/join`, {
+  const openJoin = await exports.default.fetch(`http://localhost/api/v1/teams/${acmeId}/members`, {
     method: "POST",
     headers: { cookie: joiner, "content-type": "application/json" },
     body: JSON.stringify({}),
@@ -63,17 +63,17 @@ test("open team joinable, invite team needs code", async () => {
   expect(inv.status).toBe(201);
   const invId = inv.body.id!;
 
-  const noCode = await exports.default.fetch(`http://localhost/teams/${invId}/join`, {
+  const noCode = await exports.default.fetch(`http://localhost/api/v1/teams/${invId}/members`, {
     method: "POST",
     headers: { cookie: joiner, "content-type": "application/json" },
     body: JSON.stringify({}),
   });
   expect(noCode.status).toBe(403);
 
-  const wrongCode = await exports.default.fetch(`http://localhost/teams/${invId}/join`, {
+  const wrongCode = await exports.default.fetch(`http://localhost/api/v1/teams/${invId}/members`, {
     method: "POST",
     headers: { cookie: joiner, "content-type": "application/json" },
-    body: JSON.stringify({ inviteCode: "bogus-code" }),
+    body: JSON.stringify({ invite_code: "bogus-code" }),
   });
   expect(wrongCode.status).toBe(403);
 });
@@ -82,7 +82,7 @@ test("admin detail exposes invite code and join with it works", async () => {
   const inv = await createTeam(ownerCookie, "vault", "Vault", "invite");
   const invId = inv.body.id!;
 
-  const detail = await exports.default.fetch(`http://localhost/teams/${invId}`, {
+  const detail = await exports.default.fetch(`http://localhost/api/v1/teams/${invId}`, {
     headers: { cookie: ownerCookie },
   });
   expect(detail.status).toBe(200);
@@ -90,17 +90,17 @@ test("admin detail exposes invite code and join with it works", async () => {
   expect(team.inviteCode).toBeTruthy();
 
   const member = await signup("member@test.dev");
-  const withCode = await exports.default.fetch(`http://localhost/teams/${invId}/join`, {
+  const withCode = await exports.default.fetch(`http://localhost/api/v1/teams/${invId}/members`, {
     method: "POST",
     headers: { cookie: member, "content-type": "application/json" },
-    body: JSON.stringify({ inviteCode: team.inviteCode }),
+    body: JSON.stringify({ invite_code: team.inviteCode }),
   });
   expect(withCode.status).toBe(200);
 });
 
 test("non-member list returns empty", async () => {
   const outsider = await signup("outsider@test.dev");
-  const list = await exports.default.fetch("http://localhost/teams", {
+  const list = await exports.default.fetch("http://localhost/api/v1/users/me/teams", {
     headers: { cookie: outsider },
   });
   const body = (await list.json()) as { teams: unknown[] };
@@ -108,21 +108,25 @@ test("non-member list returns empty", async () => {
 });
 
 test("sole admin cannot leave team", async () => {
-  const leave = await exports.default.fetch(`http://localhost/teams/${acmeId}/leave`, {
-    method: "POST",
+  const me = await exports.default.fetch("http://localhost/api/v1/users/me", {
     headers: { cookie: ownerCookie },
   });
+  const { user } = (await me.json()) as { user: { id: string } };
+  const leave = await exports.default.fetch(
+    `http://localhost/api/v1/teams/${acmeId}/members/${user.id}`,
+    { method: "DELETE", headers: { cookie: ownerCookie } },
+  );
   expect(leave.status).toBe(409);
 });
 
 test("leave syncs user channels via UserDO rpc", async () => {
   const member = await signup("leaver@test.dev");
-  const me = await exports.default.fetch("http://localhost/me", {
+  const me = await exports.default.fetch("http://localhost/api/v1/users/me", {
     headers: { cookie: member },
   });
   const { user } = (await me.json()) as { user: { id: string } };
 
-  const join = await exports.default.fetch(`http://localhost/teams/${acmeId}/join`, {
+  const join = await exports.default.fetch(`http://localhost/api/v1/teams/${acmeId}/members`, {
     method: "POST",
     headers: { cookie: member, "content-type": "application/json" },
     body: JSON.stringify({}),
@@ -140,17 +144,17 @@ test("leave syncs user channels via UserDO rpc", async () => {
     creatorId: user.id,
   });
 
-  const leave = await exports.default.fetch(`http://localhost/teams/${acmeId}/leave`, {
-    method: "POST",
-    headers: { cookie: member },
-  });
+  const leave = await exports.default.fetch(
+    `http://localhost/api/v1/teams/${acmeId}/members/${user.id}`,
+    { method: "DELETE", headers: { cookie: member } },
+  );
   expect(leave.status).toBe(200);
 
   const stub = env.USER_DO.idFromName(userDoName(user.id));
   const health = await env.USER_DO.get(stub).health();
   expect(health.channels).toBe(1);
 
-  const list = await exports.default.fetch("http://localhost/teams", {
+  const list = await exports.default.fetch("http://localhost/api/v1/users/me/teams", {
     headers: { cookie: member },
   });
   const body = (await list.json()) as { teams: unknown[] };

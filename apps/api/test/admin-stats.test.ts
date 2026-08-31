@@ -22,7 +22,9 @@ async function signup(email: string): Promise<{ cookie: string; id: string }> {
     body: JSON.stringify({ email, password: "admin-stats-password", name: email.split("@")[0] }),
   });
   const cookie = res.headers.get("set-cookie") ?? "";
-  const me = await exports.default.fetch("http://localhost/me", { headers: { cookie } });
+  const me = await exports.default.fetch("http://localhost/api/v1/users/me", {
+    headers: { cookie },
+  });
   const { user } = (await me.json()) as { user: { id: string } };
   return { cookie, id: user.id };
 }
@@ -30,7 +32,7 @@ async function signup(email: string): Promise<{ cookie: string; id: string }> {
 async function fetchStats(cookie?: string): Promise<Response> {
   const headers: Record<string, string> = {};
   if (cookie) headers.cookie = cookie;
-  return exports.default.fetch("http://localhost/admin/stats", { headers });
+  return exports.default.fetch("http://localhost/api/v1/admin/stats", { headers });
 }
 
 beforeAll(async () => {
@@ -39,16 +41,21 @@ beforeAll(async () => {
   adminId = admin.id;
   await env.DB.prepare("UPDATE users SET role = 'admin' WHERE id = ?").bind(adminId).run();
 
-  const teamRes = await exports.default.fetch("http://localhost/teams", {
+  const teamRes = await exports.default.fetch("http://localhost/api/v1/teams", {
     method: "POST",
     headers: { cookie: adminCookie, "content-type": "application/json" },
-    body: JSON.stringify({ name: "stats", displayName: "Stats", type: "open" }),
+    body: JSON.stringify({ name: "stats", display_name: "Stats", type: "open" }),
   });
   const team = (await teamRes.json()) as { id: string };
-  const chanRes = await exports.default.fetch(`http://localhost/teams/${team.id}/channels`, {
+  const chanRes = await exports.default.fetch("http://localhost/api/v1/channels", {
     method: "POST",
     headers: { cookie: adminCookie, "content-type": "application/json" },
-    body: JSON.stringify({ name: "general", displayName: "General", type: "public" }),
+    body: JSON.stringify({
+      team_id: team.id,
+      name: "general",
+      display_name: "General",
+      type: "public",
+    }),
   });
   const chan = (await chanRes.json()) as { id: string };
   channelId = chan.id;

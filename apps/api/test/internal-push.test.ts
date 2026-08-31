@@ -27,7 +27,7 @@ beforeAll(async () => {
 });
 
 async function registerSubscription() {
-  return exports.default.fetch("http://localhost/me/push-subscriptions", {
+  return exports.default.fetch("http://localhost/api/v1/users/me/push_subscriptions", {
     method: "POST",
     headers: { cookie, "content-type": "application/json" },
     body: JSON.stringify({

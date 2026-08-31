@@ -17,7 +17,7 @@ async function signup(email: string): Promise<string> {
 }
 
 async function requestUpload(cookie: string, overrides: Record<string, unknown> = {}) {
-  const res = await exports.default.fetch("http://localhost/uploads", {
+  const res = await exports.default.fetch("http://localhost/api/v1/uploads", {
     method: "POST",
     headers: { cookie, "content-type": "application/json" },
     body: JSON.stringify({
@@ -34,10 +34,9 @@ async function requestUpload(cookie: string, overrides: Record<string, unknown> 
 async function completeUpload(
   uploadId: string,
 ): Promise<{ status: number; body: { messageId?: string } }> {
-  const res = await exports.default.fetch("http://localhost/uploads/complete", {
+  const res = await exports.default.fetch(`http://localhost/api/v1/uploads/${uploadId}/complete`, {
     method: "POST",
     headers: { cookie: ownerCookie, "content-type": "application/json" },
-    body: JSON.stringify({ uploadId }),
   });
   return { status: res.status, body: (await res.json()) as { messageId?: string } };
 }
@@ -45,16 +44,16 @@ async function completeUpload(
 beforeAll(async () => {
   ownerCookie = await signup("upload-owner@test.dev");
   outsiderCookie = await signup("upload-outsider@test.dev");
-  const team = await exports.default.fetch("http://localhost/teams", {
+  const team = await exports.default.fetch("http://localhost/api/v1/teams", {
     method: "POST",
     headers: { cookie: ownerCookie, "content-type": "application/json" },
-    body: JSON.stringify({ name: "upteam", displayName: "Up Team", type: "open" }),
+    body: JSON.stringify({ name: "upteam", display_name: "Up Team", type: "open" }),
   });
   const teamId = ((await team.json()) as { id: string }).id;
-  const ch = await exports.default.fetch(`http://localhost/teams/${teamId}/channels`, {
+  const ch = await exports.default.fetch("http://localhost/api/v1/channels", {
     method: "POST",
     headers: { cookie: ownerCookie, "content-type": "application/json" },
-    body: JSON.stringify({ name: "files", displayName: "Files", type: "public" }),
+    body: JSON.stringify({ team_id: teamId, name: "files", display_name: "Files", type: "public" }),
   });
   channelId = ((await ch.json()) as { id: string }).id;
 });

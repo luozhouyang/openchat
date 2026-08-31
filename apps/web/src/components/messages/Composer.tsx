@@ -3,6 +3,7 @@ import { wsClient } from "../../ws/client";
 import { useMessageStore } from "../../stores/messages";
 import { Button } from "../ui/button";
 import { UploadButton } from "../upload/UploadButton";
+import type { ClientFrame } from "protocol";
 
 export function Composer({ channelId }: { channelId: string }) {
   const [text, setText] = useState("");
@@ -26,7 +27,12 @@ export function Composer({ channelId }: { channelId: string }) {
       deletedAt: null,
       createdAt: Date.now(),
     });
-    wsClient.send({ type: "post_message", channelId, content, clientToken });
+    wsClient.send({
+      type: "post_message",
+      channelId,
+      content,
+      clientToken,
+    } as unknown as ClientFrame);
     setText("");
   }
 

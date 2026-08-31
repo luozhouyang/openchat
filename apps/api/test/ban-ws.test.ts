@@ -15,7 +15,9 @@ async function signup(email: string): Promise<{ cookie: string; id: string }> {
     body: JSON.stringify({ email, password: "ban-ws-password", name: email.split("@")[0] }),
   });
   const cookie = res.headers.get("set-cookie") ?? "";
-  const me = await exports.default.fetch("http://localhost/me", { headers: { cookie } });
+  const me = await exports.default.fetch("http://localhost/api/v1/users/me", {
+    headers: { cookie },
+  });
   const { user } = (await me.json()) as { user: { id: string } };
   return { cookie, id: user.id };
 }
@@ -77,7 +79,7 @@ test("banned victim /ws with still-valid jwt rejected inside window", async () =
 });
 
 test("banned victim /me bearer route rejected", async () => {
-  const res = await exports.default.fetch("http://localhost/me", {
+  const res = await exports.default.fetch("http://localhost/api/v1/users/me", {
     headers: { authorization: `Bearer ${victimToken}` },
   });
   expect(res.status).toBe(403);

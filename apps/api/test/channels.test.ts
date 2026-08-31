@@ -17,13 +17,13 @@ async function signup(email: string): Promise<string> {
 beforeAll(async () => {
   owner = await signup("ch-owner@test.dev");
   member = await signup("ch-member@test.dev");
-  const team = await exports.default.fetch("http://localhost/teams", {
+  const team = await exports.default.fetch("http://localhost/api/v1/teams", {
     method: "POST",
     headers: { cookie: owner, "content-type": "application/json" },
-    body: JSON.stringify({ name: "chanco", displayName: "ChanCo", type: "open" }),
+    body: JSON.stringify({ name: "chanco", display_name: "ChanCo", type: "open" }),
   });
   teamId = ((await team.json()) as { id: string }).id;
-  await exports.default.fetch(`http://localhost/teams/${teamId}/join`, {
+  await exports.default.fetch(`http://localhost/api/v1/teams/${teamId}/members`, {
     method: "POST",
     headers: { cookie: member, "content-type": "application/json" },
     body: JSON.stringify({}),
@@ -31,21 +31,29 @@ beforeAll(async () => {
 });
 
 test("create public channel and member joins", async () => {
-  const create = await exports.default.fetch(`http://localhost/teams/${teamId}/channels`, {
+  const create = await exports.default.fetch("http://localhost/api/v1/channels", {
     method: "POST",
     headers: { cookie: owner, "content-type": "application/json" },
-    body: JSON.stringify({ name: "general", displayName: "General", type: "public" }),
+    body: JSON.stringify({
+      team_id: teamId,
+      name: "general",
+      display_name: "General",
+      type: "public",
+    }),
   });
   expect(create.status).toBe(201);
   const channelId = ((await create.json()) as { id: string }).id;
 
-  const join = await exports.default.fetch(`http://localhost/channels/${channelId}/join`, {
-    method: "POST",
-    headers: { cookie: member },
-  });
+  const join = await exports.default.fetch(
+    `http://localhost/api/v1/channels/${channelId}/members`,
+    {
+      method: "POST",
+      headers: { cookie: member },
+    },
+  );
   expect(join.status).toBe(200);
 
-  const detail = await exports.default.fetch(`http://localhost/channels/${channelId}`, {
+  const detail = await exports.default.fetch(`http://localhost/api/v1/channels/${channelId}`, {
     headers: { cookie: member },
   });
   expect(detail.status).toBe(200);
@@ -54,38 +62,51 @@ test("create public channel and member joins", async () => {
 });
 
 test("duplicate channel name conflicts", async () => {
-  const dup = await exports.default.fetch(`http://localhost/teams/${teamId}/channels`, {
+  const dup = await exports.default.fetch("http://localhost/api/v1/channels", {
     method: "POST",
     headers: { cookie: owner, "content-type": "application/json" },
-    body: JSON.stringify({ name: "general", displayName: "General 2", type: "public" }),
+    body: JSON.stringify({
+      team_id: teamId,
+      name: "general",
+      display_name: "General 2",
+      type: "public",
+    }),
   });
   expect(dup.status).toBe(409);
 });
 
 test("non-member cannot read channel", async () => {
   const outsider = await signup("ch-outsider@test.dev");
-  const list = await exports.default.fetch(`http://localhost/teams/${teamId}/channels`, {
+  const list = await exports.default.fetch(`http://localhost/api/v1/teams/${teamId}/channels`, {
     headers: { cookie: owner },
   });
   const channelId = ((await list.json()) as { channels: { id: string }[] }).channels[0].id;
-  const detail = await exports.default.fetch(`http://localhost/channels/${channelId}`, {
+  const detail = await exports.default.fetch(`http://localhost/api/v1/channels/${channelId}`, {
     headers: { cookie: outsider },
   });
   expect(detail.status).toBe(403);
 });
 
 test("private channel cannot be joined by non-member", async () => {
-  const create = await exports.default.fetch(`http://localhost/teams/${teamId}/channels`, {
+  const create = await exports.default.fetch("http://localhost/api/v1/channels", {
     method: "POST",
     headers: { cookie: owner, "content-type": "application/json" },
-    body: JSON.stringify({ name: "secret", displayName: "Secret", type: "private" }),
+    body: JSON.stringify({
+      team_id: teamId,
+      name: "secret",
+      display_name: "Secret",
+      type: "private",
+    }),
   });
   expect(create.status).toBe(201);
   const channelId = ((await create.json()) as { id: string }).id;
 
-  const join = await exports.default.fetch(`http://localhost/channels/${channelId}/join`, {
-    method: "POST",
-    headers: { cookie: member },
-  });
+  const join = await exports.default.fetch(
+    `http://localhost/api/v1/channels/${channelId}/members`,
+    {
+      method: "POST",
+      headers: { cookie: member },
+    },
+  );
   expect(join.status).toBe(403);
 });

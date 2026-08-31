@@ -26,33 +26,35 @@ async function signup(email: string): Promise<string> {
 }
 
 async function userIdOf(cookie: string): Promise<string> {
-  const me = await exports.default.fetch("http://localhost/me", { headers: { cookie } });
+  const me = await exports.default.fetch("http://localhost/api/v1/users/me", {
+    headers: { cookie },
+  });
   return ((await me.json()) as { user: { id: string } }).user.id;
 }
 
 async function createChannel(): Promise<string> {
-  const team = await exports.default.fetch("http://localhost/teams", {
+  const team = await exports.default.fetch("http://localhost/api/v1/teams", {
     method: "POST",
     headers: { cookie: ownerCookie, "content-type": "application/json" },
-    body: JSON.stringify({ name: "td1", displayName: "Task D1", type: "open" }),
+    body: JSON.stringify({ name: "td1", display_name: "Task D1", type: "open" }),
   });
   const teamId = ((await team.json()) as { id: string }).id;
   for (const cookie of [memberACookie, memberBCookie]) {
-    await exports.default.fetch(`http://localhost/teams/${teamId}/join`, {
+    await exports.default.fetch(`http://localhost/api/v1/teams/${teamId}/members`, {
       method: "POST",
       headers: { cookie, "content-type": "application/json" },
       body: JSON.stringify({}),
     });
   }
-  const create = await exports.default.fetch(`http://localhost/teams/${teamId}/channels`, {
+  const create = await exports.default.fetch("http://localhost/api/v1/channels", {
     method: "POST",
     headers: { cookie: ownerCookie, "content-type": "application/json" },
-    body: JSON.stringify({ name: "d1", displayName: "D1", type: "public" }),
+    body: JSON.stringify({ team_id: teamId, name: "d1", display_name: "D1", type: "public" }),
   });
   expect(create.status).toBe(201);
   const id = ((await create.json()) as { id: string }).id;
   for (const cookie of [memberACookie, memberBCookie]) {
-    const join = await exports.default.fetch(`http://localhost/channels/${id}/join`, {
+    const join = await exports.default.fetch(`http://localhost/api/v1/channels/${id}/members`, {
       method: "POST",
       headers: { cookie },
     });

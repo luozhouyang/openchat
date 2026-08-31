@@ -18,17 +18,17 @@ async function signup(email: string): Promise<string> {
 
 beforeAll(async () => {
   cookie = await signup("ws-guide@test.dev");
-  const res = await exports.default.fetch("http://localhost/teams", {
+  const res = await exports.default.fetch("http://localhost/api/v1/teams", {
     method: "POST",
     headers: { cookie, "content-type": "application/json" },
-    body: JSON.stringify({ name: "guideteam", displayName: "Guide Team", type: "open" }),
+    body: JSON.stringify({ name: "guideteam", display_name: "Guide Team", type: "open" }),
   });
   const body = (await res.json()) as { id?: string };
   teamId = body.id!;
 });
 
 test("workspaces returns team with empty channels", async () => {
-  const res = await exports.default.fetch("http://localhost/me/workspaces", {
+  const res = await exports.default.fetch("http://localhost/api/v1/users/me/workspaces", {
     headers: { cookie },
   });
   expect(res.status).toBe(200);
@@ -71,7 +71,7 @@ test("workspaces lists channels and membership", async () => {
     creatorId: "user-ws-1",
   });
 
-  const res = await exports.default.fetch("http://localhost/me/workspaces", {
+  const res = await exports.default.fetch("http://localhost/api/v1/users/me/workspaces", {
     headers: { cookie },
   });
   expect(res.status).toBe(200);
@@ -91,7 +91,7 @@ test("workspaces lists channels and membership", async () => {
     dedupKey: "dedup-ws-2",
     creatorId: "user-ws-1",
   });
-  const res2 = await exports.default.fetch("http://localhost/me/workspaces", {
+  const res2 = await exports.default.fetch("http://localhost/api/v1/users/me/workspaces", {
     headers: { cookie },
   });
   const body2 = (await res2.json()) as {
@@ -101,6 +101,6 @@ test("workspaces lists channels and membership", async () => {
 });
 
 test("workspaces requires session", async () => {
-  const res = await exports.default.fetch("http://localhost/me/workspaces");
+  const res = await exports.default.fetch("http://localhost/api/v1/users/me/workspaces");
   expect(res.status).toBe(401);
 });

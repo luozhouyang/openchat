@@ -17,7 +17,7 @@ beforeAll(async () => {
 });
 
 async function subscribe(body: Record<string, unknown>) {
-  return exports.default.fetch("http://localhost/me/push-subscriptions", {
+  return exports.default.fetch("http://localhost/api/v1/users/me/push_subscriptions", {
     method: "POST",
     headers: { cookie, "content-type": "application/json" },
     body: JSON.stringify(body),
@@ -34,7 +34,7 @@ test("register, list, and delete push subscription", async () => {
   });
   expect(reg.status).toBe(200);
 
-  const list = await exports.default.fetch("http://localhost/me/push-subscriptions", {
+  const list = await exports.default.fetch("http://localhost/api/v1/users/me/push_subscriptions", {
     headers: { cookie },
   });
   expect(list.status).toBe(200);
@@ -57,13 +57,16 @@ test("register, list, and delete push subscription", async () => {
     auth: "au",
   });
 
-  const del = await exports.default.fetch("http://localhost/me/push-subscriptions/d1", {
-    method: "DELETE",
-    headers: { cookie },
-  });
+  const del = await exports.default.fetch(
+    "http://localhost/api/v1/users/me/push_subscriptions/d1",
+    {
+      method: "DELETE",
+      headers: { cookie },
+    },
+  );
   expect(del.status).toBe(200);
 
-  const after = await exports.default.fetch("http://localhost/me/push-subscriptions", {
+  const after = await exports.default.fetch("http://localhost/api/v1/users/me/push_subscriptions", {
     headers: { cookie },
   });
   const afterBody = (await after.json()) as { subscriptions: unknown[] };
@@ -87,7 +90,7 @@ test("upsert same deviceId updates endpoint and keeps one row", async () => {
   });
   expect(reg2.status).toBe(200);
 
-  const list = await exports.default.fetch("http://localhost/me/push-subscriptions", {
+  const list = await exports.default.fetch("http://localhost/api/v1/users/me/push_subscriptions", {
     headers: { cookie },
   });
   const body = (await list.json()) as {
@@ -102,24 +105,27 @@ test("upsert same deviceId updates endpoint and keeps one row", async () => {
 });
 
 test("requires session", async () => {
-  const post = await exports.default.fetch("http://localhost/me/push-subscriptions", {
+  const post = await exports.default.fetch("http://localhost/api/v1/users/me/push_subscriptions", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ deviceId: "d3", kind: "webpush", endpoint: "https://push.example/ep3" }),
   });
   expect(post.status).toBe(401);
 
-  const get = await exports.default.fetch("http://localhost/me/push-subscriptions");
+  const get = await exports.default.fetch("http://localhost/api/v1/users/me/push_subscriptions");
   expect(get.status).toBe(401);
 
-  const del = await exports.default.fetch("http://localhost/me/push-subscriptions/d3", {
-    method: "DELETE",
-  });
+  const del = await exports.default.fetch(
+    "http://localhost/api/v1/users/me/push_subscriptions/d3",
+    {
+      method: "DELETE",
+    },
+  );
   expect(del.status).toBe(401);
 });
 
 test("exposes vapid public key", async () => {
-  const res = await exports.default.fetch("http://localhost/me/vapid-public-key", {
+  const res = await exports.default.fetch("http://localhost/api/v1/users/me/vapid_public_key", {
     headers: { cookie },
   });
   expect(res.status).toBe(200);

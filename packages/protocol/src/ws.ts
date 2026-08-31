@@ -5,13 +5,6 @@ const clientFrameSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("echo"), data: z.string().max(4096) }),
   z.object({ type: z.literal("activity") }),
   z.object({
-    type: z.literal("post_message"),
-    channelId: z.string().min(1),
-    content: z.string().min(1).max(16384),
-    parentId: z.string().optional(),
-    clientToken: z.string().min(1).max(64),
-  }),
-  z.object({
     type: z.literal("mark_read"),
     channelId: z.string().min(1),
     seq: z.number().int().nonnegative(),
@@ -27,17 +20,6 @@ const clientFrameSchema = z.discriminatedUnion("type", [
     channelId: z.string().min(1),
     messageSeq: z.number().int().positive(),
     emoji: z.string().min(1).max(8),
-  }),
-  z.object({
-    type: z.literal("edit_message"),
-    channelId: z.string().min(1),
-    messageId: z.string().min(1),
-    content: z.string().min(1).max(16384),
-  }),
-  z.object({
-    type: z.literal("delete_message"),
-    channelId: z.string().min(1),
-    messageId: z.string().min(1),
   }),
   z.object({
     type: z.literal("typing"),

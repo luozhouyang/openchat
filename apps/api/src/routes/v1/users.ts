@@ -1,13 +1,18 @@
 import { Hono } from "hono";
-import { requireSession } from "../auth/session.ts";
-import { getDb } from "../db/client.ts";
-import { listTeamsForUser } from "../db/repos/teams.ts";
-import { listChannelsForTeam, listChannelsForUser } from "../db/repos/channels.ts";
-import { syncUserChannels } from "../user-do-sync.ts";
+import { requireSession } from "../../auth/session.ts";
+import { getDb } from "../../db/client.ts";
+import { listTeamsForUser } from "../../db/repos/teams.ts";
+import { listChannelsForTeam, listChannelsForUser } from "../../db/repos/channels.ts";
+import { syncUserChannels } from "../../user-do-sync.ts";
 
-export const workspacesRoutes = new Hono<{ Bindings: Env }>();
+export const usersV1 = new Hono<{ Bindings: Env }>();
 
-workspacesRoutes.get("/me/workspaces", requireSession, async (c) => {
+usersV1.get("/users/me", requireSession, (c) => {
+  const session = c.get("session");
+  return c.json({ user: session?.user });
+});
+
+usersV1.get("/users/me/workspaces", requireSession, async (c) => {
   const db = getDb(c.env.DB);
   const userId = c.get("session")!.user.id;
   const teamsRows = await listTeamsForUser(db, userId);

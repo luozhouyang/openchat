@@ -5,6 +5,7 @@ import { channelDoName, issueInternalToken, userDoName } from "protocol";
 
 let owner = "";
 let outsider = "";
+let ownerId = "";
 let teamId = "";
 let channelId = "";
 
@@ -21,29 +22,45 @@ async function signup(email: string): Promise<string> {
   return res.headers.get("set-cookie") ?? "";
 }
 
+async function userIdOf(cookie: string): Promise<string> {
+  const me = await exports.default.fetch("http://localhost/api/v1/users/me", {
+    headers: { cookie },
+  });
+  return ((await me.json()) as { user: { id: string } }).user.id;
+}
+
 beforeAll(async () => {
   owner = await signup("np-owner@test.dev");
   outsider = await signup("np-outsider@test.dev");
-  const team = await exports.default.fetch("http://localhost/teams", {
+  ownerId = await userIdOf(owner);
+  const team = await exports.default.fetch("http://localhost/api/v1/teams", {
     method: "POST",
     headers: { cookie: owner, "content-type": "application/json" },
-    body: JSON.stringify({ name: "np", displayName: "NP", type: "open" }),
+    body: JSON.stringify({ name: "np", display_name: "NP", type: "open" }),
   });
   teamId = ((await team.json()) as { id: string }).id;
-  const create = await exports.default.fetch(`http://localhost/teams/${teamId}/channels`, {
+  const create = await exports.default.fetch("http://localhost/api/v1/channels", {
     method: "POST",
     headers: { cookie: owner, "content-type": "application/json" },
-    body: JSON.stringify({ name: "general", displayName: "General", type: "public" }),
+    body: JSON.stringify({
+      team_id: teamId,
+      name: "general",
+      display_name: "General",
+      type: "public",
+    }),
   });
   channelId = ((await create.json()) as { id: string }).id;
 });
 
-async function setPref(cookie: string, pref: string) {
-  return exports.default.fetch(`http://localhost/channels/${channelId}/notify-pref`, {
-    method: "POST",
-    headers: { cookie, "content-type": "application/json" },
-    body: JSON.stringify({ pref }),
-  });
+async function setPref(cookie: string, userId: string, pref: string) {
+  return exports.default.fetch(
+    `http://localhost/api/v1/channels/${channelId}/members/${userId}/notify_props`,
+    {
+      method: "PUT",
+      headers: { cookie, "content-type": "application/json" },
+      body: JSON.stringify({ notify_props: { pref } }),
+    },
+  );
 }
 
 function nextMessage(ws: WebSocket): Promise<MessageEvent> {
@@ -53,28 +70,38 @@ function nextMessage(ws: WebSocket): Promise<MessageEvent> {
 }
 
 test("set notify pref returns ok", async () => {
-  const res = await setPref(owner, "mention");
+  const res = await setPref(owner, ownerId, "mention");
   expect(res.status).toBe(200);
   const body = (await res.json()) as { ok: boolean };
   expect(body.ok).toBe(true);
 });
 
 test("invalid pref returns 422", async () => {
-  const res = await setPref(owner, "bogus");
+  const res = await setPref(owner, ownerId, "bogus");
   expect(res.status).toBe(422);
 });
 
 test("non-member cannot set notify pref", async () => {
-  const res = await setPref(outsider, "all");
+  const res = await exports.default.fetch(
+    `http://localhost/api/v1/channels/${channelId}/members/${ownerId}/notify_props`,
+    {
+      method: "PUT",
+      headers: { cookie: outsider, "content-type": "application/json" },
+      body: JSON.stringify({ notify_props: { pref: "all" } }),
+    },
+  );
   expect(res.status).toBe(403);
 });
 
 test("requires session", async () => {
-  const res = await exports.default.fetch(`http://localhost/channels/${channelId}/notify-pref`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ pref: "all" }),
-  });
+  const res = await exports.default.fetch(
+    `http://localhost/api/v1/channels/${channelId}/members/${ownerId}/notify_props`,
+    {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ notify_props: { pref: "all" } }),
+    },
+  );
   expect(res.status).toBe(401);
 });
 

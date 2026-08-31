@@ -12,7 +12,7 @@ import {
 import type { PresenceStatus } from "protocol";
 import migrations from "../../migrations/user-do/migrations";
 import { getDb } from "../db/client.ts";
-import { getChannel, listChannelsByIds } from "../db/repos/channels.ts";
+import { listChannelsByIds } from "../db/repos/channels.ts";
 import * as schema from "../db/schema-user-do.ts";
 
 interface SidebarEntry {
@@ -649,55 +649,6 @@ export class UserDO extends DurableObject<Env> {
       if (!userId) return;
       const id = this.env.CHANNEL_DO.idFromName(channelDoName(frame.channelId));
       void this.env.CHANNEL_DO.get(id).readMark({ userId, seq: frame.seq });
-    }
-    if (frame.type === "post_message") {
-      const attachment = ws.deserializeAttachment() as { userId?: string } | null;
-      const userId = attachment?.userId;
-      if (!userId) return;
-      const channelId = frame.channelId;
-      const db = getDb(this.env.DB);
-      const ch = await getChannel(db, channelId);
-      if (!ch || ch.archivedAt) {
-        ws.send(
-          JSON.stringify({
-            type: "error",
-            clientToken: frame.clientToken,
-            channelId,
-            code: "archived_or_not_found",
-            message: "channel unavailable",
-          }),
-        );
-        return;
-      }
-      const stub = this.env.CHANNEL_DO.get(
-        this.env.CHANNEL_DO.idFromName(channelDoName(channelId)),
-      );
-      const res = await stub.postMessage(userId, {
-        content: frame.content,
-        parentId: frame.parentId,
-        clientToken: frame.clientToken,
-      });
-      if ("error" in res) {
-        ws.send(
-          JSON.stringify({
-            type: "error",
-            clientToken: frame.clientToken,
-            channelId,
-            code: `http_${res.status}`,
-            message: res.error,
-          }),
-        );
-      } else {
-        ws.send(
-          JSON.stringify({
-            type: "ack",
-            clientToken: frame.clientToken,
-            channelId,
-            messageId: res.messageId,
-            seq: res.seq,
-          }),
-        );
-      }
     }
     if (frame.type === "sync") {
       for (const ch of frame.channels.slice(0, 8)) {

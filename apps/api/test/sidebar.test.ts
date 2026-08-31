@@ -48,12 +48,12 @@ async function signup(email: string): Promise<string> {
   return res.headers.get("set-cookie") ?? "";
 }
 
-test("GET /me/sidebar requires session and returns channels", async () => {
-  const noAuth = await exports.default.fetch("http://localhost/me/sidebar");
+test("GET /users/me/sidebar requires session and returns channels", async () => {
+  const noAuth = await exports.default.fetch("http://localhost/api/v1/users/me/sidebar");
   expect(noAuth.status).toBe(401);
 
   const cookie = await signup("sidebar-route@test.dev");
-  const res = await exports.default.fetch("http://localhost/me/sidebar", {
+  const res = await exports.default.fetch("http://localhost/api/v1/users/me/sidebar", {
     headers: { cookie },
   });
   expect(res.status).toBe(200);

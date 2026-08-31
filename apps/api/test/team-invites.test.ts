@@ -37,7 +37,7 @@ async function insertInvite(
 }
 
 async function accept(cookie: string, token: string) {
-  return exports.default.fetch("http://localhost/teams/invites/accept", {
+  return exports.default.fetch("http://localhost/api/v1/teams/invites/accept", {
     method: "POST",
     headers: { cookie, "content-type": "application/json" },
     body: JSON.stringify({ token }),
@@ -46,17 +46,17 @@ async function accept(cookie: string, token: string) {
 
 beforeAll(async () => {
   aliceCookie = await signup("alice@test.dev");
-  const create = await exports.default.fetch("http://localhost/teams", {
+  const create = await exports.default.fetch("http://localhost/api/v1/teams", {
     method: "POST",
     headers: { cookie: aliceCookie, "content-type": "application/json" },
-    body: JSON.stringify({ name: "invteam", displayName: "Inv", type: "open" }),
+    body: JSON.stringify({ name: "invteam", display_name: "Inv", type: "open" }),
   });
   const body = (await create.json()) as { id: string };
   teamId = body.id;
 });
 
 test("admin creates invite, response has no token", async () => {
-  const res = await exports.default.fetch(`http://localhost/teams/${teamId}/invites`, {
+  const res = await exports.default.fetch(`http://localhost/api/v1/teams/${teamId}/invite/email`, {
     method: "POST",
     headers: { cookie: aliceCookie, "content-type": "application/json" },
     body: JSON.stringify({ email: "bob@test.dev" }),
@@ -70,7 +70,7 @@ test("admin creates invite, response has no token", async () => {
 });
 
 test("duplicate pending invite is 409", async () => {
-  const res = await exports.default.fetch(`http://localhost/teams/${teamId}/invites`, {
+  const res = await exports.default.fetch(`http://localhost/api/v1/teams/${teamId}/invite/email`, {
     method: "POST",
     headers: { cookie: aliceCookie, "content-type": "application/json" },
     body: JSON.stringify({ email: "bob@test.dev" }),
@@ -79,7 +79,7 @@ test("duplicate pending invite is 409", async () => {
 });
 
 test("invalid email is 422", async () => {
-  const res = await exports.default.fetch(`http://localhost/teams/${teamId}/invites`, {
+  const res = await exports.default.fetch(`http://localhost/api/v1/teams/${teamId}/invite/email`, {
     method: "POST",
     headers: { cookie: aliceCookie, "content-type": "application/json" },
     body: JSON.stringify({ email: "not-an-email" }),
@@ -88,7 +88,7 @@ test("invalid email is 422", async () => {
 });
 
 test("admin lists invites including the created one", async () => {
-  const res = await exports.default.fetch(`http://localhost/teams/${teamId}/invites`, {
+  const res = await exports.default.fetch(`http://localhost/api/v1/teams/${teamId}/invites`, {
     headers: { cookie: aliceCookie },
   });
   expect(res.status).toBe(200);
@@ -100,7 +100,7 @@ test("admin lists invites including the created one", async () => {
 
 test("non-admin member cannot create invite", async () => {
   const carol = await signup("carol@test.dev");
-  const me = await exports.default.fetch("http://localhost/me", {
+  const me = await exports.default.fetch("http://localhost/api/v1/users/me", {
     headers: { cookie: carol },
   });
   const { user } = (await me.json()) as { user: { id: string } };
@@ -109,7 +109,7 @@ test("non-admin member cannot create invite", async () => {
   )
     .bind(teamId, user.id, Date.now())
     .run();
-  const res = await exports.default.fetch(`http://localhost/teams/${teamId}/invites`, {
+  const res = await exports.default.fetch(`http://localhost/api/v1/teams/${teamId}/invite/email`, {
     method: "POST",
     headers: { cookie: carol, "content-type": "application/json" },
     body: JSON.stringify({ email: "dave@test.dev" }),
@@ -129,7 +129,7 @@ test("preview returns masked info for valid token", async () => {
     knownInserted = true;
   }
   const res = await exports.default.fetch(
-    `http://localhost/teams/invites/preview?token=${encodeURIComponent(knownToken)}`,
+    `http://localhost/api/v1/teams/invites/preview?token=${encodeURIComponent(knownToken)}`,
   );
   expect(res.status).toBe(200);
   const body = (await res.json()) as {
@@ -146,7 +146,7 @@ test("preview returns masked info for valid token", async () => {
 
 test("preview with wrong token is 404", async () => {
   const res = await exports.default.fetch(
-    "http://localhost/teams/invites/preview?token=wrong-token",
+    "http://localhost/api/v1/teams/invites/preview?token=wrong-token",
   );
   expect(res.status).toBe(404);
 });
@@ -164,7 +164,7 @@ test("bob accepts and becomes member", async () => {
   expect(body.ok).toBe(true);
   expect(body.teamId).toBe(teamId);
 
-  const list = await exports.default.fetch("http://localhost/teams", {
+  const list = await exports.default.fetch("http://localhost/api/v1/users/me/teams", {
     headers: { cookie: bob },
   });
   const listBody = (await list.json()) as { teams: { id: string }[] };
@@ -216,7 +216,7 @@ test("revoked invite cannot be accepted", async () => {
     Date.now() + 48 * 3600_000,
   );
   const revoke = await exports.default.fetch(
-    `http://localhost/teams/${teamId}/invites/inv-revoke/revoke`,
+    `http://localhost/api/v1/teams/${teamId}/invites/inv-revoke/revoke`,
     {
       method: "POST",
       headers: { cookie: aliceCookie },
@@ -237,7 +237,7 @@ test("already member accept returns ok without consuming", async () => {
     Date.now(),
     Date.now() + 48 * 3600_000,
   );
-  const me = await exports.default.fetch("http://localhost/me", {
+  const me = await exports.default.fetch("http://localhost/api/v1/users/me", {
     headers: { cookie: bob },
   });
   const { user } = (await me.json()) as { user: { id: string } };
@@ -253,7 +253,7 @@ test("already member accept returns ok without consuming", async () => {
   expect(body.ok).toBe(true);
 
   const preview = await exports.default.fetch(
-    `http://localhost/teams/invites/preview?token=${encodeURIComponent(memberToken)}`,
+    `http://localhost/api/v1/teams/invites/preview?token=${encodeURIComponent(memberToken)}`,
   );
   expect(preview.status).toBe(200);
 });

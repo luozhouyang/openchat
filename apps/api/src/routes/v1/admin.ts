@@ -2,23 +2,23 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { eq, and } from "drizzle-orm";
 import { channelDoName } from "protocol";
-import { requireAdmin } from "../auth/admin-gate.ts";
-import type { SessionContext } from "../auth/session.ts";
-import { getDb } from "../db/client.ts";
-import { users, teams, channels, teamMembers, channelMembers } from "../db/schema-d1.ts";
-import { listChannelsForTeam, listChannelMemberIds } from "../db/repos/channels.ts";
-import { removeChannelMemberFromDo, syncUserChannels } from "../user-do-sync.ts";
-import { auditLog } from "../audit.ts";
+import { requireAdmin } from "../../auth/admin-gate.ts";
+import type { SessionContext } from "../../auth/session.ts";
+import { getDb } from "../../db/client.ts";
+import { users, teams, channels, teamMembers, channelMembers } from "../../db/schema-d1.ts";
+import { listChannelsForTeam, listChannelMemberIds } from "../../db/repos/channels.ts";
+import { removeChannelMemberFromDo, syncUserChannels } from "../../user-do-sync.ts";
+import { auditLog } from "../../audit.ts";
 
-export const adminRoutes = new Hono<{
+export const adminV1 = new Hono<{
   Bindings: Env;
   Variables: { session: SessionContext; adminUserId: string };
 }>();
-adminRoutes.use("*", requireAdmin);
+adminV1.use("*", requireAdmin);
 
-adminRoutes.get("/settings", (c) => c.json({ openRegistration: true }));
+adminV1.get("/settings", (c) => c.json({ openRegistration: true }));
 
-adminRoutes.get("/stats", async (c) => {
+adminV1.get("/stats", async (c) => {
   const db = getDb(c.env.DB);
   const [userRows, teamRows, channelRows] = await Promise.all([
     db.select({ id: users.id }).from(users),
@@ -53,7 +53,7 @@ adminRoutes.get("/stats", async (c) => {
   });
 });
 
-adminRoutes.post("/teams/:teamId/archive", async (c) => {
+adminV1.post("/teams/:teamId/archive", async (c) => {
   const db = getDb(c.env.DB);
   const teamId = c.req.param("teamId");
   const now = Date.now();
@@ -66,7 +66,7 @@ adminRoutes.post("/teams/:teamId/archive", async (c) => {
   return c.json({ ok: true });
 });
 
-adminRoutes.post("/channels/:channelId/archive", async (c) => {
+adminV1.post("/channels/:channelId/archive", async (c) => {
   const db = getDb(c.env.DB);
   const channelId = c.req.param("channelId");
   await db.update(channels).set({ archivedAt: Date.now() }).where(eq(channels.id, channelId));
@@ -79,7 +79,7 @@ adminRoutes.post("/channels/:channelId/archive", async (c) => {
   return c.json({ ok: true });
 });
 
-adminRoutes.post("/channels/:channelId/delete", async (c) => {
+adminV1.post("/channels/:channelId/delete", async (c) => {
   const db = getDb(c.env.DB);
   const channelId = c.req.param("channelId");
   await db.delete(channelMembers).where(eq(channelMembers.channelId, channelId));
@@ -93,7 +93,7 @@ adminRoutes.post("/channels/:channelId/delete", async (c) => {
   return c.json({ ok: true });
 });
 
-adminRoutes.post("/teams/:teamId/members/remove", async (c) => {
+adminV1.post("/teams/:teamId/members/remove", async (c) => {
   const body = z.object({ userId: z.string().min(1) }).safeParse(await c.req.json());
   if (!body.success) return c.json({ error: "invalid" }, 422);
   const db = getDb(c.env.DB);

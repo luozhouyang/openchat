@@ -21,6 +21,6 @@ export async function signup(
 }
 
 export async function userIdOf(worker: TestWorker, cookie: string): Promise<string> {
-  const me = await worker.fetch("http://localhost/me", { headers: { cookie } });
+  const me = await worker.fetch("http://localhost/api/v1/users/me", { headers: { cookie } });
   return ((await me.json()) as { user: { id: string } }).user.id;
 }

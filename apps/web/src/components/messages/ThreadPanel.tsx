@@ -4,6 +4,7 @@ import { apiFetch } from "../../lib/api";
 import { useMessageStore } from "../../stores/messages";
 import { wsClient } from "../../ws/client";
 import type { StoreMessage } from "../../stores/messages";
+import type { ClientFrame } from "protocol";
 
 export function ThreadPanel({ channelId, parentId }: { channelId: string; parentId: string }) {
   const messages = useMessageStore((s) => s.threadList(channelId, parentId));
@@ -12,7 +13,7 @@ export function ThreadPanel({ channelId, parentId }: { channelId: string; parent
     queryKey: ["thread", parentId],
     queryFn: async () => {
       const res = await apiFetch<{ messages: StoreMessage[] }>(
-        `/api/channels/${channelId}/history?parent_id=${parentId}&order=asc&limit=100`,
+        `/api/v1/channels/${channelId}/posts?parent_id=${parentId}&order=asc&limit=100`,
       );
       for (const m of res.messages) useMessageStore.getState().ingestThread(channelId, m);
       return res;
@@ -46,7 +47,13 @@ function ThreadComposer({ channelId, parentId }: { channelId: string; parentId: 
     const content = text.trim();
     if (!content) return;
     const clientToken = crypto.randomUUID();
-    wsClient.send({ type: "post_message", channelId, content, parentId, clientToken });
+    wsClient.send({
+      type: "post_message",
+      channelId,
+      content,
+      parentId,
+      clientToken,
+    } as unknown as ClientFrame);
     setText("");
   }
 

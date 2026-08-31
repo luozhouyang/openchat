@@ -17,19 +17,19 @@ beforeAll(async () => {
 });
 
 test("admin endpoint rejects unauthenticated", async () => {
-  const res = await exports.default.fetch("http://localhost/admin/settings");
+  const res = await exports.default.fetch("http://localhost/api/v1/admin/settings");
   expect(res.status).toBe(401);
 });
 
 test("admin endpoint rejects non-admin", async () => {
-  const res = await exports.default.fetch("http://localhost/admin/settings", {
+  const res = await exports.default.fetch("http://localhost/api/v1/admin/settings", {
     headers: { cookie: userCookie },
   });
   expect(res.status).toBe(403);
 });
 
 test("admin endpoint rejects bearer without session", async () => {
-  const res = await exports.default.fetch("http://localhost/admin/settings", {
+  const res = await exports.default.fetch("http://localhost/api/v1/admin/settings", {
     headers: { authorization: "Bearer invalid-token" },
   });
   expect(res.status).toBe(401);

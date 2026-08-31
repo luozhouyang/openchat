@@ -13,12 +13,12 @@ beforeAll(async () => {
 });
 
 test("GET /me without session returns 401", async () => {
-  const res = await exports.default.fetch("http://localhost/me");
+  const res = await exports.default.fetch("http://localhost/api/v1/users/me");
   expect(res.status).toBe(401);
 });
 
 test("GET /me with cookie returns user", async () => {
-  const res = await exports.default.fetch("http://localhost/me", {
+  const res = await exports.default.fetch("http://localhost/api/v1/users/me", {
     headers: { cookie: sessionCookie },
   });
   expect(res.status).toBe(200);
@@ -31,7 +31,7 @@ test("GET /me with bearer jwt returns user", async () => {
     headers: { cookie: sessionCookie },
   });
   const { token } = (await tokenRes.json()) as { token: string };
-  const res = await exports.default.fetch("http://localhost/me", {
+  const res = await exports.default.fetch("http://localhost/api/v1/users/me", {
     headers: { authorization: `Bearer ${token}` },
   });
   expect(res.status).toBe(200);

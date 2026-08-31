@@ -23,28 +23,30 @@ beforeAll(async () => {
   owner = await signup("hist-owner@test.dev");
   member = await signup("hist-member@test.dev");
   outsider = await signup("hist-outsider@test.dev");
-  const team = await exports.default.fetch("http://localhost/teams", {
+  const team = await exports.default.fetch("http://localhost/api/v1/teams", {
     method: "POST",
     headers: { cookie: owner, "content-type": "application/json" },
-    body: JSON.stringify({ name: "histco", displayName: "HistCo", type: "open" }),
+    body: JSON.stringify({ name: "histco", display_name: "HistCo", type: "open" }),
   });
   teamId = ((await team.json()) as { id: string }).id;
-  const create = await exports.default.fetch(`http://localhost/teams/${teamId}/channels`, {
+  const create = await exports.default.fetch("http://localhost/api/v1/channels", {
     method: "POST",
     headers: { cookie: owner, "content-type": "application/json" },
-    body: JSON.stringify({ name: "hist", displayName: "Hist", type: "public" }),
+    body: JSON.stringify({ team_id: teamId, name: "hist", display_name: "Hist", type: "public" }),
   });
   channelId = ((await create.json()) as { id: string }).id;
-  await exports.default.fetch(`http://localhost/teams/${teamId}/join`, {
+  await exports.default.fetch(`http://localhost/api/v1/teams/${teamId}/members`, {
     method: "POST",
     headers: { cookie: member, "content-type": "application/json" },
     body: JSON.stringify({}),
   });
-  await exports.default.fetch(`http://localhost/channels/${channelId}/join`, {
+  await exports.default.fetch(`http://localhost/api/v1/channels/${channelId}/members`, {
     method: "POST",
     headers: { cookie: member },
   });
-  const me = await exports.default.fetch("http://localhost/me", { headers: { cookie: owner } });
+  const me = await exports.default.fetch("http://localhost/api/v1/users/me", {
+    headers: { cookie: owner },
+  });
   ownerUserId = ((await me.json()) as { user: { id: string } }).user.id;
   const stub = env.CHANNEL_DO.get(env.CHANNEL_DO.idFromName(channelDoName(channelId)));
   await stub.membersAdd({ userId: ownerUserId, role: "member" });
@@ -56,7 +58,7 @@ test("history returns messages for a member", async () => {
   await stub.postMessage(ownerUserId, { content: "h-2", clientToken: "h-2" });
 
   const res = await exports.default.fetch(
-    `http://localhost/channels/${channelId}/history?limit=10`,
+    `http://localhost/api/v1/channels/${channelId}/posts?limit=10`,
     { headers: { cookie: member } },
   );
   expect(res.status).toBe(200);
@@ -70,12 +72,12 @@ test("history returns messages for a member", async () => {
 
 test("history before_seq paginates without overlap", async () => {
   const page1 = await exports.default.fetch(
-    `http://localhost/channels/${channelId}/history?limit=1`,
+    `http://localhost/api/v1/channels/${channelId}/posts?limit=1`,
     { headers: { cookie: member } },
   );
   const p1 = (await page1.json()) as { messages: { content: string }[]; oldestSeq: number | null };
   const page2 = await exports.default.fetch(
-    `http://localhost/channels/${channelId}/history?limit=10&before_seq=${p1.oldestSeq}`,
+    `http://localhost/api/v1/channels/${channelId}/posts?limit=10&before_seq=${p1.oldestSeq}`,
     { headers: { cookie: member } },
   );
   const p2 = (await page2.json()) as { messages: { content: string }[] };
@@ -85,7 +87,7 @@ test("history before_seq paginates without overlap", async () => {
 
 test("non-member gets 403 from history", async () => {
   const res = await exports.default.fetch(
-    `http://localhost/channels/${channelId}/history?limit=10`,
+    `http://localhost/api/v1/channels/${channelId}/posts?limit=10`,
     { headers: { cookie: outsider } },
   );
   expect(res.status).toBe(403);

@@ -1,12 +1,5 @@
 import { expect, test } from "vite-plus/test";
-import { parseClientFrame, messageNewEvent } from "../src/index.ts";
-
-test("parses post_message frame", () => {
-  const frame = parseClientFrame(
-    JSON.stringify({ type: "post_message", channelId: "c1", content: "hi", clientToken: "t1" }),
-  );
-  expect(frame?.type).toBe("post_message");
-});
+import { messageNewEvent } from "../src/index.ts";
 
 test("message.new event shape", () => {
   const ev = messageNewEvent("c1", {
