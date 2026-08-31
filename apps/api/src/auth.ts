@@ -46,7 +46,8 @@ export function makeAuth(env: Env) {
                 .from(users)
                 .where(eq(users.id, user.id))
                 .limit(1);
-              if (rows[0]?.banned) {
+              const row = rows[0];
+              if (row?.banned) {
                 const id = env.USER_DO.idFromName(userDoName(user.id));
                 await env.USER_DO.get(id).forceDisconnect();
                 auditLog({

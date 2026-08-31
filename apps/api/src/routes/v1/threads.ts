@@ -1,98 +1,97 @@
-import { Hono } from "hono";
-import { z } from "zod";
-import type { Context } from "hono";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
+import { Hono, type Context } from "hono";
 import { channelDoName } from "protocol";
-import { requireSession } from "../../auth/session.ts";
+import {
+  ThreadReadInput,
+  ThreadFollowInput,
+  ThreadQuery,
+  type ThreadInfo,
+  type ThreadOutput,
+  type MyThreadsOutput,
+} from "protocol";
 import type { SessionContext } from "../../auth/session.ts";
+import { requireSession } from "../../auth/session.ts";
 import { getDb } from "../../db/client.ts";
 import { getChannel, getChannelMember } from "../../db/repos/channels.ts";
 import { getTeam, getTeamMember, listChannelIdsForUserInTeam } from "../../db/repos/teams.ts";
-
-const ThreadReadBody = z.object({
-  channel_id: z.string().min(1),
-});
-
-const ThreadFollowBody = z.object({
-  channel_id: z.string().min(1),
-  state: z.boolean(),
-});
+import { apiError } from "../../lib/errors.ts";
+import { zodValidator } from "../../lib/validation.ts";
 
 type ThreadsCtx = Context<{ Bindings: Env; Variables: { session: SessionContext } }>;
+
+export const threadsV1 = new Hono<{ Bindings: Env }>();
 
 function channelStub(env: Env, channelId: string) {
   return env.CHANNEL_DO.get(env.CHANNEL_DO.idFromName(channelDoName(channelId)));
 }
 
-async function requireChannelMember(c: ThreadsCtx, channelId: string): Promise<Response | null> {
+async function requireChannelMember(c: ThreadsCtx, channelId: string) {
   const db = getDb(c.env.DB);
   const channel = await getChannel(db, channelId);
-  if (!channel) return c.json({ error: "channel not found" }, 404);
+  if (!channel) throw apiError("not found", "channel not found", 404);
   const member = await getChannelMember(db, channelId, c.get("session")!.user.id);
-  if (!member) return c.json({ error: "forbidden" }, 403);
-  return null;
+  if (!member) throw apiError("forbidden", "forbidden", 403);
 }
 
-export const threadsV1 = new Hono<{ Bindings: Env }>();
-
-threadsV1.get("/posts/:postId/thread", requireSession, async (c) => {
-  const channelId = new URL(c.req.url).searchParams.get("channel_id");
-  if (!channelId) return c.json({ error: "invalid" }, 422);
-  const denied = await requireChannelMember(c, channelId);
-  if (denied) return denied;
-  const stub = channelStub(c.env, channelId);
-  const res = await stub.getThread(c.req.param("postId")!);
-  if ("error" in res) return c.json({ error: res.error }, res.status as ContentfulStatusCode);
-  return c.json(res);
-});
-
+threadsV1.get(
+  "/posts/:postId/thread",
+  requireSession,
+  zodValidator("query", ThreadQuery),
+  async (c) => {
+    const body = c.req.valid("query");
+    await requireChannelMember(c, body.channelId);
+    const res = await channelStub(c.env, body.channelId).getThread(c.req.param("postId"));
+    if ("error" in res) throw apiError(res.error, res.error, res.status);
+    return c.json(res as ThreadOutput);
+  },
+);
 threadsV1.get("/users/:userId/teams/:teamId/threads", requireSession, async (c) => {
   const db = getDb(c.env.DB);
   const me = c.get("session")!.user.id;
-  const target = c.req.param("userId")!;
-  const userId = target === "me" ? me : target;
-  if (userId !== me) return c.json({ error: "forbidden" }, 403);
-  const teamId = c.req.param("teamId")!;
+  const target = c.req.param("userId") === "me" ? me : c.req.param("userId");
+  if (target !== me) throw apiError("forbidden", "forbidden", 403);
+  const teamId = c.req.param("teamId");
   const team = await getTeam(db, teamId);
-  if (!team) return c.json({ error: "team not found" }, 404);
-  const teamMember = await getTeamMember(db, teamId, userId);
-  if (!teamMember) return c.json({ error: "forbidden" }, 403);
-  const channelIds = await listChannelIdsForUserInTeam(db, teamId, userId);
-  const threads = [];
+  if (!team) throw apiError("not found", "team not found", 404);
+  const teamMember = await getTeamMember(db, teamId, target);
+  if (!teamMember) throw apiError("forbidden", "forbidden", 403);
+  const channelIds = await listChannelIdsForUserInTeam(db, teamId, target);
+  const threads: ThreadInfo[] = [];
   for (const channelId of channelIds) {
-    const stub = channelStub(c.env, channelId);
-    const res = await stub.threadsForUser(userId);
+    const res = await channelStub(c.env, channelId).threadsForUser(target);
     if ("error" in res) continue;
     for (const t of res.threads) {
-      threads.push({ ...t, channel_id: channelId });
+      threads.push({ ...t, channelId });
     }
   }
-  return c.json({ threads });
+  const out: MyThreadsOutput = { threads };
+  return c.json(out);
 });
-
-threadsV1.post("/posts/:postId/thread/read", requireSession, async (c) => {
-  const body = ThreadReadBody.safeParse(await c.req.json().catch(() => null));
-  if (!body.success) return c.json({ error: "invalid" }, 422);
-  const denied = await requireChannelMember(c, body.data.channel_id);
-  if (denied) return denied;
-  const stub = channelStub(c.env, body.data.channel_id);
-  const res = await stub.threadMarkRead(c.get("session")!.user.id, {
-    postId: c.req.param("postId")!,
-  });
-  if ("error" in res) return c.json({ error: res.error }, res.status as ContentfulStatusCode);
-  return c.json({ ok: true });
-});
-
-threadsV1.post("/posts/:postId/following", requireSession, async (c) => {
-  const body = ThreadFollowBody.safeParse(await c.req.json().catch(() => null));
-  if (!body.success) return c.json({ error: "invalid" }, 422);
-  const denied = await requireChannelMember(c, body.data.channel_id);
-  if (denied) return denied;
-  const stub = channelStub(c.env, body.data.channel_id);
-  const res = await stub.threadFollow(c.get("session")!.user.id, {
-    postId: c.req.param("postId")!,
-    following: body.data.state,
-  });
-  if ("error" in res) return c.json({ error: res.error }, res.status as ContentfulStatusCode);
-  return c.json({ ok: true });
-});
+threadsV1.post(
+  "/posts/:postId/thread/read",
+  requireSession,
+  zodValidator("json", ThreadReadInput),
+  async (c) => {
+    const body = c.req.valid("json");
+    await requireChannelMember(c, body.channelId);
+    const res = await channelStub(c.env, body.channelId).threadMarkRead(c.get("session")!.user.id, {
+      postId: c.req.param("postId"),
+    });
+    if ("error" in res) throw apiError(res.error, res.error, res.status);
+    return c.json({ ok: true });
+  },
+);
+threadsV1.post(
+  "/posts/:postId/following",
+  requireSession,
+  zodValidator("json", ThreadFollowInput),
+  async (c) => {
+    const body = c.req.valid("json");
+    await requireChannelMember(c, body.channelId);
+    const res = await channelStub(c.env, body.channelId).threadFollow(c.get("session")!.user.id, {
+      postId: c.req.param("postId"),
+      following: body.state,
+    });
+    if ("error" in res) throw apiError(res.error, res.error, res.status);
+    return c.json({ ok: true });
+  },
+);

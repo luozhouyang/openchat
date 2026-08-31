@@ -4,6 +4,7 @@ import { makeAuth } from "../auth.ts";
 import { verifyAuthJwt } from "../jwks.ts";
 import { getDb } from "../db/client.ts";
 import { users } from "../db/schema-d1.ts";
+import { apiError } from "../lib/errors.ts";
 
 export type SessionContext = {
   user: { id: string; email: string };
@@ -26,7 +27,8 @@ export const requireSession = createMiddleware<{
         .from(users)
         .where(eq(users.id, claims.sub))
         .limit(1);
-      if (rows[0]?.banned) return c.json({ error: "banned" }, 403);
+      const row = rows[0];
+      if (row?.banned) throw apiError("banned", "banned", 403);
       c.set("session", {
         user: { id: claims.sub, email: claims.email ?? "" },
         session: {
@@ -41,10 +43,10 @@ export const requireSession = createMiddleware<{
       c.set("session", full);
       return next();
     }
-    return c.json({ error: "unauthorized" }, 401);
+    throw apiError("unauthorized", "unauthorized", 401);
   }
   const session = await auth.api.getSession({ headers: c.req.raw.headers });
-  if (!session) return c.json({ error: "unauthorized" }, 401);
+  if (!session) throw apiError("unauthorized", "unauthorized", 401);
   c.set("session", session);
   return next();
 });

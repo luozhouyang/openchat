@@ -1,7 +1,7 @@
 import { Hono } from "hono";
-import { z } from "zod";
 import { eq, and } from "drizzle-orm";
 import { channelDoName } from "protocol";
+import { RemoveMemberInput, type AdminStatsOutput } from "protocol";
 import { requireAdmin } from "../../auth/admin-gate.ts";
 import type { SessionContext } from "../../auth/session.ts";
 import { getDb } from "../../db/client.ts";
@@ -9,6 +9,7 @@ import { users, teams, channels, teamMembers, channelMembers } from "../../db/sc
 import { listChannelsForTeam, listChannelMemberIds } from "../../db/repos/channels.ts";
 import { removeChannelMemberFromDo, syncUserChannels } from "../../user-do-sync.ts";
 import { auditLog } from "../../audit.ts";
+import { zodValidator } from "../../lib/validation.ts";
 
 export const adminV1 = new Hono<{
   Bindings: Env;
@@ -16,8 +17,9 @@ export const adminV1 = new Hono<{
 }>();
 adminV1.use("*", requireAdmin);
 
-adminV1.get("/settings", (c) => c.json({ openRegistration: true }));
-
+adminV1.get("/settings", async (c) => {
+  return c.json({ openRegistration: true });
+});
 adminV1.get("/stats", async (c) => {
   const db = getDb(c.env.DB);
   const [userRows, teamRows, channelRows] = await Promise.all([
@@ -42,17 +44,17 @@ adminV1.get("/stats", async (c) => {
         }
       }),
     );
-    messages += results.reduce((a, b) => a + b, 0);
+    messages += results.reduce((a: number, b: number) => a + b, 0);
   }
-  return c.json({
+  const out: AdminStatsOutput = {
     users: userRows.length,
     teams: teamRows.length,
     channels: channelRows.length,
     messages,
     truncated,
-  });
+  };
+  return c.json(out);
 });
-
 adminV1.post("/teams/:teamId/archive", async (c) => {
   const db = getDb(c.env.DB);
   const teamId = c.req.param("teamId");
@@ -65,7 +67,6 @@ adminV1.post("/teams/:teamId/archive", async (c) => {
   auditLog({ actor: c.get("adminUserId"), action: "team.archive", target: teamId, status: "ok" });
   return c.json({ ok: true });
 });
-
 adminV1.post("/channels/:channelId/archive", async (c) => {
   const db = getDb(c.env.DB);
   const channelId = c.req.param("channelId");
@@ -78,7 +79,6 @@ adminV1.post("/channels/:channelId/archive", async (c) => {
   });
   return c.json({ ok: true });
 });
-
 adminV1.post("/channels/:channelId/delete", async (c) => {
   const db = getDb(c.env.DB);
   const channelId = c.req.param("channelId");
@@ -92,32 +92,34 @@ adminV1.post("/channels/:channelId/delete", async (c) => {
   });
   return c.json({ ok: true });
 });
-
-adminV1.post("/teams/:teamId/members/remove", async (c) => {
-  const body = z.object({ userId: z.string().min(1) }).safeParse(await c.req.json());
-  if (!body.success) return c.json({ error: "invalid" }, 422);
-  const db = getDb(c.env.DB);
-  const teamId = c.req.param("teamId");
-  const userId = body.data.userId;
-  const chs = await listChannelsForTeam(db, teamId);
-  for (const ch of chs) {
-    const members = await listChannelMemberIds(db, ch.id);
-    if (members.includes(userId)) {
-      await db
-        .delete(channelMembers)
-        .where(and(eq(channelMembers.channelId, ch.id), eq(channelMembers.userId, userId)));
-      await removeChannelMemberFromDo(c.env, ch.id, userId);
+adminV1.post(
+  "/teams/:teamId/members/remove",
+  zodValidator("json", RemoveMemberInput),
+  async (c) => {
+    const body = c.req.valid("json");
+    const db = getDb(c.env.DB);
+    const teamId = c.req.param("teamId");
+    const userId = body.userId;
+    const chs = await listChannelsForTeam(db, teamId);
+    for (const ch of chs) {
+      const members = await listChannelMemberIds(db, ch.id);
+      if (members.includes(userId)) {
+        await db
+          .delete(channelMembers)
+          .where(and(eq(channelMembers.channelId, ch.id), eq(channelMembers.userId, userId)));
+        await removeChannelMemberFromDo(c.env, ch.id, userId);
+      }
     }
-  }
-  await db
-    .delete(teamMembers)
-    .where(and(eq(teamMembers.teamId, teamId), eq(teamMembers.userId, userId)));
-  await syncUserChannels(c.env, userId);
-  auditLog({
-    actor: c.get("adminUserId"),
-    action: "team.member.remove",
-    target: `${teamId}/${userId}`,
-    status: "ok",
-  });
-  return c.json({ ok: true });
-});
+    await db
+      .delete(teamMembers)
+      .where(and(eq(teamMembers.teamId, teamId), eq(teamMembers.userId, userId)));
+    await syncUserChannels(c.env, userId);
+    auditLog({
+      actor: c.get("adminUserId"),
+      action: "team.member.remove",
+      target: `${teamId}/${userId}`,
+      status: "ok",
+    });
+    return c.json({ ok: true });
+  },
+);

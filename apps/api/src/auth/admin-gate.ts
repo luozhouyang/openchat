@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { getDb } from "../db/client.ts";
 import { users } from "../db/schema-d1.ts";
 import { requireSession, type SessionContext } from "./session.ts";
+import { apiError } from "../lib/errors.ts";
 
 export const requireAdmin = createMiddleware<{
   Bindings: Env;
@@ -10,14 +11,15 @@ export const requireAdmin = createMiddleware<{
 }>(async (c, next) => {
   await requireSession(c as unknown as Parameters<typeof requireSession>[0], async () => {});
   const session = c.get("session");
-  if (!session) return c.json({ error: "unauthorized" }, 401);
+  if (!session) throw apiError("unauthorized", "unauthorized", 401);
   const db = getDb(c.env.DB);
   const rows = await db
     .select({ role: users.role })
     .from(users)
     .where(eq(users.id, session.user.id))
     .limit(1);
-  if (rows[0]?.role !== "admin") return c.json({ error: "forbidden" }, 403);
+  const row = rows[0];
+  if (row?.role !== "admin") throw apiError("forbidden", "forbidden", 403);
   c.set("adminUserId", session.user.id);
   return next();
 });

@@ -25,13 +25,13 @@ beforeAll(async () => {
   const team = await exports.default.fetch("http://localhost/api/v1/teams", {
     method: "POST",
     headers: { cookie: userA, "content-type": "application/json" },
-    body: JSON.stringify({ name: "pinco", display_name: "PinCo", type: "open" }),
+    body: JSON.stringify({ name: "pinco", displayName: "PinCo", type: "open" }),
   });
   const teamId = ((await team.json()) as { id: string }).id;
   const create = await exports.default.fetch("http://localhost/api/v1/channels", {
     method: "POST",
     headers: { cookie: userA, "content-type": "application/json" },
-    body: JSON.stringify({ team_id: teamId, name: "pin", display_name: "Pin", type: "public" }),
+    body: JSON.stringify({ teamId, name: "pin", displayName: "Pin", type: "public" }),
   });
   channelId = ((await create.json()) as { id: string }).id;
   await exports.default.fetch(`http://localhost/api/v1/teams/${teamId}/members`, {
@@ -60,18 +60,18 @@ test("non-author non-admin pin returns 403", async () => {
   const res = await exports.default.fetch(`http://localhost/api/v1/posts/${messageId}/pin`, {
     method: "POST",
     headers: { cookie: userB, "content-type": "application/json" },
-    body: JSON.stringify({ channel_id: channelId }),
+    body: JSON.stringify({ channelId }),
   });
   expect(res.status).toBe(403);
-  const body = (await res.json()) as { error: string };
-  expect(body.error).toBe("forbidden");
+  const body = (await res.json()) as { code: string };
+  expect(body.code).toBe("forbidden");
 });
 
 test("author pin returns ok and history shows isPinned true", async () => {
   const res = await exports.default.fetch(`http://localhost/api/v1/posts/${messageId}/pin`, {
     method: "POST",
     headers: { cookie: userA, "content-type": "application/json" },
-    body: JSON.stringify({ channel_id: channelId }),
+    body: JSON.stringify({ channelId }),
   });
   expect(res.status).toBe(200);
   expect(await res.json()).toEqual({ ok: true });
@@ -89,7 +89,7 @@ test("author unpin returns ok", async () => {
   const res = await exports.default.fetch(`http://localhost/api/v1/posts/${messageId}/unpin`, {
     method: "POST",
     headers: { cookie: userA, "content-type": "application/json" },
-    body: JSON.stringify({ channel_id: channelId }),
+    body: JSON.stringify({ channelId }),
   });
   expect(res.status).toBe(200);
   expect(await res.json()).toEqual({ ok: true });

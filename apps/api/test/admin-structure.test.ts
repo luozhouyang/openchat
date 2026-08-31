@@ -26,7 +26,7 @@ async function createTeam(cookie: string, name: string, displayName: string) {
   const res = await exports.default.fetch("http://localhost/api/v1/teams", {
     method: "POST",
     headers: { cookie, "content-type": "application/json" },
-    body: JSON.stringify({ name, display_name: displayName, type: "open" }),
+    body: JSON.stringify({ name, displayName, type: "open" }),
   });
   return (await res.json()) as { id?: string; error?: string };
 }
@@ -35,7 +35,7 @@ async function createChannel(cookie: string, teamId: string, name: string, displ
   const res = await exports.default.fetch("http://localhost/api/v1/channels", {
     method: "POST",
     headers: { cookie, "content-type": "application/json" },
-    body: JSON.stringify({ team_id: teamId, name, display_name: displayName, type: "public" }),
+    body: JSON.stringify({ teamId, name, displayName, type: "public" }),
   });
   return (await res.json()) as { id?: string; error?: string };
 }
@@ -65,8 +65,8 @@ test("channel archive by admin sets archivedAt", async () => {
   const detail = await exports.default.fetch(`http://localhost/api/v1/channels/${archChannelId}`, {
     headers: { cookie: adminCookie },
   });
-  const body = (await detail.json()) as { archivedAt: number | null };
-  expect(body.archivedAt).toBeTruthy();
+  const body = (await detail.json()) as { channel: { archivedAt: number | null } };
+  expect(body.channel.archivedAt).toBeTruthy();
 });
 
 test("team archive by admin sets archivedAt", async () => {

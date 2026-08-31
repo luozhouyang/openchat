@@ -29,16 +29,16 @@ beforeAll(async () => {
   const team = await exports.default.fetch("http://localhost/api/v1/teams", {
     method: "POST",
     headers: { cookie: owner, "content-type": "application/json" },
-    body: JSON.stringify({ name: "threadsco", display_name: "ThreadsCo", type: "open" }),
+    body: JSON.stringify({ name: "threadsco", displayName: "ThreadsCo", type: "open" }),
   });
   teamId = ((await team.json()) as { id: string }).id;
   const create = await exports.default.fetch("http://localhost/api/v1/channels", {
     method: "POST",
     headers: { cookie: owner, "content-type": "application/json" },
     body: JSON.stringify({
-      team_id: teamId,
+      teamId,
       name: "threads",
-      display_name: "Threads",
+      displayName: "Threads",
       type: "public",
     }),
   });
@@ -59,7 +59,7 @@ beforeAll(async () => {
   const root = await exports.default.fetch(`http://localhost/api/v1/channels/${channelId}/posts`, {
     method: "POST",
     headers: { cookie: member, "content-type": "application/json" },
-    body: JSON.stringify({ message: "root post", client_token: "threads-root-1" }),
+    body: JSON.stringify({ message: "root post", clientToken: "threads-root-1" }),
   });
   rootId = ((await root.json()) as { id: string }).id;
   const reply = await exports.default.fetch(`http://localhost/api/v1/channels/${channelId}/posts`, {
@@ -67,8 +67,8 @@ beforeAll(async () => {
     headers: { cookie: member, "content-type": "application/json" },
     body: JSON.stringify({
       message: "a reply",
-      parent_id: rootId,
-      client_token: "threads-reply-1",
+      parentId: rootId,
+      clientToken: "threads-reply-1",
     }),
   });
   expect(reply.status).toBe(201);
@@ -76,7 +76,7 @@ beforeAll(async () => {
 
 test("thread summary returns replyCount and participants", async () => {
   const res = await exports.default.fetch(
-    `http://localhost/api/v1/posts/${rootId}/thread?channel_id=${channelId}`,
+    `http://localhost/api/v1/posts/${rootId}/thread?channelId=${channelId}`,
     { headers: { cookie: member } },
   );
   expect(res.status).toBe(200);
@@ -88,18 +88,18 @@ test("thread summary returns replyCount and participants", async () => {
   expect(body.thread.participants).toContain(memberUserId);
 });
 
-test("team threads for user includes the thread with channel_id", async () => {
+test("team threads for user includes the thread with channelId", async () => {
   const res = await exports.default.fetch(
     `http://localhost/api/v1/users/me/teams/${teamId}/threads`,
     { headers: { cookie: member } },
   );
   expect(res.status).toBe(200);
   const body = (await res.json()) as {
-    threads: { postId: string; channel_id: string; participants: string[] }[];
+    threads: { postId: string; channelId: string; participants: string[] }[];
   };
   const hit = body.threads.find((t) => t.postId === rootId);
   expect(hit).toBeDefined();
-  expect(hit!.channel_id).toBe(channelId);
+  expect(hit!.channelId).toBe(channelId);
   expect(hit!.participants).toContain(memberUserId);
 });
 
@@ -107,13 +107,13 @@ test("thread read and follow endpoints return ok", async () => {
   const read = await exports.default.fetch(`http://localhost/api/v1/posts/${rootId}/thread/read`, {
     method: "POST",
     headers: { cookie: member, "content-type": "application/json" },
-    body: JSON.stringify({ channel_id: channelId }),
+    body: JSON.stringify({ channelId }),
   });
   expect(read.status).toBe(200);
   const follow = await exports.default.fetch(`http://localhost/api/v1/posts/${rootId}/following`, {
     method: "POST",
     headers: { cookie: member, "content-type": "application/json" },
-    body: JSON.stringify({ channel_id: channelId, state: true }),
+    body: JSON.stringify({ channelId, state: true }),
   });
   expect(follow.status).toBe(200);
   const unfollow = await exports.default.fetch(
@@ -121,7 +121,7 @@ test("thread read and follow endpoints return ok", async () => {
     {
       method: "POST",
       headers: { cookie: member, "content-type": "application/json" },
-      body: JSON.stringify({ channel_id: channelId, state: false }),
+      body: JSON.stringify({ channelId, state: false }),
     },
   );
   expect(unfollow.status).toBe(200);
@@ -129,7 +129,7 @@ test("thread read and follow endpoints return ok", async () => {
 
 test("missing thread returns 404", async () => {
   const res = await exports.default.fetch(
-    `http://localhost/api/v1/posts/does-not-exist/thread?channel_id=${channelId}`,
+    `http://localhost/api/v1/posts/does-not-exist/thread?channelId=${channelId}`,
     { headers: { cookie: member } },
   );
   expect(res.status).toBe(404);
@@ -137,7 +137,7 @@ test("missing thread returns 404", async () => {
 
 test("non-member thread access returns 403", async () => {
   const res = await exports.default.fetch(
-    `http://localhost/api/v1/posts/${rootId}/thread?channel_id=${channelId}`,
+    `http://localhost/api/v1/posts/${rootId}/thread?channelId=${channelId}`,
     { headers: { cookie: outsider } },
   );
   expect(res.status).toBe(403);

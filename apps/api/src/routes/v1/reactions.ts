@@ -1,91 +1,96 @@
-import { Hono } from "hono";
-import { z } from "zod";
-import type { Context } from "hono";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
+import { Hono, type Context } from "hono";
 import { eq } from "drizzle-orm";
 import { channelDoName, isAllowedEmoji } from "protocol";
-import { requireSession } from "../../auth/session.ts";
+import { AddReactionInput, ReactionsQuery, type ReactionsOutput } from "protocol";
 import type { SessionContext } from "../../auth/session.ts";
+import { requireSession } from "../../auth/session.ts";
 import { getDb } from "../../db/client.ts";
 import { users } from "../../db/schema-d1.ts";
 import { getChannel, getChannelMember } from "../../db/repos/channels.ts";
-
-const AddReactionBody = z.object({
-  post_id: z.string().min(1),
-  emoji_name: z.string().min(1),
-  channel_id: z.string().min(1),
-});
+import { apiError } from "../../lib/errors.ts";
+import { zodValidator } from "../../lib/validation.ts";
 
 type ReactionsCtx = Context<{ Bindings: Env; Variables: { session: SessionContext } }>;
+
+export const reactionsV1 = new Hono<{ Bindings: Env }>();
 
 function channelStub(env: Env, channelId: string) {
   return env.CHANNEL_DO.get(env.CHANNEL_DO.idFromName(channelDoName(channelId)));
 }
 
-async function requireChannelMember(c: ReactionsCtx, channelId: string): Promise<Response | null> {
+async function requireChannelMember(c: ReactionsCtx, channelId: string) {
   const db = getDb(c.env.DB);
   const channel = await getChannel(db, channelId);
-  if (!channel) return c.json({ error: "channel not found" }, 404);
+  if (!channel) throw apiError("not found", "channel not found", 404);
   const member = await getChannelMember(db, channelId, c.get("session")!.user.id);
-  if (!member) return c.json({ error: "forbidden" }, 403);
-  return null;
+  if (!member) throw apiError("forbidden", "forbidden", 403);
 }
 
-export const reactionsV1 = new Hono<{ Bindings: Env }>();
-
-reactionsV1.post("/reactions", requireSession, async (c) => {
-  const body = AddReactionBody.safeParse(await c.req.json().catch(() => null));
-  if (!body.success) return c.json({ error: "invalid" }, 422);
-  if (!isAllowedEmoji(body.data.emoji_name)) return c.json({ error: "invalid emoji" }, 422);
-  const denied = await requireChannelMember(c, body.data.channel_id);
-  if (denied) return denied;
-  const stub = channelStub(c.env, body.data.channel_id);
-  const res = await stub.toggleReactionByMessageId(c.get("session")!.user.id, {
-    messageId: body.data.post_id,
-    emoji: body.data.emoji_name,
-  });
-  if (res && "error" in res)
-    return c.json({ error: res.error }, res.status as ContentfulStatusCode);
-  return c.json({ ok: true });
-});
-
-reactionsV1.get("/posts/:postId/reactions", requireSession, async (c) => {
-  const channelId = new URL(c.req.url).searchParams.get("channel_id");
-  if (!channelId) return c.json({ error: "invalid" }, 422);
-  const denied = await requireChannelMember(c, channelId);
-  if (denied) return denied;
-  const stub = channelStub(c.env, channelId);
-  const res = await stub.reactionSnapshotByMessageId(c.req.param("postId")!);
-  if ("error" in res) return c.json({ error: res.error }, res.status as ContentfulStatusCode);
-  return c.json({ reactions: res });
-});
-
+reactionsV1.post(
+  "/reactions",
+  requireSession,
+  zodValidator("json", AddReactionInput),
+  async (c) => {
+    const body = c.req.valid("json");
+    if (!isAllowedEmoji(body.emojiName)) throw apiError("invalid emoji", "invalid emoji", 422);
+    await requireChannelMember(c, body.channelId);
+    const res = await channelStub(c.env, body.channelId).toggleReactionByMessageId(
+      c.get("session")!.user.id,
+      { messageId: body.postId, emoji: body.emojiName },
+    );
+    if (res && "error" in res) throw apiError(res.error, res.error, res.status);
+    return c.json({ ok: true });
+  },
+);
+reactionsV1.get(
+  "/posts/:postId/reactions",
+  requireSession,
+  zodValidator("query", ReactionsQuery),
+  async (c) => {
+    const body = c.req.valid("query");
+    await requireChannelMember(c, body.channelId);
+    const res = await channelStub(c.env, body.channelId).reactionSnapshotByMessageId(
+      c.req.param("postId"),
+    );
+    if ("error" in res) {
+      const err = res as { error: string; status: number };
+      throw apiError(err.error, err.error, err.status);
+    }
+    const out: ReactionsOutput = { reactions: res };
+    return c.json(out);
+  },
+);
 reactionsV1.delete(
   "/users/:userId/posts/:postId/reactions/:emojiName",
   requireSession,
+  zodValidator("query", ReactionsQuery),
   async (c) => {
-    const channelId = new URL(c.req.url).searchParams.get("channel_id");
-    if (!channelId) return c.json({ error: "invalid" }, 422);
-    const denied = await requireChannelMember(c, channelId);
-    if (denied) return denied;
+    const body = c.req.valid("query");
+    await requireChannelMember(c, body.channelId);
     const db = getDb(c.env.DB);
     const me = c.get("session")!.user.id;
-    const target = c.req.param("userId")! === "me" ? me : c.req.param("userId")!;
-    const rows = await db.select({ role: users.role }).from(users).where(eq(users.id, me)).limit(1);
-    if (target !== me && rows[0]?.role !== "admin") return c.json({ error: "forbidden" }, 403);
-    const emoji = c.req.param("emojiName")!;
-    if (!isAllowedEmoji(emoji)) return c.json({ error: "invalid emoji" }, 422);
-    const stub = channelStub(c.env, channelId);
-    const snapshot = await stub.reactionSnapshotByMessageId(c.req.param("postId")!);
-    if ("error" in snapshot)
-      return c.json({ error: snapshot.error }, snapshot.status as ContentfulStatusCode);
-    if (!(snapshot[emoji] ?? []).includes(target)) return c.json({ error: "not found" }, 404);
+    const target = c.req.param("userId") === "me" ? me : c.req.param("userId");
+    const roleRows = await db
+      .select({ role: users.role })
+      .from(users)
+      .where(eq(users.id, me))
+      .limit(1);
+    const role = roleRows[0]?.role;
+    if (target !== me && role !== "admin") throw apiError("forbidden", "forbidden", 403);
+    const emoji = c.req.param("emojiName");
+    if (!isAllowedEmoji(emoji)) throw apiError("invalid emoji", "invalid emoji", 422);
+    const stub = channelStub(c.env, body.channelId);
+    const snapshot = await stub.reactionSnapshotByMessageId(c.req.param("postId"));
+    if ("error" in snapshot) {
+      const err = snapshot as { error: string; status: number };
+      throw apiError(err.error, err.error, err.status);
+    }
+    if (!(snapshot[emoji] ?? []).includes(target)) throw apiError("not found", "not found", 404);
     const res = await stub.toggleReactionByMessageId(me, {
-      messageId: c.req.param("postId")!,
+      messageId: c.req.param("postId"),
       emoji,
     });
-    if (res && "error" in res)
-      return c.json({ error: res.error }, res.status as ContentfulStatusCode);
+    if (res && "error" in res) throw apiError(res.error, res.error, res.status);
     return c.json({ ok: true });
   },
 );

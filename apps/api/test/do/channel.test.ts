@@ -36,7 +36,7 @@ async function createChannel(): Promise<string> {
   const team = await exports.default.fetch("http://localhost/api/v1/teams", {
     method: "POST",
     headers: { cookie: ownerCookie, "content-type": "application/json" },
-    body: JSON.stringify({ name: "td1", display_name: "Task D1", type: "open" }),
+    body: JSON.stringify({ name: "td1", displayName: "Task D1", type: "open" }),
   });
   const teamId = ((await team.json()) as { id: string }).id;
   for (const cookie of [memberACookie, memberBCookie]) {
@@ -49,7 +49,7 @@ async function createChannel(): Promise<string> {
   const create = await exports.default.fetch("http://localhost/api/v1/channels", {
     method: "POST",
     headers: { cookie: ownerCookie, "content-type": "application/json" },
-    body: JSON.stringify({ team_id: teamId, name: "d1", display_name: "D1", type: "public" }),
+    body: JSON.stringify({ teamId, name: "d1", displayName: "D1", type: "public" }),
   });
   expect(create.status).toBe(201);
   const id = ((await create.json()) as { id: string }).id;

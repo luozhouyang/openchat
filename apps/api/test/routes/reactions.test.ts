@@ -29,16 +29,16 @@ beforeAll(async () => {
   const team = await exports.default.fetch("http://localhost/api/v1/teams", {
     method: "POST",
     headers: { cookie: owner, "content-type": "application/json" },
-    body: JSON.stringify({ name: "reactsco", display_name: "ReactsCo", type: "open" }),
+    body: JSON.stringify({ name: "reactsco", displayName: "ReactsCo", type: "open" }),
   });
   teamId = ((await team.json()) as { id: string }).id;
   const create = await exports.default.fetch("http://localhost/api/v1/channels", {
     method: "POST",
     headers: { cookie: owner, "content-type": "application/json" },
     body: JSON.stringify({
-      team_id: teamId,
+      teamId,
       name: "reacts",
-      display_name: "Reacts",
+      displayName: "Reacts",
       type: "public",
     }),
   });
@@ -59,7 +59,7 @@ beforeAll(async () => {
   const post = await exports.default.fetch(`http://localhost/api/v1/channels/${channelId}/posts`, {
     method: "POST",
     headers: { cookie: member, "content-type": "application/json" },
-    body: JSON.stringify({ message: "react to me", client_token: "reacts-post-1" }),
+    body: JSON.stringify({ message: "react to me", clientToken: "reacts-post-1" }),
   });
   postId = ((await post.json()) as { id: string }).id;
 });
@@ -68,13 +68,13 @@ test("reaction adds and toggles off", async () => {
   const add = await exports.default.fetch("http://localhost/api/v1/reactions", {
     method: "POST",
     headers: { cookie: member, "content-type": "application/json" },
-    body: JSON.stringify({ post_id: postId, emoji_name: "👍", channel_id: channelId }),
+    body: JSON.stringify({ postId, emojiName: "👍", channelId }),
   });
   expect(add.status).toBe(200);
   expect(await add.json()).toEqual({ ok: true });
 
   const after = await exports.default.fetch(
-    `http://localhost/api/v1/posts/${postId}/reactions?channel_id=${channelId}`,
+    `http://localhost/api/v1/posts/${postId}/reactions?channelId=${channelId}`,
     { headers: { cookie: member } },
   );
   expect(after.status).toBe(200);
@@ -84,12 +84,12 @@ test("reaction adds and toggles off", async () => {
   const remove = await exports.default.fetch("http://localhost/api/v1/reactions", {
     method: "POST",
     headers: { cookie: member, "content-type": "application/json" },
-    body: JSON.stringify({ post_id: postId, emoji_name: "👍", channel_id: channelId }),
+    body: JSON.stringify({ postId, emojiName: "👍", channelId }),
   });
   expect(remove.status).toBe(200);
 
   const afterToggle = await exports.default.fetch(
-    `http://localhost/api/v1/posts/${postId}/reactions?channel_id=${channelId}`,
+    `http://localhost/api/v1/posts/${postId}/reactions?channelId=${channelId}`,
     { headers: { cookie: member } },
   );
   const afterBody = (await afterToggle.json()) as { reactions: Record<string, string[]> };
@@ -100,7 +100,7 @@ test("invalid emoji rejected with 422", async () => {
   const res = await exports.default.fetch("http://localhost/api/v1/reactions", {
     method: "POST",
     headers: { cookie: member, "content-type": "application/json" },
-    body: JSON.stringify({ post_id: postId, emoji_name: "not-an-emoji", channel_id: channelId }),
+    body: JSON.stringify({ postId, emojiName: "not-an-emoji", channelId }),
   });
   expect(res.status).toBe(422);
 });
@@ -109,7 +109,7 @@ test("non-member reaction rejected with 403", async () => {
   const res = await exports.default.fetch("http://localhost/api/v1/reactions", {
     method: "POST",
     headers: { cookie: outsider, "content-type": "application/json" },
-    body: JSON.stringify({ post_id: postId, emoji_name: "👍", channel_id: channelId }),
+    body: JSON.stringify({ postId, emojiName: "👍", channelId }),
   });
   expect(res.status).toBe(403);
 });
@@ -118,7 +118,7 @@ test("reaction on missing post returns 404", async () => {
   const res = await exports.default.fetch("http://localhost/api/v1/reactions", {
     method: "POST",
     headers: { cookie: member, "content-type": "application/json" },
-    body: JSON.stringify({ post_id: "missing-post", emoji_name: "👍", channel_id: channelId }),
+    body: JSON.stringify({ postId: "missing-post", emojiName: "👍", channelId }),
   });
   expect(res.status).toBe(404);
 });
@@ -127,18 +127,18 @@ test("delete reaction removes only own reaction", async () => {
   const add = await exports.default.fetch("http://localhost/api/v1/reactions", {
     method: "POST",
     headers: { cookie: member, "content-type": "application/json" },
-    body: JSON.stringify({ post_id: postId, emoji_name: "🔥", channel_id: channelId }),
+    body: JSON.stringify({ postId, emojiName: "🔥", channelId }),
   });
   expect(add.status).toBe(200);
 
   const del = await exports.default.fetch(
-    `http://localhost/api/v1/users/me/posts/${postId}/reactions/${encodeURIComponent("🔥")}?channel_id=${channelId}`,
+    `http://localhost/api/v1/users/me/posts/${postId}/reactions/${encodeURIComponent("🔥")}?channelId=${channelId}`,
     { method: "DELETE", headers: { cookie: member } },
   );
   expect(del.status).toBe(200);
 
   const snap = await exports.default.fetch(
-    `http://localhost/api/v1/posts/${postId}/reactions?channel_id=${channelId}`,
+    `http://localhost/api/v1/posts/${postId}/reactions?channelId=${channelId}`,
     { headers: { cookie: member } },
   );
   const body = (await snap.json()) as { reactions: Record<string, string[]> };
@@ -147,7 +147,7 @@ test("delete reaction removes only own reaction", async () => {
 
 test("deleting a reaction that is not present returns 404", async () => {
   const res = await exports.default.fetch(
-    `http://localhost/api/v1/users/me/posts/${postId}/reactions/${encodeURIComponent("✅")}?channel_id=${channelId}`,
+    `http://localhost/api/v1/users/me/posts/${postId}/reactions/${encodeURIComponent("✅")}?channelId=${channelId}`,
     { method: "DELETE", headers: { cookie: member } },
   );
   expect(res.status).toBe(404);

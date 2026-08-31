@@ -49,7 +49,7 @@ beforeAll(async () => {
   const create = await exports.default.fetch("http://localhost/api/v1/teams", {
     method: "POST",
     headers: { cookie: aliceCookie, "content-type": "application/json" },
-    body: JSON.stringify({ name: "invteam", display_name: "Inv", type: "open" }),
+    body: JSON.stringify({ name: "invteam", displayName: "Inv", type: "open" }),
   });
   const body = (await create.json()) as { id: string };
   teamId = body.id;

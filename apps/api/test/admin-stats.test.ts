@@ -44,16 +44,16 @@ beforeAll(async () => {
   const teamRes = await exports.default.fetch("http://localhost/api/v1/teams", {
     method: "POST",
     headers: { cookie: adminCookie, "content-type": "application/json" },
-    body: JSON.stringify({ name: "stats", display_name: "Stats", type: "open" }),
+    body: JSON.stringify({ name: "stats", displayName: "Stats", type: "open" }),
   });
   const team = (await teamRes.json()) as { id: string };
   const chanRes = await exports.default.fetch("http://localhost/api/v1/channels", {
     method: "POST",
     headers: { cookie: adminCookie, "content-type": "application/json" },
     body: JSON.stringify({
-      team_id: team.id,
+      teamId: team.id,
       name: "general",
-      display_name: "General",
+      displayName: "General",
       type: "public",
     }),
   });

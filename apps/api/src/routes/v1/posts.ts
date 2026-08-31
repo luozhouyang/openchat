@@ -1,10 +1,15 @@
 import { Hono } from "hono";
-import type { Context } from "hono";
-import { z } from "zod";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { channelDoName } from "protocol";
+import {
+  CreatePostInput,
+  PatchPostInput,
+  DeletePostInput,
+  PinPostInput,
+  ListPostsQuery,
+  type PostOutput,
+  type ListPostsOutput,
+} from "protocol";
 import { requireSession } from "../../auth/session.ts";
-import type { SessionContext } from "../../auth/session.ts";
 import { requireChannelRole } from "../../auth/guards.ts";
 import { getDb } from "../../db/client.ts";
 import {
@@ -13,26 +18,8 @@ import {
   deleteMessage,
   getMessageHistory,
 } from "../../services/message.service.ts";
-import { HttpError } from "../../lib/errors.ts";
-
-const CreatePostBody = z.object({
-  message: z.string().min(1).max(16384),
-  parent_id: z.string().min(1).optional(),
-  client_token: z.string().min(1).max(64).optional(),
-});
-
-const PatchPostBody = z.object({
-  message: z.string().min(1).max(16384),
-  channel_id: z.string().min(1),
-});
-
-const DeletePostBody = z.object({
-  channel_id: z.string().min(1),
-});
-
-const PinPostBody = z.object({
-  channel_id: z.string().min(1),
-});
+import { apiError } from "../../lib/errors.ts";
+import { zodValidator } from "../../lib/validation.ts";
 
 export const postsV1 = new Hono<{ Bindings: Env }>();
 
@@ -40,101 +27,118 @@ postsV1.post(
   "/channels/:channelId/posts",
   requireSession,
   requireChannelRole("member"),
+  zodValidator("json", CreatePostInput),
   async (c) => {
-    const body = CreatePostBody.safeParse(await c.req.json().catch(() => null));
-    if (!body.success) return c.json({ error: "invalid" }, 422);
+    const body = c.req.valid("json");
     const db = getDb(c.env.DB);
     const channelId = c.req.param("channelId");
-    try {
-      const { messageId, seq } = await postMessage(db, c.env, {
-        channelId,
-        userId: c.get("session")!.user.id,
-        content: body.data.message,
-        parentId: body.data.parent_id,
-        clientToken: body.data.client_token,
-      });
-      const stub = c.env.CHANNEL_DO.get(c.env.CHANNEL_DO.idFromName(channelDoName(channelId)));
-      const res = await stub.history({ afterSeq: seq - 1, limit: 1 });
-      const msg = res.messages.find((m) => m.id === messageId) ?? { id: messageId, seq };
-      return c.json(msg, 201);
-    } catch (err) {
-      if (err instanceof HttpError)
-        return c.json({ error: err.code }, err.status as ContentfulStatusCode);
-      throw err;
-    }
+    const { messageId, seq } = await postMessage(db, c.env, {
+      channelId,
+      userId: c.get("session")!.user.id,
+      content: body.message,
+      parentId: body.parentId,
+      clientToken: body.clientToken,
+    });
+    const stub = c.env.CHANNEL_DO.get(c.env.CHANNEL_DO.idFromName(channelDoName(channelId)));
+    const res = await stub.history({ afterSeq: seq - 1, limit: 1 });
+    const msg = (res.messages as PostOutput[]).find((m) => m.id === messageId);
+    const out: PostOutput = msg
+      ? msg
+      : {
+          id: messageId,
+          seq,
+          userId: c.get("session")!.user.id,
+          parentId: body.parentId ?? null,
+          type: "text",
+          content: body.message,
+          mentions: null,
+          editedAt: null,
+          deletedAt: null,
+          createdAt: Date.now(),
+        };
+    return c.json(out, 201);
   },
 );
-
 postsV1.get(
   "/channels/:channelId/posts",
   requireSession,
   requireChannelRole("member"),
+  zodValidator("query", ListPostsQuery),
   async (c) => {
+    const body = c.req.valid("query");
     const channelId = c.req.param("channelId");
-    const q = new URL(c.req.url).searchParams;
-    const limit = Math.min(Number(q.get("limit")) || Number(q.get("per_page")) || 30, 500);
-    const beforeSeq = q.get("before_seq") ? Number(q.get("before_seq")) : undefined;
-    const parentId = q.get("parent_id") || undefined;
-    const order = q.get("order") === "asc" ? "asc" : undefined;
-    const res = await getMessageHistory(c.env, { channelId, limit, beforeSeq, parentId, order });
-    return c.json({ messages: res.messages, oldestSeq: res.oldestSeq });
+    const res = await getMessageHistory(c.env, {
+      channelId,
+      limit: body.limit,
+      beforeSeq: body.beforeSeq,
+      parentId: body.parentId,
+      order: body.order,
+    });
+    const out: ListPostsOutput = {
+      messages: res.messages,
+      oldestSeq: res.oldestSeq,
+    };
+    return c.json(out);
   },
 );
-
-postsV1.put("/posts/:postId/patch", requireSession, async (c) => {
-  const body = PatchPostBody.safeParse(await c.req.json().catch(() => null));
-  if (!body.success) return c.json({ error: "invalid" }, 422);
-  const db = getDb(c.env.DB);
-  try {
+postsV1.put(
+  "/posts/:postId/patch",
+  requireSession,
+  zodValidator("json", PatchPostInput),
+  async (c) => {
+    const body = c.req.valid("json");
+    const db = getDb(c.env.DB);
     await editMessage(db, c.env, {
-      channelId: body.data.channel_id,
+      channelId: body.channelId,
       callerUserId: c.get("session")!.user.id,
       messageId: c.req.param("postId"),
-      content: body.data.message,
+      content: body.message,
     });
-  } catch (err) {
-    if (err instanceof HttpError)
-      return c.json({ error: err.code }, err.status as ContentfulStatusCode);
-    throw err;
-  }
-  return c.json({ ok: true });
-});
-
-postsV1.delete("/posts/:postId", requireSession, async (c) => {
-  const body = DeletePostBody.safeParse(await c.req.json().catch(() => null));
-  if (!body.success) return c.json({ error: "invalid" }, 422);
-  const db = getDb(c.env.DB);
-  try {
-    await deleteMessage(db, c.env, {
-      channelId: body.data.channel_id,
-      callerUserId: c.get("session")!.user.id,
-      messageId: c.req.param("postId"),
-    });
-  } catch (err) {
-    if (err instanceof HttpError)
-      return c.json({ error: err.code }, err.status as ContentfulStatusCode);
-    throw err;
-  }
-  return c.json({ ok: true });
-});
-
-type PostsCtx = Context<{ Bindings: Env; Variables: { session: SessionContext } }>;
-
-function pinHandler(pinned: boolean) {
-  return async (c: PostsCtx) => {
-    const body = PinPostBody.safeParse(await c.req.json().catch(() => null));
-    if (!body.success) return c.json({ error: "invalid" }, 422);
-    const stub = c.env.CHANNEL_DO.get(
-      c.env.CHANNEL_DO.idFromName(channelDoName(body.data.channel_id)),
-    );
-    const res = await stub.pinMessage(c.get("session")!.user.id, {
-      messageId: c.req.param("postId")!,
-      pinned,
-    });
-    if ("error" in res) return c.json({ error: res.error }, res.status as ContentfulStatusCode);
     return c.json({ ok: true });
-  };
-}
-
-postsV1.post("/posts/:postId/pin", requireSession, pinHandler(true));
-postsV1.post("/posts/:postId/unpin", requireSession, pinHandler(false));
+  },
+);
+postsV1.delete(
+  "/posts/:postId",
+  requireSession,
+  zodValidator("json", DeletePostInput),
+  async (c) => {
+    const body = c.req.valid("json");
+    const db = getDb(c.env.DB);
+    await deleteMessage(db, c.env, {
+      channelId: body.channelId,
+      callerUserId: c.get("session")!.user.id,
+      messageId: c.req.param("postId"),
+    });
+    return c.json({ ok: true });
+  },
+);
+postsV1.post(
+  "/posts/:postId/pin",
+  requireSession,
+  zodValidator("json", PinPostInput),
+  async (c) => {
+    const body = c.req.valid("json");
+    const stub = c.env.CHANNEL_DO.get(c.env.CHANNEL_DO.idFromName(channelDoName(body.channelId)));
+    const res = await stub.pinMessage(c.get("session")!.user.id, {
+      messageId: c.req.param("postId"),
+      pinned: true,
+    });
+    if ("error" in res) throw apiError(res.error, res.error, res.status);
+    return c.json({ ok: true });
+  },
+);
+postsV1.post(
+  "/posts/:postId/unpin",
+  requireSession,
+  zodValidator("json", PinPostInput),
+  async (c) => {
+    const body = c.req.valid("json");
+    const stub = c.env.CHANNEL_DO.get(c.env.CHANNEL_DO.idFromName(channelDoName(body.channelId)));
+    const res = await stub.pinMessage(c.get("session")!.user.id, {
+      messageId: c.req.param("postId"),
+      pinned: false,
+    });
+    if ("error" in res) throw apiError(res.error, res.error, res.status);
+    return c.json({ ok: true });
+  },
+);

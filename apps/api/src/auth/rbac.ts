@@ -133,9 +133,12 @@ export async function resolvePermissions(
   const perms = new Set<Permission>();
   const names = new Set<string>();
 
-  const user = (
-    await db.select({ role: users.role }).from(users).where(eq(users.id, userId)).limit(1)
-  )[0];
+  const userRows = await db
+    .select({ role: users.role })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  const user = userRows[0];
   names.add(user?.role === "admin" ? "system_admin" : "system_user");
 
   if (scope.teamId) {

@@ -1,6 +1,6 @@
 import { Hono } from "hono";
-import { z } from "zod";
 import { eq, and } from "drizzle-orm";
+import { RolesInput, type RolesListOutput, type SchemesOutput } from "protocol";
 import { requireSession } from "../../auth/session.ts";
 import { requirePermission } from "../../auth/guards.ts";
 import { PERMISSIONS } from "../../auth/rbac.ts";
@@ -10,15 +10,15 @@ import { listRoles, listSchemes } from "../../db/repos/roles.ts";
 import { getTeamMember } from "../../db/repos/teams.ts";
 import { getChannelMember } from "../../db/repos/channels.ts";
 import { syncChannelMember } from "../../user-do-sync.ts";
-
-const RolesBody = z.object({ roles: z.array(z.string()) });
+import { apiError } from "../../lib/errors.ts";
+import { zodValidator } from "../../lib/validation.ts";
 
 export const rolesV1 = new Hono<{ Bindings: Env }>();
 
 rolesV1.get("/roles", requireSession, requirePermission(PERMISSIONS.MANAGE_ROLES), async (c) => {
   const db = getDb(c.env.DB);
   const rows = await listRoles(db);
-  return c.json({
+  const out: RolesListOutput = {
     roles: rows.map((r) => {
       let permissions: string[] = [];
       try {
@@ -30,69 +30,67 @@ rolesV1.get("/roles", requireSession, requirePermission(PERMISSIONS.MANAGE_ROLES
       return {
         id: r.id,
         name: r.name,
-        display_name: r.displayName,
+        displayName: r.displayName,
         permissions,
-        built_in: r.builtIn,
+        builtIn: r.builtIn === true,
       };
     }),
-  });
+  };
+  return c.json(out);
 });
-
 rolesV1.get("/schemes", requireSession, requirePermission(PERMISSIONS.MANAGE_ROLES), async (c) => {
   const db = getDb(c.env.DB);
   const schemes = await listSchemes(db);
-  return c.json({ schemes });
+  const out: SchemesOutput = { schemes };
+  return c.json(out);
 });
-
 rolesV1.put(
   "/users/:userId/roles",
   requireSession,
   requirePermission(PERMISSIONS.MANAGE_ROLES),
+  zodValidator("json", RolesInput),
   async (c) => {
-    const body = RolesBody.safeParse(await c.req.json().catch(() => null));
-    if (!body.success) return c.json({ error: "invalid" }, 422);
+    const body = c.req.valid("json");
     const rawUserId = c.req.param("userId");
     const userId = rawUserId === "me" ? c.get("session")!.user.id : rawUserId;
-    const role = body.data.roles.includes("system_admin") ? "admin" : "user";
+    const role = body.roles.includes("system_admin") ? "admin" : "user";
     const db = getDb(c.env.DB);
     await db.update(users).set({ role }).where(eq(users.id, userId));
     return c.json({ ok: true });
   },
 );
-
 rolesV1.put(
   "/teams/:teamId/members/:userId/roles",
   requireSession,
   requirePermission(PERMISSIONS.MANAGE_TEAMS),
+  zodValidator("json", RolesInput),
   async (c) => {
-    const body = RolesBody.safeParse(await c.req.json().catch(() => null));
-    if (!body.success) return c.json({ error: "invalid" }, 422);
+    const body = c.req.valid("json");
     const teamId = c.req.param("teamId");
     const userId = c.req.param("userId");
     const db = getDb(c.env.DB);
     const member = await getTeamMember(db, teamId, userId);
-    if (!member) return c.json({ error: "not found" }, 404);
+    if (!member) throw apiError("not found", "not found", 404);
     await db
       .update(teamMembers)
-      .set({ roles: body.data.roles.join(" ") })
+      .set({ roles: body.roles.join(" ") })
       .where(and(eq(teamMembers.teamId, teamId), eq(teamMembers.userId, userId)));
     return c.json({ ok: true });
   },
 );
-
 rolesV1.put(
   "/channels/:channelId/members/:userId/roles",
   requireSession,
   requirePermission(PERMISSIONS.MANAGE_CHANNEL_ROLES),
+  zodValidator("json", RolesInput),
   async (c) => {
-    const body = RolesBody.safeParse(await c.req.json().catch(() => null));
-    if (!body.success) return c.json({ error: "invalid" }, 422);
+    const body = c.req.valid("json");
     const channelId = c.req.param("channelId");
     const userId = c.req.param("userId");
     const db = getDb(c.env.DB);
     const member = await getChannelMember(db, channelId, userId);
-    if (!member) return c.json({ error: "not found" }, 404);
-    const roles = body.data.roles.join(" ");
+    if (!member) throw apiError("not found", "not found", 404);
+    const roles = body.roles.join(" ");
     await db
       .update(channelMembers)
       .set({ roles })

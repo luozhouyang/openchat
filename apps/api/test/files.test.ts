@@ -24,13 +24,13 @@ async function createChannel(
   const team = await exports.default.fetch("http://localhost/api/v1/teams", {
     method: "POST",
     headers: { cookie, "content-type": "application/json" },
-    body: JSON.stringify({ name: `team-${name}`, display_name: `Team ${name}`, type: "open" }),
+    body: JSON.stringify({ name: `team-${name}`, displayName: `Team ${name}`, type: "open" }),
   });
   const teamId = ((await team.json()) as { id: string }).id;
   const ch = await exports.default.fetch("http://localhost/api/v1/channels", {
     method: "POST",
     headers: { cookie, "content-type": "application/json" },
-    body: JSON.stringify({ team_id: teamId, name, display_name: name, type: "public" }),
+    body: JSON.stringify({ teamId, name, displayName: name, type: "public" }),
   });
   return { id: ((await ch.json()) as { id: string }).id, teamId };
 }
@@ -119,4 +119,31 @@ test("member download of missing file not found", async () => {
     redirect: "manual",
   });
   expect(res.status).toBe(404);
+});
+
+test("file info returns camelCase fields for a member", async () => {
+  const uploadId = await uploadFile(memberCookie, channelId, "info.png");
+  const res = await exports.default.fetch(`http://localhost/api/v1/files/${uploadId}/info`, {
+    headers: { cookie: memberCookie },
+  });
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as {
+    id: string;
+    name: string;
+    size: number;
+    mimeType: string;
+    extension: string;
+    postId: string;
+    createdAt: number;
+  };
+  expect(body.id).toBe(uploadId);
+  expect(body.name).toBe("info.png");
+  expect(body.mimeType).toBe("image/png");
+  expect(body.postId).toBeTruthy();
+  expect(typeof body.createdAt).toBe("number");
+});
+
+test("file info requires session", async () => {
+  const res = await exports.default.fetch("http://localhost/api/v1/files/any/info");
+  expect(res.status).toBe(401);
 });

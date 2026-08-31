@@ -15,9 +15,9 @@ let channelId = "";
 interface RoleRow {
   id: string;
   name: string;
-  display_name: string;
+  displayName: string;
   permissions: string[];
-  built_in: boolean;
+  builtIn: boolean;
 }
 
 async function fetchAs(cookie: string, path: string, init: RequestInit = {}): Promise<Response> {
@@ -44,7 +44,7 @@ beforeAll(async () => {
   const team = await fetchAs(ownerCookie, "/api/v1/teams", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ name: "rolesco", display_name: "RolesCo", type: "open" }),
+    body: JSON.stringify({ name: "rolesco", displayName: "RolesCo", type: "open" }),
   });
   teamId = ((await team.json()) as { id: string }).id;
 
@@ -52,9 +52,9 @@ beforeAll(async () => {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
-      team_id: teamId,
+      teamId,
       name: "general",
-      display_name: "General",
+      displayName: "General",
       type: "public",
     }),
   });
@@ -82,7 +82,7 @@ test("GET /roles as system admin returns seed roles including system_admin", asy
   expect(names).toContain("team_admin");
   const systemAdmin = body.roles.find((r) => r.name === "system_admin")!;
   expect(systemAdmin.permissions).toContain("manage_roles");
-  expect(typeof systemAdmin.built_in).toBe("boolean");
+  expect(typeof systemAdmin.builtIn).toBe("boolean");
 });
 
 test("GET /roles rejects a normal user", async () => {

@@ -18,7 +18,8 @@ export async function handleWsUpgrade(request: Request, env: Env): Promise<Respo
     .from(users)
     .where(eq(users.id, claims.sub))
     .limit(1);
-  if (rows[0]?.banned) return new Response("banned", { status: 403 });
+  const row = rows[0];
+  if (row?.banned) return new Response("banned", { status: 403 });
 
   const url = new URL(request.url);
   const internal = await issueInternalToken({

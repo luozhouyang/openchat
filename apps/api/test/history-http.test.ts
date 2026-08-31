@@ -26,13 +26,13 @@ beforeAll(async () => {
   const team = await exports.default.fetch("http://localhost/api/v1/teams", {
     method: "POST",
     headers: { cookie: owner, "content-type": "application/json" },
-    body: JSON.stringify({ name: "histco", display_name: "HistCo", type: "open" }),
+    body: JSON.stringify({ name: "histco", displayName: "HistCo", type: "open" }),
   });
   teamId = ((await team.json()) as { id: string }).id;
   const create = await exports.default.fetch("http://localhost/api/v1/channels", {
     method: "POST",
     headers: { cookie: owner, "content-type": "application/json" },
-    body: JSON.stringify({ team_id: teamId, name: "hist", display_name: "Hist", type: "public" }),
+    body: JSON.stringify({ teamId, name: "hist", displayName: "Hist", type: "public" }),
   });
   channelId = ((await create.json()) as { id: string }).id;
   await exports.default.fetch(`http://localhost/api/v1/teams/${teamId}/members`, {
@@ -77,7 +77,7 @@ test("history before_seq paginates without overlap", async () => {
   );
   const p1 = (await page1.json()) as { messages: { content: string }[]; oldestSeq: number | null };
   const page2 = await exports.default.fetch(
-    `http://localhost/api/v1/channels/${channelId}/posts?limit=10&before_seq=${p1.oldestSeq}`,
+    `http://localhost/api/v1/channels/${channelId}/posts?limit=10&beforeSeq=${p1.oldestSeq}`,
     { headers: { cookie: member } },
   );
   const p2 = (await page2.json()) as { messages: { content: string }[] };
