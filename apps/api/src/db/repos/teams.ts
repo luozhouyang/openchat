@@ -1,8 +1,8 @@
 import { eq, and, like } from "drizzle-orm";
-import { getDb } from "../client.ts";
+import type { BaseSQLiteDatabase } from "drizzle-orm/sqlite-core";
 import { teams, teamMembers, channels, channelMembers } from "../schema-d1.ts";
 
-type Db = ReturnType<typeof getDb>;
+type Db = BaseSQLiteDatabase<"async", D1Result, typeof import("../schema-d1.ts")>;
 
 export async function createTeam(
   db: Db,

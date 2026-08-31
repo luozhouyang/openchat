@@ -1,22 +1,22 @@
 import { Hono } from "hono";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
-import { id, CreateChannelInput, OpenDmInput, OpenGmInput, channelDoName } from "protocol";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
+import { CreateChannelInput, OpenDmInput, OpenGmInput, channelDoName } from "protocol";
 import { requireSession } from "../auth/session.ts";
 import { requireTeamRole, requireChannelRole } from "../auth/guards.ts";
 import { getDb } from "../db/client.ts";
-import { channels, channelMembers } from "../db/schema-d1.ts";
+import { channelMembers } from "../db/schema-d1.ts";
+import { listChannelsForTeam, getChannel, listChannelMemberIds } from "../db/repos/channels.ts";
 import {
   createChannel,
-  getChannel,
-  getChannelByDedupKey,
-  listChannelsForTeam,
-  addChannelMember,
-  removeChannelMember,
-  getChannelMember,
-  listChannelMemberIds,
-} from "../db/repos/channels.ts";
-import { getTeamMember } from "../db/repos/teams.ts";
+  openDirect,
+  openGroup,
+  joinChannel,
+  leaveChannel,
+  archiveChannel,
+} from "../services/channel.service.ts";
+import { HttpError } from "../lib/errors.ts";
 import { syncChannelMember, syncUserChannels, removeChannelMemberFromDo } from "../user-do-sync.ts";
 
 export const channelsRoutes = new Hono<{ Bindings: Env }>();
@@ -31,20 +31,18 @@ channelsRoutes.post(
     const db = getDb(c.env.DB);
     try {
       const ch = await createChannel(db, {
-        id: id("chn"),
         teamId: c.req.param("teamId"),
-        name: body.data.name ?? null,
+        name: body.data.name,
         displayName: body.data.displayName,
         type: body.data.type,
-        dedupKey: null,
         creatorId: c.get("session")!.user.id,
       });
-      if (ch) {
-        await syncChannelMember(c.env, ch.id, ch.creatorId!, "channel_admin");
-      }
-      return c.json({ id: ch?.id }, 201);
-    } catch {
-      return c.json({ error: "name taken" }, 409);
+      await syncChannelMember(c.env, ch.id, ch.creatorId!, "channel_admin");
+      return c.json({ id: ch.id }, 201);
+    } catch (err) {
+      if (err instanceof HttpError)
+        return c.json({ error: err.code }, err.status as ContentfulStatusCode);
+      throw err;
     }
   },
 );
@@ -79,16 +77,18 @@ channelsRoutes.get(
 
 channelsRoutes.post("/channels/:channelId/join", requireSession, async (c) => {
   const db = getDb(c.env.DB);
-  const ch = await getChannel(db, c.req.param("channelId"));
-  if (!ch) return c.json({ error: "not found" }, 404);
-  if (ch.type !== "public") return c.json({ error: "forbidden" }, 403);
+  const channelId = c.req.param("channelId");
   const userId = c.get("session")!.user.id;
-  if (ch.teamId && !(await getTeamMember(db, ch.teamId, userId)))
-    return c.json({ error: "forbidden" }, 403);
-  if (!(await getChannelMember(db, ch.id, userId))) {
-    await addChannelMember(db, { channelId: ch.id, userId, roles: "channel_user" });
-    await syncChannelMember(c.env, ch.id, userId, "channel_user");
-    await syncUserChannels(c.env, userId);
+  try {
+    const joined = await joinChannel(db, { channelId, userId });
+    if (joined) {
+      await syncChannelMember(c.env, channelId, userId, "channel_user");
+      await syncUserChannels(c.env, userId);
+    }
+  } catch (err) {
+    if (err instanceof HttpError)
+      return c.json({ error: err.code }, err.status as ContentfulStatusCode);
+    throw err;
   }
   return c.json({ ok: true });
 });
@@ -99,9 +99,10 @@ channelsRoutes.post(
   requireChannelRole("member"),
   async (c) => {
     const db = getDb(c.env.DB);
+    const channelId = c.req.param("channelId");
     const userId = c.get("session")!.user.id;
-    await removeChannelMember(db, c.req.param("channelId"), userId);
-    await removeChannelMemberFromDo(c.env, c.req.param("channelId"), userId);
+    await leaveChannel(db, { channelId, userId });
+    await removeChannelMemberFromDo(c.env, channelId, userId);
     await syncUserChannels(c.env, userId);
     return c.json({ ok: true });
   },
@@ -182,10 +183,7 @@ channelsRoutes.post(
   requireChannelRole("admin"),
   async (c) => {
     const db = getDb(c.env.DB);
-    await db
-      .update(channels)
-      .set({ archivedAt: Date.now() })
-      .where(eq(channels.id, c.req.param("channelId")));
+    await archiveChannel(db, { channelId: c.req.param("channelId") });
     return c.json({ ok: true });
   },
 );
@@ -207,64 +205,52 @@ channelsRoutes.post(
   },
 );
 
-async function dedupKeyFor(kind: "dm" | "gm", ids: string[]): Promise<string> {
-  const sorted = [...ids].sort();
-  const data = new TextEncoder().encode(`${kind}:${sorted.join(",")}`);
-  const digest = await crypto.subtle.digest("SHA-256", data);
-  const hex = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
-  return `${kind}:${hex}`;
-}
-
 channelsRoutes.post("/channels/dm", requireSession, async (c) => {
-  const db = getDb(c.env.DB);
-  const me = c.get("session")!.user.id;
   const body = OpenDmInput.safeParse(await c.req.json());
   if (!body.success) return c.json({ error: "invalid" }, 422);
-  const { withUserId } = body.data;
-  if (withUserId === me) return c.json({ error: "invalid" }, 422);
-  const key = await dedupKeyFor("dm", [me, withUserId]);
-  const existing = await getChannelByDedupKey(db, key);
-  if (existing) return c.json({ id: existing.id, existing: true });
-  const ch = await createChannel(db, {
-    id: id("chn"),
-    teamId: null,
-    name: null,
-    displayName: "dm",
-    type: "dm",
-    dedupKey: key,
-    creatorId: null,
-  });
-  await addChannelMember(db, { channelId: ch!.id, userId: me, roles: "channel_user" });
-  await addChannelMember(db, { channelId: ch!.id, userId: withUserId, roles: "channel_user" });
-  await syncChannelMember(c.env, ch!.id, me, "channel_user");
-  await syncChannelMember(c.env, ch!.id, withUserId, "channel_user");
-  await syncUserChannels(c.env, me);
-  await syncUserChannels(c.env, withUserId);
-  return c.json({ id: ch!.id, existing: false }, 201);
+  const me = c.get("session")!.user.id;
+  if (body.data.withUserId === me) return c.json({ error: "invalid" }, 422);
+  const db = getDb(c.env.DB);
+  try {
+    const { id: channelId, existing } = await openDirect(db, {
+      userId: me,
+      withUserId: body.data.withUserId,
+    });
+    if (!existing) {
+      await syncChannelMember(c.env, channelId, me, "channel_user");
+      await syncChannelMember(c.env, channelId, body.data.withUserId, "channel_user");
+      await syncUserChannels(c.env, me);
+      await syncUserChannels(c.env, body.data.withUserId);
+    }
+    return c.json({ id: channelId, existing }, existing ? 200 : 201);
+  } catch (err) {
+    if (err instanceof HttpError)
+      return c.json({ error: err.code }, err.status as ContentfulStatusCode);
+    throw err;
+  }
 });
 
 channelsRoutes.post("/channels/gm", requireSession, async (c) => {
-  const db = getDb(c.env.DB);
-  const me = c.get("session")!.user.id;
   const body = OpenGmInput.safeParse(await c.req.json());
   if (!body.success) return c.json({ error: "invalid" }, 422);
-  const ids = [...new Set([me, ...body.data.userIds])];
-  const key = await dedupKeyFor("gm", ids);
-  const existing = await getChannelByDedupKey(db, key);
-  if (existing) return c.json({ id: existing.id, existing: true });
-  const ch = await createChannel(db, {
-    id: id("chn"),
-    teamId: null,
-    name: null,
-    displayName: "gm",
-    type: "gm",
-    dedupKey: key,
-    creatorId: null,
-  });
-  for (const userId of ids) {
-    await addChannelMember(db, { channelId: ch!.id, userId, roles: "channel_user" });
-    await syncChannelMember(c.env, ch!.id, userId, "channel_user");
-    await syncUserChannels(c.env, userId);
+  const me = c.get("session")!.user.id;
+  const db = getDb(c.env.DB);
+  try {
+    const { id: channelId, existing } = await openGroup(db, {
+      userId: me,
+      userIds: body.data.userIds,
+    });
+    if (!existing) {
+      const ids = [...new Set([me, ...body.data.userIds])];
+      for (const userId of ids) {
+        await syncChannelMember(c.env, channelId, userId, "channel_user");
+        await syncUserChannels(c.env, userId);
+      }
+    }
+    return c.json({ id: channelId, existing }, existing ? 200 : 201);
+  } catch (err) {
+    if (err instanceof HttpError)
+      return c.json({ error: err.code }, err.status as ContentfulStatusCode);
+    throw err;
   }
-  return c.json({ id: ch!.id, existing: false }, 201);
 });
