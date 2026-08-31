@@ -443,6 +443,9 @@ importers:
       clsx:
         specifier: 'catalog:'
         version: 2.1.1
+      platform:
+        specifier: workspace:*
+        version: link:../../packages/platform
       protocol:
         specifier: workspace:*
         version: link:../../packages/protocol
@@ -452,6 +455,9 @@ importers:
       react-dom:
         specifier: 'catalog:'
         version: 19.2.8(react@19.2.8)
+      realtime:
+        specifier: workspace:*
+        version: link:../../packages/realtime
       tailwind-merge:
         specifier: 'catalog:'
         version: 3.6.0

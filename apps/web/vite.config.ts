@@ -20,6 +20,9 @@ export default defineConfig({
       "/ws": { target: "ws://localhost:8787", ws: true },
     },
   },
+  fmt: {
+    ignorePatterns: ["src/routeTree.gen.ts"],
+  },
   test: {
     environment: "jsdom",
     globals: true,

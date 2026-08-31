@@ -7,6 +7,12 @@ test("connection store transitions", () => {
   expect(useConnectionStore.getState().state).toBe("open");
 });
 
+test("platform instance resolves serverUrl and auth", async () => {
+  const { platform } = await import("../src/lib/platform");
+  expect(platform.platform).toBe("web");
+  expect(typeof platform.getAuthToken).toBe("function");
+});
+
 test("sidebar bump and markRead", () => {
   const s = useSidebarStore.getState();
   s.bump("c1");

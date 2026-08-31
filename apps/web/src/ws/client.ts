@@ -1,4 +1,5 @@
-import { authClient } from "../lib/auth-client";
+import { RealtimeClient } from "realtime";
+import { platform } from "../lib/platform";
 import { useConnectionStore } from "../stores/connection";
 import { useMessageStore } from "../stores/messages";
 import { useSidebarStore } from "../stores/sidebar";
@@ -7,71 +8,46 @@ import { useTypingStore } from "../stores/typing";
 import type { ClientFrame, ServerEvent, ChannelEvent, Message } from "protocol";
 
 class WsClient {
-  private ws: WebSocket | null = null;
-  private reconnectDelay = 1000;
-  private closedByUser = false;
-  private tokenTimer: ReturnType<typeof setTimeout> | null = null;
+  private realtime: RealtimeClient;
+
+  constructor() {
+    this.realtime = new RealtimeClient({
+      getToken: () => platform.getAuthToken(),
+      buildUrl: (deviceId) => `${platform.serverUrl}?deviceId=${deviceId}`,
+      onAuthMissing: () => {
+        window.location.href = "/login";
+      },
+      handlers: {
+        onOpen: () => this.sendSync(),
+        onMessage: (raw) => this.dispatch(raw),
+        onStateChange: (state) => useConnectionStore.getState().set(state),
+      },
+    });
+  }
 
   async connect(deviceId: string) {
-    this.closedByUser = false;
-    await this.open(deviceId);
-  }
-
-  private async open(deviceId: string) {
-    useConnectionStore.getState().set("connecting");
-    const tokenRes = await authClient.token();
-    if (tokenRes.error || !tokenRes.data) {
-      window.location.href = "/login";
-      return;
-    }
-    const proto = window.location.protocol === "https:" ? "wss" : "ws";
-    const ws = new WebSocket(`${proto}://${window.location.host}/ws?deviceId=${deviceId}`);
-    this.ws = ws;
-
-    ws.onopen = () => {
-      useConnectionStore.getState().set("open");
-      this.reconnectDelay = 1000;
-      this.scheduleTokenRefresh();
-      const channels = Object.keys(useMessageStore.getState().channels);
-      if (channels.length > 0) {
-        this.send({
-          type: "sync",
-          channels: channels.map((channelId) => ({
-            channelId,
-            lastSeq: useMessageStore.getState().maxSeq(channelId),
-          })),
-        });
-      }
-    };
-    ws.onmessage = (ev) => this.dispatch(ev.data);
-    ws.onclose = () => {
-      useConnectionStore.getState().set(this.closedByUser ? "idle" : "reconnecting");
-      if (!this.closedByUser) {
-        const delay = this.reconnectDelay + Math.random() * 500;
-        this.reconnectDelay = Math.min(this.reconnectDelay * 2, 30_000);
-        setTimeout(() => void this.open(deviceId), delay);
-      }
-    };
-  }
-
-  private scheduleTokenRefresh() {
-    if (this.tokenTimer) clearTimeout(this.tokenTimer);
-    this.tokenTimer = setTimeout(() => {
-      if (this.ws?.readyState === WebSocket.OPEN) {
-        this.ws.close(4100, "token-refresh");
-      }
-    }, 14 * 60_000);
+    await this.realtime.connect(deviceId);
   }
 
   send(frame: ClientFrame) {
-    if (this.ws?.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify(frame));
-    }
+    this.realtime.send(JSON.stringify(frame));
   }
 
   close() {
-    this.closedByUser = true;
-    this.ws?.close();
+    this.realtime.close();
+  }
+
+  private sendSync() {
+    const channels = Object.keys(useMessageStore.getState().channels);
+    if (channels.length > 0) {
+      this.send({
+        type: "sync",
+        channels: channels.map((channelId) => ({
+          channelId,
+          lastSeq: useMessageStore.getState().maxSeq(channelId),
+        })),
+      });
+    }
   }
 
   private dispatch(raw: string) {

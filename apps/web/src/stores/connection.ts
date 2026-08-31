@@ -1,5 +1,10 @@
 import { create } from "zustand";
-export const useConnectionStore = create<{ state: string; set: (s: string) => void }>((set) => ({
+import type { RealtimeState } from "realtime";
+
+export const useConnectionStore = create<{
+  state: RealtimeState;
+  set: (s: RealtimeState) => void;
+}>((set) => ({
   state: "idle",
   set: (state) => set({ state }),
 }));

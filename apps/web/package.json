@@ -17,9 +17,11 @@
     "better-auth": "catalog:",
     "class-variance-authority": "catalog:",
     "clsx": "catalog:",
+    "platform": "workspace:*",
     "protocol": "workspace:*",
     "react": "catalog:",
     "react-dom": "catalog:",
+    "realtime": "workspace:*",
     "tailwind-merge": "catalog:",
     "zustand": "catalog:"
   },
