@@ -15,6 +15,8 @@ const msg = (seq: number) => ({
   createdAt: seq,
 });
 
+const resetStore = () => useMessageStore.setState({ channels: {}, threads: {} });
+
 test("ingest in order updates maxSeq", () => {
   const s = useMessageStore.getState();
   s.reset("c1");
@@ -95,20 +97,72 @@ test("setReactions updates matching message by seq", () => {
   expect(list[0].reactions).toBeUndefined();
 });
 
-test("ingestThread stores replies by parent, sorted and deduped", () => {
+test("ingestThread stores replies by channelId:parentId, sorted and deduped", () => {
   const s = useMessageStore.getState();
   const replyA = { ...msg(3), parentId: "root-1", id: "ra" };
   const replyB = { ...msg(2), parentId: "root-1", id: "rb" };
-  s.ingestThread(replyA);
-  s.ingestThread(replyB);
-  s.ingestThread(replyA);
+  s.ingestThread("c1", replyA);
+  s.ingestThread("c1", replyB);
+  s.ingestThread("c1", replyA);
   expect(
     useMessageStore
       .getState()
-      .threadList("root-1")
+      .threadList("c1", "root-1")
       .map((m) => m.id),
   ).toEqual(["rb", "ra"]);
-  expect(useMessageStore.getState().threadList("root-2")).toEqual([]);
-  s.ingestThread({ ...msg(9), parentId: null, id: "orphan" });
-  expect(useMessageStore.getState().threadList("")).toEqual([]);
+  expect(useMessageStore.getState().threadList("c1", "root-2")).toEqual([]);
+  expect(useMessageStore.getState().threadList("c2", "root-1")).toEqual([]);
+  s.ingestThread("c1", { ...msg(9), parentId: null, id: "orphan" });
+  expect(useMessageStore.getState().threadList("c1", "")).toEqual([]);
+});
+
+test("ingestThread isolates replies with same parentId across channels", () => {
+  resetStore();
+  const s = useMessageStore.getState();
+  s.ingestThread("c1", { ...msg(1), parentId: "root-1", id: "r-c1" });
+  s.ingestThread("c2", { ...msg(1), parentId: "root-1", id: "r-c2" });
+  expect(
+    useMessageStore
+      .getState()
+      .threadList("c1", "root-1")
+      .map((m) => m.id),
+  ).toEqual(["r-c1"]);
+  expect(
+    useMessageStore
+      .getState()
+      .threadList("c2", "root-1")
+      .map((m) => m.id),
+  ).toEqual(["r-c2"]);
+});
+
+test("setReactions only affects threads in the same channel", () => {
+  resetStore();
+  const s = useMessageStore.getState();
+  s.reset("c1");
+  s.reset("c2");
+  s.ingest("c1", msg(1));
+  s.ingest("c2", msg(1));
+  s.ingestThread("c1", { ...msg(1), parentId: "root-1", id: "t-c1" });
+  s.ingestThread("c2", { ...msg(1), parentId: "root-1", id: "t-c2" });
+  s.setReactions("c1", 1, { "👍": ["u1"] });
+  expect(useMessageStore.getState().threadList("c1", "root-1")[0].reactions).toEqual({
+    "👍": ["u1"],
+  });
+  expect(useMessageStore.getState().threadList("c2", "root-1")[0].reactions).toBeUndefined();
+  expect(useMessageStore.getState().list("c1")[0].reactions).toEqual({ "👍": ["u1"] });
+  expect(useMessageStore.getState().list("c2")[0].reactions).toBeUndefined();
+});
+
+test("edit and remove propagate to thread entries", () => {
+  resetStore();
+  const s = useMessageStore.getState();
+  s.reset("c1");
+  s.ingest("c1", msg(1));
+  s.ingestThread("c1", { ...msg(1), parentId: "root-1", id: "t1" });
+  s.edit("c1", "t1", "edited text");
+  expect(useMessageStore.getState().threadList("c1", "root-1")[0].content).toBe("edited text");
+  expect(useMessageStore.getState().threadList("c1", "root-1")[0].editedAt).toBeTruthy();
+  s.remove("c1", "t1");
+  expect(useMessageStore.getState().threadList("c1", "root-1")[0].deletedAt).toBeTruthy();
+  expect(useMessageStore.getState().threadList("c2", "root-1")).toEqual([]);
 });

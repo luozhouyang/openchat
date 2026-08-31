@@ -26,8 +26,8 @@ interface MessageState {
     messageSeq: number,
     reactions: Record<string, string[]>,
   ) => void;
-  ingestThread: (message: StoreMessage) => void;
-  threadList: (parentId: string) => StoreMessage[];
+  ingestThread: (channelId: string, message: StoreMessage) => void;
+  threadList: (channelId: string, parentId: string) => StoreMessage[];
 }
 
 function ensure(state: MessageState, channelId: string): ChannelState {
@@ -143,7 +143,19 @@ export const useMessageStore = create<MessageState>((set, get) => ({
           m.editedAt = Date.now();
         }
       }
-      return { channels: { ...s.channels } };
+      const prefix = `${channelId}:`;
+      const threads = { ...s.threads };
+      for (const [key, arr] of Object.entries(threads)) {
+        if (!key.startsWith(prefix)) continue;
+        let changed = false;
+        const next = arr.map((m) => {
+          if (m.id !== messageId) return m;
+          changed = true;
+          return { ...m, content, editedAt: Date.now() };
+        });
+        if (changed) threads[key] = next;
+      }
+      return { channels: { ...s.channels }, threads };
     });
   },
   remove(channelId, messageId) {
@@ -152,7 +164,19 @@ export const useMessageStore = create<MessageState>((set, get) => ({
       for (const m of ch.bySeq.values()) {
         if (m.id === messageId) m.deletedAt = Date.now();
       }
-      return { channels: { ...s.channels } };
+      const prefix = `${channelId}:`;
+      const threads = { ...s.threads };
+      for (const [key, arr] of Object.entries(threads)) {
+        if (!key.startsWith(prefix)) continue;
+        let changed = false;
+        const next = arr.map((m) => {
+          if (m.id !== messageId) return m;
+          changed = true;
+          return { ...m, deletedAt: Date.now() };
+        });
+        if (changed) threads[key] = next;
+      }
+      return { channels: { ...s.channels }, threads };
     });
   },
   setReactions(channelId, messageSeq, reactions) {
@@ -163,23 +187,29 @@ export const useMessageStore = create<MessageState>((set, get) => ({
         if (m) m.reactions = reactions;
       }
       const threads = { ...s.threads };
-      for (const arr of Object.values(threads)) {
-        const m = arr.find((x) => x.seq === messageSeq);
-        if (m) m.reactions = reactions;
+      const prefix = `${channelId}:`;
+      for (const [key, arr] of Object.entries(threads)) {
+        if (!key.startsWith(prefix)) continue;
+        const idx = arr.findIndex((x) => x.seq === messageSeq);
+        if (idx === -1) continue;
+        const next = [...arr];
+        next[idx] = { ...next[idx], reactions };
+        threads[key] = next;
       }
       return { channels: ch ? { ...s.channels } : s.channels, threads };
     });
   },
-  ingestThread(message) {
+  ingestThread(channelId, message) {
     set((s) => {
       if (!message.parentId) return s;
-      const arr = s.threads[message.parentId] ?? [];
+      const key = `${channelId}:${message.parentId}`;
+      const arr = s.threads[key] ?? [];
       if (arr.some((m) => m.id === message.id)) return s;
       const next = [...arr, { ...message }].sort((a, b) => a.seq - b.seq);
-      return { threads: { ...s.threads, [message.parentId]: next } };
+      return { threads: { ...s.threads, [key]: next } };
     });
   },
-  threadList(parentId) {
-    return get().threads[parentId] ?? [];
+  threadList(channelId, parentId) {
+    return get().threads[`${channelId}:${parentId}`] ?? [];
   },
 }));

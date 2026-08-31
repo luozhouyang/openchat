@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Outlet } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { apiFetch } from "../../lib/api";
@@ -48,10 +48,13 @@ function ChannelView() {
   }, [channelId]);
 
   return (
-    <div className="flex h-full flex-col">
-      <MessageList channelId={channelId} />
-      <TypingIndicator channelId={channelId} />
-      <Composer channelId={channelId} />
+    <div className="flex h-full">
+      <div className="flex min-w-0 flex-1 flex-col">
+        <MessageList channelId={channelId} />
+        <TypingIndicator channelId={channelId} />
+        <Composer channelId={channelId} />
+      </div>
+      <Outlet />
     </div>
   );
 }

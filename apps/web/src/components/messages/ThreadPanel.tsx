@@ -6,7 +6,7 @@ import { wsClient } from "../../ws/client";
 import type { StoreMessage } from "../../stores/messages";
 
 export function ThreadPanel({ channelId, parentId }: { channelId: string; parentId: string }) {
-  const messages = useMessageStore((s) => s.threadList(parentId));
+  const messages = useMessageStore((s) => s.threadList(channelId, parentId));
 
   useQuery({
     queryKey: ["thread", parentId],
@@ -14,7 +14,7 @@ export function ThreadPanel({ channelId, parentId }: { channelId: string; parent
       const res = await apiFetch<{ messages: StoreMessage[] }>(
         `/api/channels/${channelId}/history?parent_id=${parentId}&order=asc&limit=100`,
       );
-      for (const m of res.messages) useMessageStore.getState().ingestThread(m);
+      for (const m of res.messages) useMessageStore.getState().ingestThread(channelId, m);
       return res;
     },
   });

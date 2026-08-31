@@ -82,7 +82,7 @@ class WsClient {
         if (inner.type === "message.new") {
           const message = inner.message as Message;
           useMessageStore.getState().ingest(ev.channelId, message);
-          if (message.parentId) useMessageStore.getState().ingestThread(message);
+          if (message.parentId) useMessageStore.getState().ingestThread(ev.channelId, message);
           useSidebarStore.getState().bump(ev.channelId);
         } else if (inner.type === "message.edit") {
           useMessageStore.getState().edit(ev.channelId, inner.messageId, inner.content);
@@ -93,7 +93,7 @@ class WsClient {
           useMessageStore.getState().setReactions(ev.channelId, e.messageSeq, e.reactions);
         } else if (inner.type === "thread.reply") {
           const e = inner as { message: Message };
-          useMessageStore.getState().ingestThread(e.message);
+          useMessageStore.getState().ingestThread(ev.channelId, e.message);
         } else if (inner.type === "typing.start") {
           useTypingStore.getState().mark(ev.channelId, inner.userId, inner.expiresAt);
         }
