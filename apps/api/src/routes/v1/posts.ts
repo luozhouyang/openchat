@@ -1,8 +1,10 @@
 import { Hono } from "hono";
+import type { Context } from "hono";
 import { z } from "zod";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { channelDoName } from "protocol";
 import { requireSession } from "../../auth/session.ts";
+import type { SessionContext } from "../../auth/session.ts";
 import { requireChannelRole } from "../../auth/guards.ts";
 import { getDb } from "../../db/client.ts";
 import {
@@ -25,6 +27,10 @@ const PatchPostBody = z.object({
 });
 
 const DeletePostBody = z.object({
+  channel_id: z.string().min(1),
+});
+
+const PinPostBody = z.object({
   channel_id: z.string().min(1),
 });
 
@@ -111,3 +117,24 @@ postsV1.delete("/posts/:postId", requireSession, async (c) => {
   }
   return c.json({ ok: true });
 });
+
+type PostsCtx = Context<{ Bindings: Env; Variables: { session: SessionContext } }>;
+
+function pinHandler(pinned: boolean) {
+  return async (c: PostsCtx) => {
+    const body = PinPostBody.safeParse(await c.req.json().catch(() => null));
+    if (!body.success) return c.json({ error: "invalid" }, 422);
+    const stub = c.env.CHANNEL_DO.get(
+      c.env.CHANNEL_DO.idFromName(channelDoName(body.data.channel_id)),
+    );
+    const res = await stub.pinMessage(c.get("session")!.user.id, {
+      messageId: c.req.param("postId")!,
+      pinned,
+    });
+    if ("error" in res) return c.json({ error: res.error }, res.status as ContentfulStatusCode);
+    return c.json({ ok: true });
+  };
+}
+
+postsV1.post("/posts/:postId/pin", requireSession, pinHandler(true));
+postsV1.post("/posts/:postId/unpin", requireSession, pinHandler(false));
