@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
-import { newId } from "protocol";
+import { id } from "protocol";
 import { requireSession } from "../auth/session.ts";
 import { requireTeamRole } from "../auth/guards.ts";
 import { getDb } from "../db/client.ts";
@@ -26,10 +26,10 @@ inviteRoutes.post("/teams/:teamId/invites", requireSession, requireTeamRole("adm
   if (await repo.hasPendingInvite(db, team.id, email))
     return c.json({ error: "pending invite exists" }, 409);
   const token = generateInviteToken();
-  const id = newId();
+  const inviteId = id("inv");
   const expiresAt = Date.now() + TTL_MS;
   await repo.createInvite(db, {
-    id,
+    id: inviteId,
     teamId: team.id,
     tokenHash: await hashToken(token),
     email,
@@ -39,7 +39,7 @@ inviteRoutes.post("/teams/:teamId/invites", requireSession, requireTeamRole("adm
   });
   const inviteUrl = `${c.env.BETTER_AUTH_URL}/teams/invites/preview?token=${encodeURIComponent(token)}`;
   await sendInviteEmail(c.env, email, inviteUrl, team.displayName);
-  return c.json({ id, teamId: team.id, email, expiresAt }, 201);
+  return c.json({ id: inviteId, teamId: team.id, email, expiresAt }, 201);
 });
 
 inviteRoutes.get("/teams/:teamId/invites", requireSession, requireTeamRole("admin"), async (c) => {

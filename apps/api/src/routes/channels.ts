@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
-import { newId, CreateChannelInput, OpenDmInput, OpenGmInput, channelDoName } from "protocol";
+import { id, CreateChannelInput, OpenDmInput, OpenGmInput, channelDoName } from "protocol";
 import { requireSession } from "../auth/session.ts";
 import { requireTeamRole, requireChannelRole } from "../auth/guards.ts";
 import { getDb } from "../db/client.ts";
@@ -31,7 +31,7 @@ channelsRoutes.post(
     const db = getDb(c.env.DB);
     try {
       const ch = await createChannel(db, {
-        id: newId(),
+        id: id("chn"),
         teamId: c.req.param("teamId"),
         name: body.data.name ?? null,
         displayName: body.data.displayName,
@@ -226,7 +226,7 @@ channelsRoutes.post("/channels/dm", requireSession, async (c) => {
   const existing = await getChannelByDedupKey(db, key);
   if (existing) return c.json({ id: existing.id, existing: true });
   const ch = await createChannel(db, {
-    id: newId(),
+    id: id("chn"),
     teamId: null,
     name: null,
     displayName: "dm",
@@ -253,7 +253,7 @@ channelsRoutes.post("/channels/gm", requireSession, async (c) => {
   const existing = await getChannelByDedupKey(db, key);
   if (existing) return c.json({ id: existing.id, existing: true });
   const ch = await createChannel(db, {
-    id: newId(),
+    id: id("chn"),
     teamId: null,
     name: null,
     displayName: "gm",

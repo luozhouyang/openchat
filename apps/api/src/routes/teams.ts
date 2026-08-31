@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { eq } from "drizzle-orm";
-import { newId, CreateTeamInput, JoinTeamInput } from "protocol";
+import { id, CreateTeamInput, JoinTeamInput } from "protocol";
 import { requireSession } from "../auth/session.ts";
 import { requireTeamRole } from "../auth/guards.ts";
 import { getDb } from "../db/client.ts";
@@ -30,10 +30,10 @@ teamsRoutes.post("/teams", requireSession, async (c) => {
   const body = CreateTeamInput.safeParse(await c.req.json());
   if (!body.success) return c.json({ error: "invalid" }, 422);
   const db = getDb(c.env.DB);
-  const id = newId();
+  const teamId = id("team");
   try {
     await createTeam(db, {
-      id,
+      id: teamId,
       name: body.data.name,
       displayName: body.data.displayName,
       type: body.data.type,
@@ -43,7 +43,7 @@ teamsRoutes.post("/teams", requireSession, async (c) => {
   } catch {
     return c.json({ error: "name taken" }, 409);
   }
-  return c.json({ id }, 201);
+  return c.json({ id: teamId }, 201);
 });
 
 teamsRoutes.get("/teams", requireSession, async (c) => {

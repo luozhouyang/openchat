@@ -2,7 +2,7 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "@better-auth/drizzle-adapter";
 import { admin, bearer, jwt } from "better-auth/plugins";
 import { eq } from "drizzle-orm";
-import { userDoName } from "protocol";
+import { userDoName, id } from "protocol";
 import { getDb } from "./db/client.ts";
 import * as schema from "./db/schema-d1.ts";
 import { users } from "./db/schema-d1.ts";
@@ -29,6 +29,11 @@ export function makeAuth(env: Env) {
     },
     databaseHooks: {
       user: {
+        create: {
+          before: async (user) => {
+            return { data: { ...user, id: id("usr") } };
+          },
+        },
         update: {
           after: async (user) => {
             const env = currentEnv;

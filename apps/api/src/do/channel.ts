@@ -2,7 +2,7 @@ import { DurableObject } from "cloudflare:workers";
 import { drizzle } from "drizzle-orm/durable-sqlite";
 import { migrate } from "drizzle-orm/durable-sqlite/migrator";
 import { and, asc, count, desc, eq, gt, isNull, lt } from "drizzle-orm";
-import { newId, userDoName, isAllowedEmoji } from "protocol";
+import { id, userDoName, isAllowedEmoji } from "protocol";
 import migrations from "../../migrations/channel-do/migrations";
 import * as schema from "../db/schema-channel-do.ts";
 import { createBroadcaster } from "./broadcast.ts";
@@ -233,11 +233,11 @@ export class ChannelDO extends DurableObject<Env> {
         .limit(1);
       if (member.length > 0) validMentions.push(userId);
     }
-    const id = newId();
+    const messageId = id("msg");
     const result = await this.db
       .insert(schema.messages)
       .values({
-        id,
+        id: messageId,
         userId: senderUserId,
         parentId: body.parentId ?? null,
         type: body.type === "file" ? "file" : "text",

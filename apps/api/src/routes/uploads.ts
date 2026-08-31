@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { newId } from "protocol";
+import { id } from "protocol";
 import { requireSession } from "../auth/session.ts";
 import { getDb } from "../db/client.ts";
 import { getChannel, getChannelMember } from "../db/repos/channels.ts";
@@ -46,7 +46,7 @@ uploadsRoutes.post("/uploads", requireSession, async (c) => {
   if (body.data.size > MAX_SIZE) return c.json({ error: "too large" }, 422);
   if (!ALLOWED_TYPES.has(body.data.contentType)) return c.json({ error: "type not allowed" }, 422);
 
-  const uploadId = newId();
+  const uploadId = id("upl");
   const filename = sanitizeFilename(body.data.filename);
   const key = `uploads/${body.data.channelId}/${uploadId}/${filename}`;
   await createUpload(db, {
