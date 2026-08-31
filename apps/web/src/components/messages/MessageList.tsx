@@ -68,7 +68,7 @@ export function MessageList({ channelId }: { channelId: string }) {
             key={vi.key}
             style={{ position: "absolute", top: vi.start, width: "100%", height: vi.size }}
           >
-            <MessageRow message={list[vi.index]} />
+            <MessageRow message={list[vi.index]} channelId={channelId} />
           </div>
         ))}
       </div>

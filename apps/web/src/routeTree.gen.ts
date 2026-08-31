@@ -16,6 +16,7 @@ import { Route as SignupRouteImport } from "./routes/signup";
 import { Route as TeamIdIndexRouteImport } from "./routes/$teamId/index";
 import { Route as TeamIdCChannelIdRouteImport } from "./routes/$teamId/c.$channelId";
 import { Route as TeamIdDmChannelIdRouteImport } from "./routes/$teamId/dm.$channelId";
+import { Route as TeamIdCChannelIdTThreadIdRouteImport } from "./routes/$teamId/c.$channelId.t.$threadId";
 
 const IndexRoute = IndexRouteImport.update({
   id: "/",
@@ -52,6 +53,11 @@ const TeamIdDmChannelIdRoute = TeamIdDmChannelIdRouteImport.update({
   path: "/dm/$channelId",
   getParentRoute: () => TeamIdRoute,
 } as any);
+const TeamIdCChannelIdTThreadIdRoute = TeamIdCChannelIdTThreadIdRouteImport.update({
+  id: "/t/$threadId",
+  path: "/t/$threadId",
+  getParentRoute: () => TeamIdCChannelIdRoute,
+} as any);
 
 export interface FileRoutesByFullPath {
   "/": typeof IndexRoute;
@@ -59,16 +65,18 @@ export interface FileRoutesByFullPath {
   "/login": typeof LoginRoute;
   "/signup": typeof SignupRoute;
   "/$teamId/": typeof TeamIdIndexRoute;
-  "/$teamId/c/$channelId": typeof TeamIdCChannelIdRoute;
+  "/$teamId/c/$channelId": typeof TeamIdCChannelIdRouteWithChildren;
   "/$teamId/dm/$channelId": typeof TeamIdDmChannelIdRoute;
+  "/$teamId/c/$channelId/t/$threadId": typeof TeamIdCChannelIdTThreadIdRoute;
 }
 export interface FileRoutesByTo {
   "/": typeof IndexRoute;
   "/login": typeof LoginRoute;
   "/signup": typeof SignupRoute;
   "/$teamId": typeof TeamIdIndexRoute;
-  "/$teamId/c/$channelId": typeof TeamIdCChannelIdRoute;
+  "/$teamId/c/$channelId": typeof TeamIdCChannelIdRouteWithChildren;
   "/$teamId/dm/$channelId": typeof TeamIdDmChannelIdRoute;
+  "/$teamId/c/$channelId/t/$threadId": typeof TeamIdCChannelIdTThreadIdRoute;
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport;
@@ -77,8 +85,9 @@ export interface FileRoutesById {
   "/login": typeof LoginRoute;
   "/signup": typeof SignupRoute;
   "/$teamId/": typeof TeamIdIndexRoute;
-  "/$teamId/c/$channelId": typeof TeamIdCChannelIdRoute;
+  "/$teamId/c/$channelId": typeof TeamIdCChannelIdRouteWithChildren;
   "/$teamId/dm/$channelId": typeof TeamIdDmChannelIdRoute;
+  "/$teamId/c/$channelId/t/$threadId": typeof TeamIdCChannelIdTThreadIdRoute;
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath;
@@ -89,9 +98,17 @@ export interface FileRouteTypes {
     | "/signup"
     | "/$teamId/"
     | "/$teamId/c/$channelId"
-    | "/$teamId/dm/$channelId";
+    | "/$teamId/dm/$channelId"
+    | "/$teamId/c/$channelId/t/$threadId";
   fileRoutesByTo: FileRoutesByTo;
-  to: "/" | "/login" | "/signup" | "/$teamId" | "/$teamId/c/$channelId" | "/$teamId/dm/$channelId";
+  to:
+    | "/"
+    | "/login"
+    | "/signup"
+    | "/$teamId"
+    | "/$teamId/c/$channelId"
+    | "/$teamId/dm/$channelId"
+    | "/$teamId/c/$channelId/t/$threadId";
   id:
     | "__root__"
     | "/"
@@ -100,7 +117,8 @@ export interface FileRouteTypes {
     | "/signup"
     | "/$teamId/"
     | "/$teamId/c/$channelId"
-    | "/$teamId/dm/$channelId";
+    | "/$teamId/dm/$channelId"
+    | "/$teamId/c/$channelId/t/$threadId";
   fileRoutesById: FileRoutesById;
 }
 export interface RootRouteChildren {
@@ -161,18 +179,37 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof TeamIdDmChannelIdRouteImport;
       parentRoute: typeof TeamIdRoute;
     };
+    "/$teamId/c/$channelId/t/$threadId": {
+      id: "/$teamId/c/$channelId/t/$threadId";
+      path: "/t/$threadId";
+      fullPath: "/$teamId/c/$channelId/t/$threadId";
+      preLoaderRoute: typeof TeamIdCChannelIdTThreadIdRouteImport;
+      parentRoute: typeof TeamIdCChannelIdRoute;
+    };
   }
 }
 
+interface TeamIdCChannelIdRouteChildren {
+  TeamIdCChannelIdTThreadIdRoute: typeof TeamIdCChannelIdTThreadIdRoute;
+}
+
+const TeamIdCChannelIdRouteChildren: TeamIdCChannelIdRouteChildren = {
+  TeamIdCChannelIdTThreadIdRoute: TeamIdCChannelIdTThreadIdRoute,
+};
+
+const TeamIdCChannelIdRouteWithChildren = TeamIdCChannelIdRoute._addFileChildren(
+  TeamIdCChannelIdRouteChildren,
+);
+
 interface TeamIdRouteChildren {
   TeamIdIndexRoute: typeof TeamIdIndexRoute;
-  TeamIdCChannelIdRoute: typeof TeamIdCChannelIdRoute;
+  TeamIdCChannelIdRoute: typeof TeamIdCChannelIdRouteWithChildren;
   TeamIdDmChannelIdRoute: typeof TeamIdDmChannelIdRoute;
 }
 
 const TeamIdRouteChildren: TeamIdRouteChildren = {
   TeamIdIndexRoute: TeamIdIndexRoute,
-  TeamIdCChannelIdRoute: TeamIdCChannelIdRoute,
+  TeamIdCChannelIdRoute: TeamIdCChannelIdRouteWithChildren,
   TeamIdDmChannelIdRoute: TeamIdDmChannelIdRoute,
 };
 

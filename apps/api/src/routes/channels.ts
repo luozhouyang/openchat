@@ -142,6 +142,41 @@ channelsRoutes.get(
 );
 
 channelsRoutes.post(
+  "/channels/:channelId/messages/:messageId/edit",
+  requireSession,
+  requireChannelRole("member"),
+  async (c) => {
+    const body = z.object({ content: z.string().min(1).max(16384) }).safeParse(await c.req.json());
+    if (!body.success) return c.json({ error: "invalid" }, 422);
+    const userId = c.get("session")!.user.id;
+    const stub = c.env.CHANNEL_DO.get(
+      c.env.CHANNEL_DO.idFromName(channelDoName(c.req.param("channelId"))),
+    );
+    const res = await stub.editMessage(userId, {
+      messageId: c.req.param("messageId"),
+      content: body.data.content,
+    });
+    if ("error" in res) return c.json({ error: res.error }, res.status);
+    return c.json({ ok: true });
+  },
+);
+
+channelsRoutes.post(
+  "/channels/:channelId/messages/:messageId/delete",
+  requireSession,
+  requireChannelRole("member"),
+  async (c) => {
+    const userId = c.get("session")!.user.id;
+    const stub = c.env.CHANNEL_DO.get(
+      c.env.CHANNEL_DO.idFromName(channelDoName(c.req.param("channelId"))),
+    );
+    const res = await stub.deleteMessage(userId, { messageId: c.req.param("messageId") });
+    if ("error" in res) return c.json({ error: res.error }, res.status);
+    return c.json({ ok: true });
+  },
+);
+
+channelsRoutes.post(
   "/channels/:channelId/archive",
   requireSession,
   requireChannelRole("admin"),

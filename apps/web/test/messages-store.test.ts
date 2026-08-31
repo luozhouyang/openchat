@@ -83,3 +83,32 @@ test("fail removes pending message and recomputes maxSeq", () => {
   ).toEqual(["m1"]);
   expect(useMessageStore.getState().maxSeq("c5")).toBe(1);
 });
+
+test("setReactions updates matching message by seq", () => {
+  const s = useMessageStore.getState();
+  s.reset("c6");
+  s.ingest("c6", msg(1));
+  s.ingest("c6", msg(2));
+  s.setReactions("c6", 2, { "👍": ["u1"] });
+  const list = useMessageStore.getState().list("c6");
+  expect(list[1].reactions).toEqual({ "👍": ["u1"] });
+  expect(list[0].reactions).toBeUndefined();
+});
+
+test("ingestThread stores replies by parent, sorted and deduped", () => {
+  const s = useMessageStore.getState();
+  const replyA = { ...msg(3), parentId: "root-1", id: "ra" };
+  const replyB = { ...msg(2), parentId: "root-1", id: "rb" };
+  s.ingestThread(replyA);
+  s.ingestThread(replyB);
+  s.ingestThread(replyA);
+  expect(
+    useMessageStore
+      .getState()
+      .threadList("root-1")
+      .map((m) => m.id),
+  ).toEqual(["rb", "ra"]);
+  expect(useMessageStore.getState().threadList("root-2")).toEqual([]);
+  s.ingestThread({ ...msg(9), parentId: null, id: "orphan" });
+  expect(useMessageStore.getState().threadList("")).toEqual([]);
+});

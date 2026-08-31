@@ -1,23 +1,33 @@
 import { create } from "zustand";
 import type { Message } from "protocol";
 
+export type StoreMessage = Message & { reactions?: Record<string, string[]> };
+
 interface ChannelState {
-  bySeq: Map<number, Message>;
-  pending: Map<number, Message>;
+  bySeq: Map<number, StoreMessage>;
+  pending: Map<number, StoreMessage>;
   maxSeq: number;
 }
 
 interface MessageState {
   channels: Record<string, ChannelState>;
+  threads: Record<string, StoreMessage[]>;
   reset: (channelId: string) => void;
-  ingest: (channelId: string, message: Message) => void;
-  applySync: (channelId: string, messages: Message[]) => void;
-  list: (channelId: string) => Message[];
+  ingest: (channelId: string, message: StoreMessage) => void;
+  applySync: (channelId: string, messages: StoreMessage[]) => void;
+  list: (channelId: string) => StoreMessage[];
   maxSeq: (channelId: string) => number;
   ack: (channelId: string, clientToken: string, real: { id: string; seq: number }) => void;
   fail: (channelId: string, clientToken: string) => void;
   edit: (channelId: string, messageId: string, content: string) => void;
   remove: (channelId: string, messageId: string) => void;
+  setReactions: (
+    channelId: string,
+    messageSeq: number,
+    reactions: Record<string, string[]>,
+  ) => void;
+  ingestThread: (message: StoreMessage) => void;
+  threadList: (parentId: string) => StoreMessage[];
 }
 
 function ensure(state: MessageState, channelId: string): ChannelState {
@@ -34,7 +44,7 @@ function drain(ch: ChannelState) {
   }
 }
 
-function removeById(ch: ChannelState, id: string): Message | null {
+function removeById(ch: ChannelState, id: string): StoreMessage | null {
   for (const [seq, m] of ch.bySeq) {
     if (m.id === id) {
       ch.bySeq.delete(seq);
@@ -54,6 +64,7 @@ function removeById(ch: ChannelState, id: string): Message | null {
 
 export const useMessageStore = create<MessageState>((set, get) => ({
   channels: {},
+  threads: {},
   reset(channelId) {
     set((s) => {
       s.channels[channelId] = { bySeq: new Map(), pending: new Map(), maxSeq: 0 };
@@ -143,5 +154,32 @@ export const useMessageStore = create<MessageState>((set, get) => ({
       }
       return { channels: { ...s.channels } };
     });
+  },
+  setReactions(channelId, messageSeq, reactions) {
+    set((s) => {
+      const ch = s.channels[channelId];
+      if (ch) {
+        const m = ch.bySeq.get(messageSeq);
+        if (m) m.reactions = reactions;
+      }
+      const threads = { ...s.threads };
+      for (const arr of Object.values(threads)) {
+        const m = arr.find((x) => x.seq === messageSeq);
+        if (m) m.reactions = reactions;
+      }
+      return { channels: ch ? { ...s.channels } : s.channels, threads };
+    });
+  },
+  ingestThread(message) {
+    set((s) => {
+      if (!message.parentId) return s;
+      const arr = s.threads[message.parentId] ?? [];
+      if (arr.some((m) => m.id === message.id)) return s;
+      const next = [...arr, { ...message }].sort((a, b) => a.seq - b.seq);
+      return { threads: { ...s.threads, [message.parentId]: next } };
+    });
+  },
+  threadList(parentId) {
+    return get().threads[parentId] ?? [];
   },
 }));

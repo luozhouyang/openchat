@@ -471,6 +471,34 @@ export class UserDO extends DurableObject<Env> {
       const id = this.env.CHANNEL_DO.idFromName(channelDoName(frame.channelId));
       void this.env.CHANNEL_DO.get(id).typing(userId);
     }
+    if (frame.type === "react") {
+      const attachment = ws.deserializeAttachment() as { userId?: string } | null;
+      const userId = attachment?.userId;
+      if (!userId) return;
+      const stub = this.env.CHANNEL_DO.get(
+        this.env.CHANNEL_DO.idFromName(channelDoName(frame.channelId)),
+      );
+      const res = await stub.toggleReaction(userId, {
+        messageSeq: frame.messageSeq,
+        emoji: frame.emoji,
+      });
+      if (res && "error" in res) {
+        ws.send(JSON.stringify({ type: "error", code: `http_${res.status}`, message: res.error }));
+      }
+    }
+    if (frame.type === "subscribe_thread") {
+      const attachment = ws.deserializeAttachment() as { userId?: string } | null;
+      const userId = attachment?.userId;
+      if (!userId) return;
+      const stub = this.env.CHANNEL_DO.get(
+        this.env.CHANNEL_DO.idFromName(channelDoName(frame.channelId)),
+      );
+      if (frame.subscribe) {
+        await stub.threadsSubscribe({ parentId: frame.parentId, userId });
+      } else {
+        await stub.threadsUnsubscribe({ parentId: frame.parentId, userId });
+      }
+    }
     if (frame.type === "activity") {
       this.lastActiveAt = Date.now();
       this.awayNotified = false;
