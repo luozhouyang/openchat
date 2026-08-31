@@ -1,34 +1,26 @@
 import { eq, and } from "drizzle-orm";
-import { getDb } from "../client.ts";
+import type { Preference, PreferenceInsert, Db } from "../types.ts";
 import { preferences } from "../schema-d1.ts";
-
-type Db = ReturnType<typeof getDb>;
 
 export async function getPreference(
   db: Db,
   row: { userId: string; category: string; name: string },
-) {
-  return (
-    (
-      await db
-        .select()
-        .from(preferences)
-        .where(
-          and(
-            eq(preferences.userId, row.userId),
-            eq(preferences.category, row.category),
-            eq(preferences.name, row.name),
-          ),
-        )
-        .limit(1)
-    )[0] ?? null
-  );
+): Promise<Preference | null> {
+  const rows = await db
+    .select()
+    .from(preferences)
+    .where(
+      and(
+        eq(preferences.userId, row.userId),
+        eq(preferences.category, row.category),
+        eq(preferences.name, row.name),
+      ),
+    )
+    .limit(1);
+  return rows[0] ?? null;
 }
 
-export async function setPreference(
-  db: Db,
-  row: { userId: string; category: string; name: string; value: string },
-) {
+export async function setPreference(db: Db, row: PreferenceInsert) {
   await db
     .insert(preferences)
     .values(row)
@@ -38,7 +30,7 @@ export async function setPreference(
     });
 }
 
-export async function listPreferences(db: Db, userId: string) {
+export async function listPreferences(db: Db, userId: string): Promise<Preference[]> {
   return db.select().from(preferences).where(eq(preferences.userId, userId));
 }
 

@@ -1,8 +1,6 @@
 import { eq, and, like } from "drizzle-orm";
-import type { BaseSQLiteDatabase } from "drizzle-orm/sqlite-core";
+import type { Team, TeamMember, TeamMemberInsert, Db } from "../types.ts";
 import { teams, teamMembers, channels, channelMembers } from "../schema-d1.ts";
-
-type Db = BaseSQLiteDatabase<"async", D1Result, typeof import("../schema-d1.ts")>;
 
 export async function createTeam(
   db: Db,
@@ -23,8 +21,9 @@ export async function createTeam(
   return getTeam(db, row.id);
 }
 
-export async function getTeam(db: Db, teamId: string) {
-  return (await db.select().from(teams).where(eq(teams.id, teamId)).limit(1))[0] ?? null;
+export async function getTeam(db: Db, teamId: string): Promise<Team | null> {
+  const rows = await db.select().from(teams).where(eq(teams.id, teamId)).limit(1);
+  return rows[0] ?? null;
 }
 
 export async function listTeamsForUser(db: Db, userId: string) {
@@ -35,22 +34,20 @@ export async function listTeamsForUser(db: Db, userId: string) {
     .where(eq(teamMembers.userId, userId));
 }
 
-export async function getTeamMember(db: Db, teamId: string, userId: string) {
-  return (
-    (
-      await db
-        .select()
-        .from(teamMembers)
-        .where(and(eq(teamMembers.teamId, teamId), eq(teamMembers.userId, userId)))
-        .limit(1)
-    )[0] ?? null
-  );
+export async function getTeamMember(
+  db: Db,
+  teamId: string,
+  userId: string,
+): Promise<TeamMember | null> {
+  const rows = await db
+    .select()
+    .from(teamMembers)
+    .where(and(eq(teamMembers.teamId, teamId), eq(teamMembers.userId, userId)))
+    .limit(1);
+  return rows[0] ?? null;
 }
 
-export async function addTeamMember(
-  db: Db,
-  row: { teamId: string; userId: string; roles: string },
-) {
+export async function addTeamMember(db: Db, row: Omit<TeamMemberInsert, "joinedAt">) {
   await db.insert(teamMembers).values({ ...row, joinedAt: Date.now() });
 }
 
@@ -60,7 +57,7 @@ export async function removeTeamMember(db: Db, teamId: string, userId: string) {
     .where(and(eq(teamMembers.teamId, teamId), eq(teamMembers.userId, userId)));
 }
 
-export async function countTeamAdmins(db: Db, teamId: string) {
+export async function countTeamAdmins(db: Db, teamId: string): Promise<number> {
   const rows = await db
     .select()
     .from(teamMembers)
@@ -68,7 +65,11 @@ export async function countTeamAdmins(db: Db, teamId: string) {
   return rows.length;
 }
 
-export async function listChannelIdsForUserInTeam(db: Db, teamId: string, userId: string) {
+export async function listChannelIdsForUserInTeam(
+  db: Db,
+  teamId: string,
+  userId: string,
+): Promise<string[]> {
   const rows = await db
     .select({ channelId: channelMembers.channelId })
     .from(channelMembers)

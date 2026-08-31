@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { id } from "protocol";
-import { getDb } from "../db/client.ts";
 import { channels, channelMembers } from "../db/schema-d1.ts";
+import type { Db } from "../db/types.ts";
 import {
   getChannel,
   getChannelByDedupKey,
@@ -12,7 +12,6 @@ import {
 import { getTeamMember } from "../db/repos/teams.ts";
 import { apiError } from "../lib/errors.ts";
 
-type Db = ReturnType<typeof getDb>;
 type Channel = typeof channels.$inferSelect;
 
 export async function dedupKeyFor(kind: "dm" | "gm", ids: string[]): Promise<string> {

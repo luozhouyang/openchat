@@ -92,7 +92,7 @@ export async function completeUpload(
   if (obj.size !== session.fileSize) throw apiError("size mismatch", "size mismatch", 422);
   if (obj.contentType !== session.type) throw apiError("type mismatch", "type mismatch", 422);
 
-  await completeUploadSession(db, session.id, { fileOffset: session.fileSize ?? 0 });
+  await completeUploadSession(db, { id: session.id, fileOffset: session.fileSize ?? 0 });
   const messageId = await postFileMessage(env, session.channelId!, session.userId!, {
     fileId: session.id,
     key: session.path,
