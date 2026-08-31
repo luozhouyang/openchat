@@ -15,16 +15,7 @@ export function StructurePanel() {
         <div key={t.id} className="rounded border p-4">
           <div className="mb-2 flex items-center justify-between">
             <p className="font-medium">{t.displayName}</p>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() =>
-                fetch(`/admin/teams/${t.id}/archive`, {
-                  method: "POST",
-                  credentials: "include",
-                })
-              }
-            >
+            <Button size="sm" variant="outline" onClick={() => void api.admin.archiveTeam(t.id)}>
               归档团队
             </Button>
           </div>
@@ -36,24 +27,14 @@ export function StructurePanel() {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() =>
-                      fetch(`/admin/channels/${c.id}/archive`, {
-                        method: "POST",
-                        credentials: "include",
-                      })
-                    }
+                    onClick={() => void api.admin.archiveChannel(c.id)}
                   >
                     归档
                   </Button>
                   <Button
                     size="sm"
                     variant="destructive"
-                    onClick={() =>
-                      fetch(`/admin/channels/${c.id}/delete`, {
-                        method: "POST",
-                        credentials: "include",
-                      })
-                    }
+                    onClick={() => void api.admin.deleteChannel(c.id)}
                   >
                     删除
                   </Button>

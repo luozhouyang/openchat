@@ -1,14 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { apiFetch } from "../../lib/api";
+import { api } from "../../lib/api";
 
 export function StatsCards() {
   const stats = useQuery({
     queryKey: ["admin-stats"],
-    queryFn: () =>
-      apiFetch<{ users: number; teams: number; channels: number; messages: number }>(
-        "/admin/stats",
-      ),
+    queryFn: () => api.admin.stats(),
   });
   const items = [
     ["用户", stats.data?.users],

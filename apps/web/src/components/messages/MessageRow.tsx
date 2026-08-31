@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useParams } from "@tanstack/react-router";
 import { wsClient } from "../../ws/client";
-import { apiFetch } from "../../lib/api";
+import { api } from "../../lib/api";
 import { ReactionBar } from "./ReactionBar";
 import { AttachmentView } from "../upload/AttachmentView";
 import type { StoreMessage } from "../../stores/messages";
@@ -15,17 +15,11 @@ export function MessageRow({ message, channelId }: { message: StoreMessage; chan
     const content = draft.trim();
     setEditing(false);
     if (!content || content === message.content) return;
-    await apiFetch(`/api/channels/${channelId}/messages/${message.id}/edit`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ content }),
-    });
+    await api.posts.patch(message.id, { message: content, channelId });
   }
 
   async function remove() {
-    await apiFetch(`/api/channels/${channelId}/messages/${message.id}/delete`, {
-      method: "POST",
-    });
+    await api.posts.remove(message.id, { channelId });
   }
 
   if (message.deletedAt) {

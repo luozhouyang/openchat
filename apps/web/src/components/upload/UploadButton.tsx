@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { apiFetch } from "../../lib/api";
+import { api } from "../../lib/api";
 
 export function UploadButton({
   channelId,
@@ -13,15 +13,11 @@ export function UploadButton({
 
   async function upload(file: File) {
     setProgress(0);
-    const res = await apiFetch<{ uploadId: string; putUrl: string }>("/uploads", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        channelId,
-        filename: file.name,
-        size: file.size,
-        contentType: file.type,
-      }),
+    const res = await api.uploads.create({
+      channelId,
+      filename: file.name,
+      size: file.size,
+      contentType: file.type,
     });
     await fetch(res.putUrl, {
       method: "PUT",
@@ -29,12 +25,7 @@ export function UploadButton({
       headers: { "content-type": file.type },
     });
     setProgress(100);
-    await fetch("/uploads/complete", {
-      method: "POST",
-      credentials: "include",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ uploadId: res.uploadId }),
-    });
+    await api.uploads.complete(res.uploadId);
     setProgress(null);
     onUploaded();
   }

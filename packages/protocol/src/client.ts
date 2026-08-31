@@ -1,11 +1,15 @@
 import type {
+  AdminStatsOutput,
   ChannelsForTeamOutput,
   ChannelsListOutput,
   ChannelDetailOutput,
+  CompleteUploadOutput,
   CreateChannelInput,
   CreateChannelOutput,
   CreateTeamInput,
   CreateTeamOutput,
+  CreateUploadOutput,
+  DeletePostInput,
   JoinTeamInput,
   ListMembersQuery,
   ListPostsOutput,
@@ -15,21 +19,26 @@ import type {
   OpenChannelOutput,
   OpenDirectInput,
   OpenGroupInput,
+  PatchPostInput,
   PatchTeamInput,
+  PushSubscribeInput,
   PutStatusInput,
   StatusIdsInput,
   StatusesOutput,
   StatusOutput,
   TeamOutput,
+  UploadRequest,
   WorkspaceResponse,
 } from "./rest.ts";
 
 export class ApiError extends Error {
-  constructor(
-    public status: number,
-    public body: unknown,
-  ) {
+  status: number;
+  body: unknown;
+
+  constructor(status: number, body: unknown) {
     super(`api ${status}`);
+    this.status = status;
+    this.body = body;
   }
 }
 
@@ -42,7 +51,7 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   return res.json() as Promise<T>;
 }
 
-function json<T>(method: string, body?: unknown): RequestInit {
+function json(method: string, body?: unknown): RequestInit {
   return {
     method,
     headers: { "content-type": "application/json" },
@@ -102,6 +111,36 @@ export const api = {
     list: (channelId: string, query?: ListPostsQuery) =>
       apiFetch<ListPostsOutput>(
         `/api/v1/channels/${channelId}/posts?limit=${query?.limit ?? 30}${query?.beforeSeq !== undefined ? `&beforeSeq=${query.beforeSeq}` : ""}${query?.parentId ? `&parentId=${query.parentId}` : ""}${query?.order ? `&order=${query.order}` : ""}`,
+      ),
+    patch: (postId: string, input: PatchPostInput) =>
+      apiFetch<{ ok: true }>(`/api/v1/posts/${postId}/patch`, json("PUT", input)),
+    remove: (postId: string, input: DeletePostInput) =>
+      apiFetch<{ ok: true }>(`/api/v1/posts/${postId}`, json("DELETE", input)),
+  },
+
+  push: {
+    vapidPublicKey: () => apiFetch<{ publicKey: string }>("/api/v1/users/me/vapid_public_key"),
+    subscribe: (input: PushSubscribeInput) =>
+      apiFetch<{ ok: true }>("/api/v1/users/me/push_subscriptions", json("POST", input)),
+  },
+
+  admin: {
+    archiveTeam: (teamId: string) =>
+      apiFetch<{ ok: true }>(`/api/v1/admin/teams/${teamId}/archive`, { method: "POST" }),
+    archiveChannel: (channelId: string) =>
+      apiFetch<{ ok: true }>(`/api/v1/admin/channels/${channelId}/archive`, { method: "POST" }),
+    deleteChannel: (channelId: string) =>
+      apiFetch<{ ok: true }>(`/api/v1/admin/channels/${channelId}/delete`, { method: "POST" }),
+    stats: () => apiFetch<AdminStatsOutput>("/api/v1/admin/stats"),
+  },
+
+  uploads: {
+    create: (input: UploadRequest) =>
+      apiFetch<CreateUploadOutput>("/api/v1/uploads", json("POST", input)),
+    complete: (uploadId: string) =>
+      apiFetch<CompleteUploadOutput>(
+        `/api/v1/uploads/${uploadId}/complete`,
+        json("POST", { uploadId }),
       ),
   },
 

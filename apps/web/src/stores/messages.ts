@@ -1,7 +1,10 @@
 import { create } from "zustand";
 import type { Message } from "protocol";
 
-export type StoreMessage = Message & { reactions?: Record<string, string[]> };
+export type StoreMessage = Omit<Message, "attachments"> & {
+  attachments?: unknown[] | null;
+  reactions?: Record<string, string[]>;
+};
 
 interface ChannelState {
   bySeq: Map<number, StoreMessage>;

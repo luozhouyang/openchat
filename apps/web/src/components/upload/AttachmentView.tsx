@@ -1,6 +1,12 @@
-import type { Message } from "protocol";
+import type { StoreMessage } from "../../stores/messages";
 
-export function AttachmentView({ message, channelId }: { message: Message; channelId: string }) {
+export function AttachmentView({
+  message,
+  channelId,
+}: {
+  message: StoreMessage;
+  channelId: string;
+}) {
   if (!message.attachments || message.attachments.length === 0) return null;
   return (
     <div className="mt-1 flex gap-2">

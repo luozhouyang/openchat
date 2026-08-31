@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { apiFetch } from "../../lib/api";
+import { api } from "../../lib/api";
 import { useMessageStore } from "../../stores/messages";
 import { wsClient } from "../../ws/client";
-import type { StoreMessage } from "../../stores/messages";
 import type { ClientFrame } from "protocol";
 
 export function ThreadPanel({ channelId, parentId }: { channelId: string; parentId: string }) {
@@ -12,9 +11,7 @@ export function ThreadPanel({ channelId, parentId }: { channelId: string; parent
   useQuery({
     queryKey: ["thread", parentId],
     queryFn: async () => {
-      const res = await apiFetch<{ messages: StoreMessage[] }>(
-        `/api/v1/channels/${channelId}/posts?parent_id=${parentId}&order=asc&limit=100`,
-      );
+      const res = await api.posts.list(channelId, { parentId, order: "asc", limit: 100 });
       for (const m of res.messages) useMessageStore.getState().ingestThread(channelId, m);
       return res;
     },

@@ -1,9 +1,8 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useCallback, useEffect, useRef } from "react";
 import { useMessageStore } from "../../stores/messages";
-import { apiFetch } from "../../lib/api";
+import { api } from "../../lib/api";
 import { MessageRow } from "./MessageRow";
-import type { Message } from "protocol";
 
 export function MessageList({ channelId }: { channelId: string }) {
   const list = useMessageStore((s) => s.list(channelId));
@@ -34,9 +33,7 @@ export function MessageList({ channelId }: { channelId: string }) {
     const anchorSeq = list[0].seq;
     const scrollTop = parentRef.current?.scrollTop ?? 0;
     try {
-      const res = await apiFetch<{ messages: Message[] }>(
-        `/api/channels/${channelId}/history?before_seq=${anchorSeq}&limit=30`,
-      );
+      const res = await api.posts.list(channelId, { beforeSeq: anchorSeq, limit: 30 });
       useMessageStore.getState().applySync(channelId, res.messages);
       const idx = useMessageStore
         .getState()
