@@ -26,9 +26,12 @@ async function createTeam(
   const res = await exports.default.fetch("http://localhost/api/v1/teams", {
     method: "POST",
     headers: { cookie, "content-type": "application/json" },
-    body: JSON.stringify({ name, display_name: displayName, type }),
+    body: JSON.stringify({ name, displayName, type }),
   });
-  return { status: res.status, body: (await res.json()) as { id?: string; error?: string } };
+  return {
+    status: res.status,
+    body: (await res.json()) as { id?: string; inviteCode?: string; error?: string },
+  };
 }
 
 beforeAll(async () => {
@@ -73,27 +76,31 @@ test("open team joinable, invite team needs code", async () => {
   const wrongCode = await exports.default.fetch(`http://localhost/api/v1/teams/${invId}/members`, {
     method: "POST",
     headers: { cookie: joiner, "content-type": "application/json" },
-    body: JSON.stringify({ invite_code: "bogus-code" }),
+    body: JSON.stringify({ inviteCode: "bogus-code" }),
   });
   expect(wrongCode.status).toBe(403);
 });
 
-test("admin detail exposes invite code and join with it works", async () => {
+test("admin detail exposes team and join with invite code works", async () => {
   const inv = await createTeam(ownerCookie, "vault", "Vault", "invite");
   const invId = inv.body.id!;
+  const inviteCode = inv.body.inviteCode!;
+  expect(inviteCode).toBeTruthy();
 
   const detail = await exports.default.fetch(`http://localhost/api/v1/teams/${invId}`, {
     headers: { cookie: ownerCookie },
   });
   expect(detail.status).toBe(200);
-  const { team } = (await detail.json()) as { team: { inviteCode: string | null } };
-  expect(team.inviteCode).toBeTruthy();
+  const { team } = (await detail.json()) as { team: { id: string; name: string; type: string } };
+  expect(team.id).toBe(invId);
+  expect(team.name).toBe("vault");
+  expect(team.type).toBe("invite");
 
   const member = await signup("member@test.dev");
   const withCode = await exports.default.fetch(`http://localhost/api/v1/teams/${invId}/members`, {
     method: "POST",
     headers: { cookie: member, "content-type": "application/json" },
-    body: JSON.stringify({ invite_code: team.inviteCode }),
+    body: JSON.stringify({ inviteCode }),
   });
   expect(withCode.status).toBe(200);
 });

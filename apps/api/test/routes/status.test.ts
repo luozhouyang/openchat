@@ -20,9 +20,9 @@ test("GET /users/me/status returns offline by default", async () => {
   });
   expect(res.status).toBe(200);
   const body = (await res.json()) as Record<string, unknown>;
-  expect(body).toMatchObject({ user_id: aliceId, status: "offline", manual: false });
-  expect(body).toHaveProperty("last_activity_at");
-  expect(body).toHaveProperty("dnd_end_time");
+  expect(body).toMatchObject({ userId: aliceId, status: "offline", manual: false });
+  expect(body).toHaveProperty("lastActivityAt");
+  expect(body).toHaveProperty("dndEndTime");
 });
 
 test("PUT /users/me/status then GET returns it", async () => {
@@ -30,7 +30,7 @@ test("PUT /users/me/status then GET returns it", async () => {
   const put = await exports.default.fetch("http://localhost/api/v1/users/me/status", {
     method: "PUT",
     headers: { "content-type": "application/json", cookie: aliceCookie },
-    body: JSON.stringify({ status: "dnd", dnd_end_time: dndEnd }),
+    body: JSON.stringify({ status: "dnd", dndEndTime: dndEnd }),
   });
   expect(put.status).toBe(200);
   expect(await put.json()).toEqual({ ok: true });
@@ -40,8 +40,8 @@ test("PUT /users/me/status then GET returns it", async () => {
   });
   expect(res.status).toBe(200);
   const body = (await res.json()) as Record<string, unknown>;
-  expect(body).toMatchObject({ user_id: aliceId, status: "dnd", manual: true });
-  expect(body.dnd_end_time).toBe(dndEnd);
+  expect(body).toMatchObject({ userId: aliceId, status: "dnd", manual: true });
+  expect(body.dndEndTime).toBe(dndEnd);
 });
 
 test("PUT status for another user returns 403", async () => {
@@ -66,7 +66,7 @@ test("POST /users/status/ids returns presence statuses", async () => {
   const res = await exports.default.fetch("http://localhost/api/v1/users/status/ids", {
     method: "POST",
     headers: { "content-type": "application/json", cookie: aliceCookie },
-    body: JSON.stringify({ user_ids: [aliceId, bobId, "status-nonexistent"] }),
+    body: JSON.stringify({ userIds: [aliceId, bobId, "status-nonexistent"] }),
   });
   expect(res.status).toBe(200);
   const body = (await res.json()) as { statuses: Record<string, string> };
@@ -77,11 +77,11 @@ test("POST /users/status/ids returns presence statuses", async () => {
 });
 
 test("POST /users/status/ids rejects more than 200 ids", async () => {
-  const user_ids = Array.from({ length: 201 }, (_, i) => `status-user-${i}`);
+  const userIds = Array.from({ length: 201 }, (_, i) => `status-user-${i}`);
   const res = await exports.default.fetch("http://localhost/api/v1/users/status/ids", {
     method: "POST",
     headers: { "content-type": "application/json", cookie: aliceCookie },
-    body: JSON.stringify({ user_ids }),
+    body: JSON.stringify({ userIds }),
   });
   expect(res.status).toBe(422);
 });

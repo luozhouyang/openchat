@@ -21,7 +21,7 @@ beforeAll(async () => {
   const res = await exports.default.fetch("http://localhost/api/v1/teams", {
     method: "POST",
     headers: { cookie, "content-type": "application/json" },
-    body: JSON.stringify({ name: "guideteam", display_name: "Guide Team", type: "open" }),
+    body: JSON.stringify({ name: "guideteam", displayName: "Guide Team", type: "open" }),
   });
   const body = (await res.json()) as { id?: string };
   teamId = body.id!;

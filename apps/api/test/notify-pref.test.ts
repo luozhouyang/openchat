@@ -36,16 +36,16 @@ beforeAll(async () => {
   const team = await exports.default.fetch("http://localhost/api/v1/teams", {
     method: "POST",
     headers: { cookie: owner, "content-type": "application/json" },
-    body: JSON.stringify({ name: "np", display_name: "NP", type: "open" }),
+    body: JSON.stringify({ name: "np", displayName: "NP", type: "open" }),
   });
   teamId = ((await team.json()) as { id: string }).id;
   const create = await exports.default.fetch("http://localhost/api/v1/channels", {
     method: "POST",
     headers: { cookie: owner, "content-type": "application/json" },
     body: JSON.stringify({
-      team_id: teamId,
+      teamId,
       name: "general",
-      display_name: "General",
+      displayName: "General",
       type: "public",
     }),
   });
@@ -54,11 +54,11 @@ beforeAll(async () => {
 
 async function setPref(cookie: string, userId: string, pref: string) {
   return exports.default.fetch(
-    `http://localhost/api/v1/channels/${channelId}/members/${userId}/notify_props`,
+    `http://localhost/api/v1/channels/${channelId}/members/${userId}/notifyProps`,
     {
       method: "PUT",
       headers: { cookie, "content-type": "application/json" },
-      body: JSON.stringify({ notify_props: { pref } }),
+      body: JSON.stringify({ notifyProps: { pref } }),
     },
   );
 }
@@ -83,11 +83,11 @@ test("invalid pref returns 422", async () => {
 
 test("non-member cannot set notify pref", async () => {
   const res = await exports.default.fetch(
-    `http://localhost/api/v1/channels/${channelId}/members/${ownerId}/notify_props`,
+    `http://localhost/api/v1/channels/${channelId}/members/${ownerId}/notifyProps`,
     {
       method: "PUT",
       headers: { cookie: outsider, "content-type": "application/json" },
-      body: JSON.stringify({ notify_props: { pref: "all" } }),
+      body: JSON.stringify({ notifyProps: { pref: "all" } }),
     },
   );
   expect(res.status).toBe(403);
@@ -95,11 +95,11 @@ test("non-member cannot set notify pref", async () => {
 
 test("requires session", async () => {
   const res = await exports.default.fetch(
-    `http://localhost/api/v1/channels/${channelId}/members/${ownerId}/notify_props`,
+    `http://localhost/api/v1/channels/${channelId}/members/${ownerId}/notifyProps`,
     {
       method: "PUT",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ notify_props: { pref: "all" } }),
+      body: JSON.stringify({ notifyProps: { pref: "all" } }),
     },
   );
   expect(res.status).toBe(401);

@@ -20,7 +20,7 @@ beforeAll(async () => {
   const team = await exports.default.fetch("http://localhost/api/v1/teams", {
     method: "POST",
     headers: { cookie: owner, "content-type": "application/json" },
-    body: JSON.stringify({ name: "chanco", display_name: "ChanCo", type: "open" }),
+    body: JSON.stringify({ name: "chanco", displayName: "ChanCo", type: "open" }),
   });
   teamId = ((await team.json()) as { id: string }).id;
   await exports.default.fetch(`http://localhost/api/v1/teams/${teamId}/members`, {
@@ -35,9 +35,9 @@ test("create public channel and member joins", async () => {
     method: "POST",
     headers: { cookie: owner, "content-type": "application/json" },
     body: JSON.stringify({
-      team_id: teamId,
+      teamId,
       name: "general",
-      display_name: "General",
+      displayName: "General",
       type: "public",
     }),
   });
@@ -57,8 +57,8 @@ test("create public channel and member joins", async () => {
     headers: { cookie: member },
   });
   expect(detail.status).toBe(200);
-  const body = (await detail.json()) as { memberCount: number };
-  expect(body.memberCount).toBe(2);
+  const body = (await detail.json()) as { channel: { memberCount: number } };
+  expect(body.channel.memberCount).toBe(2);
 });
 
 test("duplicate channel name conflicts", async () => {
@@ -66,9 +66,9 @@ test("duplicate channel name conflicts", async () => {
     method: "POST",
     headers: { cookie: owner, "content-type": "application/json" },
     body: JSON.stringify({
-      team_id: teamId,
+      teamId,
       name: "general",
-      display_name: "General 2",
+      displayName: "General 2",
       type: "public",
     }),
   });
@@ -92,9 +92,9 @@ test("private channel cannot be joined by non-member", async () => {
     method: "POST",
     headers: { cookie: owner, "content-type": "application/json" },
     body: JSON.stringify({
-      team_id: teamId,
+      teamId,
       name: "secret",
-      display_name: "Secret",
+      displayName: "Secret",
       type: "private",
     }),
   });

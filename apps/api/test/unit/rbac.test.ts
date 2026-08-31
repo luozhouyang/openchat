@@ -38,7 +38,7 @@ beforeAll(async () => {
   const team = await exports.default.fetch("http://localhost/api/v1/teams", {
     method: "POST",
     headers: { cookie: userCookie, "content-type": "application/json" },
-    body: JSON.stringify({ name: "rbacteam", display_name: "RbacTeam", type: "open" }),
+    body: JSON.stringify({ name: "rbacteam", displayName: "RbacTeam", type: "open" }),
   });
   teamId = ((await team.json()) as { id: string }).id;
 });
@@ -83,7 +83,7 @@ test("requirePermission via endpoint: team patch needs MANAGE_TEAMS", async () =
   const denied = await exports.default.fetch(`http://localhost/api/v1/teams/${teamId}/patch`, {
     method: "PUT",
     headers: { cookie: plainCookie, "content-type": "application/json" },
-    body: JSON.stringify({ display_name: "Nope" }),
+    body: JSON.stringify({ displayName: "Nope" }),
   });
   expect(denied.status).toBe(403);
 
@@ -100,7 +100,7 @@ test("requirePermission via endpoint: team patch needs MANAGE_TEAMS", async () =
   const allowed = await exports.default.fetch(`http://localhost/api/v1/teams/${teamId}/patch`, {
     method: "PUT",
     headers: { cookie: plainCookie, "content-type": "application/json" },
-    body: JSON.stringify({ display_name: "Renamed" }),
+    body: JSON.stringify({ displayName: "Renamed" }),
   });
   expect(allowed.status).toBe(200);
 });

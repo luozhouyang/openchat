@@ -1,118 +1,106 @@
 import { Hono } from "hono";
-import { z } from "zod";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
+import {
+  CreateTeamInput,
+  CreateTeamOutput,
+  PatchTeamInput,
+  JoinTeamInput,
+  MyTeamsOutput,
+  TeamOutput,
+  type TeamType,
+} from "protocol";
 import { requireSession } from "../../auth/session.ts";
 import { requireTeamRole } from "../../auth/guards.ts";
 import { getDb } from "../../db/client.ts";
-import { getTeam, listTeamsForUser } from "../../db/repos/teams.ts";
+import { getTeam, listTeamsForUser, getTeamMember } from "../../db/repos/teams.ts";
 import { createTeam, joinTeam, leaveTeam, updateTeam } from "../../services/team.service.ts";
-import { HttpError } from "../../lib/errors.ts";
+import { zodValidator } from "../../lib/validation.ts";
+import { apiError } from "../../lib/errors.ts";
 import { syncUserChannels } from "../../user-do-sync.ts";
-
-const slug = z
-  .string()
-  .min(2)
-  .max(64)
-  .regex(/^[a-z0-9][a-z0-9-]*$/);
-
-const CreateTeamBody = z.object({
-  name: slug,
-  display_name: z.string().min(1).max(128),
-  type: z.enum(["open", "invite"]).default("open"),
-  description: z.string().max(1024).optional(),
-});
-
-const JoinTeamBody = z.object({
-  invite_code: z.string().max(128).optional(),
-  inviteCode: z.string().max(128).optional(),
-});
-
-const PatchTeamBody = z.object({
-  display_name: z.string().min(1).max(128).optional(),
-  description: z.string().max(1024).optional(),
-  archived: z.boolean().optional(),
-});
 
 export const teamsV1 = new Hono<{ Bindings: Env }>();
 
-teamsV1.post("/teams", requireSession, async (c) => {
-  const body = CreateTeamBody.safeParse(await c.req.json().catch(() => null));
-  if (!body.success) return c.json({ error: "invalid" }, 422);
+teamsV1.post("/teams", requireSession, zodValidator("json", CreateTeamInput), async (c) => {
+  const body = c.req.valid("json");
   const db = getDb(c.env.DB);
-  try {
-    const { id: teamId } = await createTeam(db, {
-      name: body.data.name,
-      displayName: body.data.display_name,
-      type: body.data.type,
-      description: body.data.description,
-      creatorId: c.get("session")!.user.id,
-    });
-    return c.json({ id: teamId }, 201);
-  } catch (err) {
-    if (err instanceof HttpError)
-      return c.json({ error: err.code }, err.status as ContentfulStatusCode);
-    throw err;
-  }
+  const { id: teamId, inviteCode } = await createTeam(db, {
+    name: body.name,
+    displayName: body.displayName,
+    type: body.type,
+    description: body.description,
+    creatorId: c.get("session")!.user.id,
+  });
+  const out: CreateTeamOutput = inviteCode ? { id: teamId, inviteCode } : { id: teamId };
+  return c.json(out, 201);
 });
 
 teamsV1.get("/users/me/teams", requireSession, async (c) => {
   const db = getDb(c.env.DB);
   const rows = await listTeamsForUser(db, c.get("session")!.user.id);
-  return c.json({
+  const out: MyTeamsOutput = {
     teams: rows.map((r) => ({
       id: r.team.id,
       name: r.team.name,
       displayName: r.team.displayName,
-      type: r.team.type,
+      type: r.team.type as TeamType,
       roles: r.roles,
       archivedAt: r.team.archivedAt,
     })),
-  });
+  };
+  return c.json(out);
 });
 
 teamsV1.get("/teams/:teamId", requireSession, requireTeamRole("admin"), async (c) => {
   const db = getDb(c.env.DB);
-  const team = await getTeam(db, c.req.param("teamId"));
-  if (!team) return c.json({ error: "not found" }, 404);
-  return c.json({ team });
+  const teamId = c.req.param("teamId");
+  const team = await getTeam(db, teamId);
+  if (!team) throw apiError("not found", "not found", 404);
+  const member = await getTeamMember(db, teamId, c.get("session")!.user.id);
+  const out: TeamOutput = {
+    team: {
+      id: team.id,
+      name: team.name,
+      displayName: team.displayName,
+      type: team.type as TeamType,
+      roles: member?.roles ?? "team_user",
+      archivedAt: team.archivedAt,
+    },
+  };
+  return c.json(out);
 });
 
-teamsV1.put("/teams/:teamId/patch", requireSession, requireTeamRole("admin"), async (c) => {
-  const body = PatchTeamBody.safeParse(await c.req.json().catch(() => null));
-  if (!body.success) return c.json({ error: "invalid" }, 422);
-  const patch: { displayName?: string; description?: string; archived?: boolean } = {};
-  if (body.data.display_name !== undefined) patch.displayName = body.data.display_name;
-  if (body.data.description !== undefined) patch.description = body.data.description;
-  if (body.data.archived !== undefined) patch.archived = body.data.archived;
-  if (Object.keys(patch).length === 0) return c.json({ error: "invalid" }, 422);
-  const db = getDb(c.env.DB);
-  try {
+teamsV1.put(
+  "/teams/:teamId/patch",
+  requireSession,
+  requireTeamRole("admin"),
+  zodValidator("json", PatchTeamInput),
+  async (c) => {
+    const body = c.req.valid("json");
+    const patch: { displayName?: string; description?: string; archived?: boolean } = {};
+    if (body.displayName !== undefined) patch.displayName = body.displayName;
+    if (body.description !== undefined) patch.description = body.description;
+    if (body.archived !== undefined) patch.archived = body.archived;
+    if (Object.keys(patch).length === 0) throw apiError("invalid", "invalid", 422);
+    const db = getDb(c.env.DB);
     await updateTeam(db, { teamId: c.req.param("teamId"), patch });
-  } catch (err) {
-    if (err instanceof HttpError)
-      return c.json({ error: err.code }, err.status as ContentfulStatusCode);
-    throw err;
-  }
-  return c.json({ ok: true });
-});
+    return c.json({ ok: true });
+  },
+);
 
-teamsV1.post("/teams/:teamId/members", requireSession, async (c) => {
-  const body = JoinTeamBody.safeParse(await c.req.json().catch(() => ({})));
-  if (!body.success) return c.json({ error: "invalid" }, 422);
-  const db = getDb(c.env.DB);
-  try {
+teamsV1.post(
+  "/teams/:teamId/members",
+  requireSession,
+  zodValidator("json", JoinTeamInput),
+  async (c) => {
+    const body = c.req.valid("json");
+    const db = getDb(c.env.DB);
     await joinTeam(db, {
       teamId: c.req.param("teamId"),
       userId: c.get("session")!.user.id,
-      inviteCode: body.data.invite_code ?? body.data.inviteCode,
+      inviteCode: body.inviteCode,
     });
-  } catch (err) {
-    if (err instanceof HttpError)
-      return c.json({ error: err.code }, err.status as ContentfulStatusCode);
-    throw err;
-  }
-  return c.json({ ok: true });
-});
+    return c.json({ ok: true });
+  },
+);
 
 teamsV1.delete(
   "/teams/:teamId/members/:userId",
@@ -121,16 +109,9 @@ teamsV1.delete(
   async (c) => {
     const userId = c.req.param("userId");
     const me = c.get("session")!.user.id;
-    if (userId !== me) return c.json({ error: "forbidden" }, 403);
+    if (userId !== me) throw apiError("forbidden", "forbidden", 403);
     const db = getDb(c.env.DB);
-    const teamId = c.req.param("teamId");
-    try {
-      await leaveTeam(db, { teamId, userId });
-    } catch (err) {
-      if (err instanceof HttpError)
-        return c.json({ error: err.code }, err.status as ContentfulStatusCode);
-      throw err;
-    }
+    await leaveTeam(db, { teamId: c.req.param("teamId"), userId });
     await syncUserChannels(c.env, userId);
     return c.json({ ok: true });
   },

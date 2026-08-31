@@ -33,7 +33,7 @@ test("dm is idempotent", async () => {
   const first = await exports.default.fetch("http://localhost/api/v1/channels/direct", {
     method: "POST",
     headers: { cookie: a, "content-type": "application/json" },
-    body: JSON.stringify([aId, bId]),
+    body: JSON.stringify({ userIds: [aId, bId] }),
   });
   expect(first.status).toBe(201);
   const firstBody = (await first.json()) as { id: string };
@@ -41,7 +41,7 @@ test("dm is idempotent", async () => {
   const second = await exports.default.fetch("http://localhost/api/v1/channels/direct", {
     method: "POST",
     headers: { cookie: a, "content-type": "application/json" },
-    body: JSON.stringify([bId, aId]),
+    body: JSON.stringify({ userIds: [bId, aId] }),
   });
   expect(second.status).toBe(200);
   const secondBody = (await second.json()) as { id: string; existing: boolean };
@@ -58,7 +58,7 @@ test("gm is idempotent and order-insensitive", async () => {
   const first = await exports.default.fetch("http://localhost/api/v1/channels/group", {
     method: "POST",
     headers: { cookie: a, "content-type": "application/json" },
-    body: JSON.stringify([aId, bId, cId, dId]),
+    body: JSON.stringify({ userIds: [aId, bId, cId, dId] }),
   });
   expect(first.status).toBe(201);
   const firstBody = (await first.json()) as { id: string };
@@ -66,7 +66,7 @@ test("gm is idempotent and order-insensitive", async () => {
   const second = await exports.default.fetch("http://localhost/api/v1/channels/group", {
     method: "POST",
     headers: { cookie: a, "content-type": "application/json" },
-    body: JSON.stringify([dId, cId, bId, aId]),
+    body: JSON.stringify({ userIds: [dId, cId, bId, aId] }),
   });
   expect(second.status).toBe(200);
   const secondBody = (await second.json()) as { id: string; existing: boolean };

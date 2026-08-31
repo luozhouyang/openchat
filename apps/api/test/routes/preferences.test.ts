@@ -21,7 +21,7 @@ test("PUT /users/me/preferences stores prefs and GET returns them", async () => 
     body: JSON.stringify([
       { category: "theme", name: "mode", value: "dark" },
       { category: "notify", name: "mentions", value: "1" },
-      { category: "theme", name: "accent", value: "blue", user_id: aliceId },
+      { category: "theme", name: "accent", value: "blue" },
     ]),
   });
   expect(put.status).toBe(200);
