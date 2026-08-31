@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from "./routes/__root";
 import { Route as IndexRouteImport } from "./routes/index";
 import { Route as TeamIdRouteImport } from "./routes/$teamId";
+import { Route as AdminRouteImport } from "./routes/admin";
 import { Route as LoginRouteImport } from "./routes/login";
 import { Route as SettingsRouteImport } from "./routes/settings";
 import { Route as SignupRouteImport } from "./routes/signup";
@@ -27,6 +28,11 @@ const IndexRoute = IndexRouteImport.update({
 const TeamIdRoute = TeamIdRouteImport.update({
   id: "/$teamId",
   path: "/$teamId",
+  getParentRoute: () => rootRouteImport,
+} as any);
+const AdminRoute = AdminRouteImport.update({
+  id: "/admin",
+  path: "/admin",
   getParentRoute: () => rootRouteImport,
 } as any);
 const LoginRoute = LoginRouteImport.update({
@@ -68,6 +74,7 @@ const TeamIdCChannelIdTThreadIdRoute = TeamIdCChannelIdTThreadIdRouteImport.upda
 export interface FileRoutesByFullPath {
   "/": typeof IndexRoute;
   "/$teamId": typeof TeamIdRouteWithChildren;
+  "/admin": typeof AdminRoute;
   "/login": typeof LoginRoute;
   "/settings": typeof SettingsRoute;
   "/signup": typeof SignupRoute;
@@ -78,6 +85,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   "/": typeof IndexRoute;
+  "/admin": typeof AdminRoute;
   "/login": typeof LoginRoute;
   "/settings": typeof SettingsRoute;
   "/signup": typeof SignupRoute;
@@ -90,6 +98,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport;
   "/": typeof IndexRoute;
   "/$teamId": typeof TeamIdRouteWithChildren;
+  "/admin": typeof AdminRoute;
   "/login": typeof LoginRoute;
   "/settings": typeof SettingsRoute;
   "/signup": typeof SignupRoute;
@@ -103,6 +112,7 @@ export interface FileRouteTypes {
   fullPaths:
     | "/"
     | "/$teamId"
+    | "/admin"
     | "/login"
     | "/settings"
     | "/signup"
@@ -113,6 +123,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo;
   to:
     | "/"
+    | "/admin"
     | "/login"
     | "/settings"
     | "/signup"
@@ -124,6 +135,7 @@ export interface FileRouteTypes {
     | "__root__"
     | "/"
     | "/$teamId"
+    | "/admin"
     | "/login"
     | "/settings"
     | "/signup"
@@ -136,6 +148,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute;
   TeamIdRoute: typeof TeamIdRouteWithChildren;
+  AdminRoute: typeof AdminRoute;
   LoginRoute: typeof LoginRoute;
   SettingsRoute: typeof SettingsRoute;
   SignupRoute: typeof SignupRoute;
@@ -155,6 +168,13 @@ declare module "@tanstack/react-router" {
       path: "/$teamId";
       fullPath: "/$teamId";
       preLoaderRoute: typeof TeamIdRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/admin": {
+      id: "/admin";
+      path: "/admin";
+      fullPath: "/admin";
+      preLoaderRoute: typeof AdminRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     "/login": {
@@ -238,6 +258,7 @@ const TeamIdRouteWithChildren = TeamIdRoute._addFileChildren(TeamIdRouteChildren
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   TeamIdRoute: TeamIdRouteWithChildren,
+  AdminRoute: AdminRoute,
   LoginRoute: LoginRoute,
   SettingsRoute: SettingsRoute,
   SignupRoute: SignupRoute,
