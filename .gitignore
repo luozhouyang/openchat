@@ -37,3 +37,6 @@ dist-ssr
 !.vscode/
 !.vscode/settings.json
 !.vscode/extensions.json
+
+# local registry mirror (not committed)
+.npmrc
