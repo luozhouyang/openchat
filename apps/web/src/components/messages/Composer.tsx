@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { wsClient } from "../../ws/client";
 import { useMessageStore } from "../../stores/messages";
 import { Button } from "../ui/button";
+import { UploadButton } from "../upload/UploadButton";
 
 export function Composer({ channelId }: { channelId: string }) {
   const [text, setText] = useState("");
@@ -31,6 +32,7 @@ export function Composer({ channelId }: { channelId: string }) {
 
   return (
     <div className="flex gap-2 border-t p-3">
+      <UploadButton channelId={channelId} onUploaded={() => {}} />
       <input
         className="flex-1 rounded border px-3 py-2 text-sm"
         value={text}

@@ -3,6 +3,7 @@ import { Link, useParams } from "@tanstack/react-router";
 import { wsClient } from "../../ws/client";
 import { apiFetch } from "../../lib/api";
 import { ReactionBar } from "./ReactionBar";
+import { AttachmentView } from "../upload/AttachmentView";
 import type { StoreMessage } from "../../stores/messages";
 
 export function MessageRow({ message, channelId }: { message: StoreMessage; channelId: string }) {
@@ -85,6 +86,7 @@ export function MessageRow({ message, channelId }: { message: StoreMessage; chan
       {message.reactions && Object.keys(message.reactions).length > 0 && (
         <ReactionBar channelId={channelId} messageSeq={message.seq} reactions={message.reactions} />
       )}
+      <AttachmentView message={message} channelId={channelId} />
     </div>
   );
 }

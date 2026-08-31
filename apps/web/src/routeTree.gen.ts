@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from "./routes/__root";
 import { Route as IndexRouteImport } from "./routes/index";
 import { Route as TeamIdRouteImport } from "./routes/$teamId";
 import { Route as LoginRouteImport } from "./routes/login";
+import { Route as SettingsRouteImport } from "./routes/settings";
 import { Route as SignupRouteImport } from "./routes/signup";
 import { Route as TeamIdIndexRouteImport } from "./routes/$teamId/index";
 import { Route as TeamIdCChannelIdRouteImport } from "./routes/$teamId/c.$channelId";
@@ -31,6 +32,11 @@ const TeamIdRoute = TeamIdRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: "/login",
   path: "/login",
+  getParentRoute: () => rootRouteImport,
+} as any);
+const SettingsRoute = SettingsRouteImport.update({
+  id: "/settings",
+  path: "/settings",
   getParentRoute: () => rootRouteImport,
 } as any);
 const SignupRoute = SignupRouteImport.update({
@@ -63,6 +69,7 @@ export interface FileRoutesByFullPath {
   "/": typeof IndexRoute;
   "/$teamId": typeof TeamIdRouteWithChildren;
   "/login": typeof LoginRoute;
+  "/settings": typeof SettingsRoute;
   "/signup": typeof SignupRoute;
   "/$teamId/": typeof TeamIdIndexRoute;
   "/$teamId/c/$channelId": typeof TeamIdCChannelIdRouteWithChildren;
@@ -72,6 +79,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   "/": typeof IndexRoute;
   "/login": typeof LoginRoute;
+  "/settings": typeof SettingsRoute;
   "/signup": typeof SignupRoute;
   "/$teamId": typeof TeamIdIndexRoute;
   "/$teamId/c/$channelId": typeof TeamIdCChannelIdRouteWithChildren;
@@ -83,6 +91,7 @@ export interface FileRoutesById {
   "/": typeof IndexRoute;
   "/$teamId": typeof TeamIdRouteWithChildren;
   "/login": typeof LoginRoute;
+  "/settings": typeof SettingsRoute;
   "/signup": typeof SignupRoute;
   "/$teamId/": typeof TeamIdIndexRoute;
   "/$teamId/c/$channelId": typeof TeamIdCChannelIdRouteWithChildren;
@@ -95,6 +104,7 @@ export interface FileRouteTypes {
     | "/"
     | "/$teamId"
     | "/login"
+    | "/settings"
     | "/signup"
     | "/$teamId/"
     | "/$teamId/c/$channelId"
@@ -104,6 +114,7 @@ export interface FileRouteTypes {
   to:
     | "/"
     | "/login"
+    | "/settings"
     | "/signup"
     | "/$teamId"
     | "/$teamId/c/$channelId"
@@ -114,6 +125,7 @@ export interface FileRouteTypes {
     | "/"
     | "/$teamId"
     | "/login"
+    | "/settings"
     | "/signup"
     | "/$teamId/"
     | "/$teamId/c/$channelId"
@@ -125,6 +137,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute;
   TeamIdRoute: typeof TeamIdRouteWithChildren;
   LoginRoute: typeof LoginRoute;
+  SettingsRoute: typeof SettingsRoute;
   SignupRoute: typeof SignupRoute;
 }
 
@@ -149,6 +162,13 @@ declare module "@tanstack/react-router" {
       path: "/login";
       fullPath: "/login";
       preLoaderRoute: typeof LoginRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/settings": {
+      id: "/settings";
+      path: "/settings";
+      fullPath: "/settings";
+      preLoaderRoute: typeof SettingsRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     "/signup": {
@@ -219,6 +239,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   TeamIdRoute: TeamIdRouteWithChildren,
   LoginRoute: LoginRoute,
+  SettingsRoute: SettingsRoute,
   SignupRoute: SignupRoute,
 };
 export const routeTree = rootRouteImport
