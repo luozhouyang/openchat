@@ -25,6 +25,7 @@ export function makeAuth(env: Env) {
       additionalFields: {
         nickname: { type: "string", required: false },
         avatarUrl: { type: "string", required: false },
+        username: { type: "string", required: false, unique: true },
       },
     },
     databaseHooks: {
