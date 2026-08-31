@@ -560,6 +560,18 @@ export class ChannelDO extends DurableObject<Env> {
     return this.toggleReactionCore(callerUserId, rows[0].seq, body.emoji);
   }
 
+  async reactionSnapshotByMessageId(
+    messageId: string,
+  ): Promise<{ error: string; status: 404 } | Record<string, string[]>> {
+    const rows = await this.db
+      .select({ seq: schema.messages.seq })
+      .from(schema.messages)
+      .where(eq(schema.messages.id, messageId))
+      .limit(1);
+    if (rows.length === 0) return { error: "message not found", status: 404 };
+    return this.reactionSnapshot(rows[0].seq);
+  }
+
   private async toggleReactionCore(
     callerUserId: string,
     messageSeq: number,
@@ -638,6 +650,61 @@ export class ChannelDO extends DurableObject<Env> {
         channelId: rows[0].channelId,
       },
     };
+  }
+
+  async threadsForUser(userId: string): Promise<{ threads: ThreadInfo[] }> {
+    const rows = await this.db.select().from(schema.threads);
+    const threads = rows
+      .filter((r) => (JSON.parse(r.participants ?? "[]") as string[]).includes(userId))
+      .map((r) => ({
+        postId: r.postId,
+        replyCount: r.replyCount,
+        lastReplyAt: r.lastReplyAt,
+        participants: JSON.parse(r.participants ?? "[]") as string[],
+        channelId: r.channelId,
+      }));
+    return { threads };
+  }
+
+  async threadMarkRead(
+    userId: string,
+    body: { postId: string },
+  ): Promise<{ error: string; status: 403 } | { ok: true }> {
+    const member = await this.db
+      .select()
+      .from(schema.memberState)
+      .where(eq(schema.memberState.userId, userId))
+      .limit(1);
+    if (member.length === 0) return { error: "not a member", status: 403 };
+    const now = Date.now();
+    await this.db
+      .insert(schema.threadMemberships)
+      .values({ postId: body.postId, userId, following: true, lastViewed: now, unreadMentions: 0 })
+      .onConflictDoUpdate({
+        target: [schema.threadMemberships.postId, schema.threadMemberships.userId],
+        set: { lastViewed: now, unreadMentions: 0 },
+      });
+    return { ok: true };
+  }
+
+  async threadFollow(
+    userId: string,
+    body: { postId: string; following: boolean },
+  ): Promise<{ error: string; status: 403 } | { ok: true }> {
+    const member = await this.db
+      .select()
+      .from(schema.memberState)
+      .where(eq(schema.memberState.userId, userId))
+      .limit(1);
+    if (member.length === 0) return { error: "not a member", status: 403 };
+    await this.db
+      .insert(schema.threadMemberships)
+      .values({ postId: body.postId, userId, following: body.following })
+      .onConflictDoUpdate({
+        target: [schema.threadMemberships.postId, schema.threadMemberships.userId],
+        set: { following: body.following },
+      });
+    return { ok: true };
   }
 
   private async updateMeta(id: string, userId: string, content: string, at: number) {
