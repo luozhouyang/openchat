@@ -1,9 +1,9 @@
 import { zValidator } from "@hono/zod-validator";
 import type { ZodType } from "zod";
 
-export function zodValidator(
+export function zodValidator<T extends ZodType>(
   target: "json" | "query" | "param" | "header" | "cookie",
-  schema: ZodType,
+  schema: T,
 ) {
   return zValidator(target, schema, (result, c) => {
     if (result.success) return undefined;
