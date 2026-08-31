@@ -47,6 +47,7 @@ catalog:
   "@base-ui/react": ^1.7.0
   class-variance-authority: ^0.7.1
   uuid: ^14.0.2
+  "@playwright/test": ^1.62.1
 overrides:
   vite: "catalog:"
 peerDependencyRules:
