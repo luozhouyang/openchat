@@ -25,6 +25,7 @@ catalog:
   "@aws-sdk/s3-request-presigner": 3.1121.0
   web-push: ^3.6.7
   "@types/web-push": ^3.6.4
+  "@hono/zod-validator": ^0.9.1
   react: ^19.2.8
   react-dom: ^19.2.8
   "@tanstack/react-router": ^1.170.32
@@ -58,3 +59,4 @@ allowBuilds:
 minimumReleaseAgeExclude:
   - "@cloudflare/workers-types@5.20260830.1"
   - zod@4.5.4
+  - "@hono/zod-validator@0.9.1"
