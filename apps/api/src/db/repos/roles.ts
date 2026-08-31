@@ -1,11 +1,15 @@
 import { eq } from "drizzle-orm";
 import { getDb } from "../client.ts";
-import { roles } from "../schema-d1.ts";
+import { roles, schemes } from "../schema-d1.ts";
 
 type Db = ReturnType<typeof getDb>;
 
 export async function listRoles(db: Db) {
   return db.select().from(roles);
+}
+
+export async function listSchemes(db: Db) {
+  return db.select().from(schemes);
 }
 
 export async function getRoleByName(db: Db, name: string) {

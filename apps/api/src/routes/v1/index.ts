@@ -13,6 +13,7 @@ import { invitesV1 } from "./invites.ts";
 import { adminV1 } from "./admin.ts";
 import { pushV1 } from "./push.ts";
 import { sidebarV1 } from "./sidebar.ts";
+import { rolesV1 } from "./roles.ts";
 
 export const v1Router = new Hono<{ Bindings: Env }>();
 v1Router.route("/", usersV1);
@@ -29,3 +30,4 @@ v1Router.route("/", invitesV1);
 v1Router.route("/admin", adminV1);
 v1Router.route("/", pushV1);
 v1Router.route("/", sidebarV1);
+v1Router.route("/", rolesV1);
