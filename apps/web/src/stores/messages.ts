@@ -14,6 +14,8 @@ interface MessageState {
   applySync: (channelId: string, messages: Message[]) => void;
   list: (channelId: string) => Message[];
   maxSeq: (channelId: string) => number;
+  ack: (channelId: string, clientToken: string, real: { id: string; seq: number }) => void;
+  fail: (channelId: string, clientToken: string) => void;
   edit: (channelId: string, messageId: string, content: string) => void;
   remove: (channelId: string, messageId: string) => void;
 }
@@ -30,6 +32,24 @@ function drain(ch: ChannelState) {
     ch.bySeq.set(next.seq, next);
     ch.maxSeq = next.seq;
   }
+}
+
+function removeById(ch: ChannelState, id: string): Message | null {
+  for (const [seq, m] of ch.bySeq) {
+    if (m.id === id) {
+      ch.bySeq.delete(seq);
+      ch.maxSeq = 0;
+      for (const k of ch.bySeq.keys()) if (k > ch.maxSeq) ch.maxSeq = k;
+      return m;
+    }
+  }
+  for (const [seq, m] of ch.pending) {
+    if (m.id === id) {
+      ch.pending.delete(seq);
+      return m;
+    }
+  }
+  return null;
 }
 
 export const useMessageStore = create<MessageState>((set, get) => ({
@@ -74,6 +94,34 @@ export const useMessageStore = create<MessageState>((set, get) => ({
   },
   maxSeq(channelId) {
     return get().channels[channelId]?.maxSeq ?? 0;
+  },
+  ack(channelId, clientToken, real) {
+    set((s) => {
+      const ch = ensure(s, channelId);
+      const old = removeById(ch, `pending-${clientToken}`);
+      if (!old) return s;
+      const message = { ...old, id: real.id, seq: real.seq };
+      if (message.seq <= ch.maxSeq) {
+        if (ch.bySeq.has(message.seq)) return { channels: { ...s.channels } };
+        ch.bySeq.set(message.seq, message);
+      } else if (message.seq === ch.maxSeq + 1) {
+        ch.bySeq.set(message.seq, message);
+        ch.maxSeq = message.seq;
+        drain(ch);
+      } else {
+        ch.pending.set(message.seq, message);
+      }
+      return { channels: { ...s.channels } };
+    });
+  },
+  fail(channelId, clientToken) {
+    set((s) => {
+      const ch = ensure(s, channelId);
+      if (removeById(ch, `pending-${clientToken}`)) {
+        return { channels: { ...s.channels } };
+      }
+      return s;
+    });
   },
   edit(channelId, messageId, content) {
     set((s) => {

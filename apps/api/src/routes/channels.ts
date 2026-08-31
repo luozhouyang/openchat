@@ -125,6 +125,22 @@ channelsRoutes.get(
   },
 );
 
+channelsRoutes.get(
+  "/channels/:channelId/history",
+  requireSession,
+  requireChannelRole("member"),
+  async (c) => {
+    const channelId = c.req.param("channelId");
+    const limit = Math.min(Number(c.req.query("limit")) || 30, 500);
+    const beforeSeq = c.req.query("before_seq") ? Number(c.req.query("before_seq")) : undefined;
+    const parentId = c.req.query("parent_id") || undefined;
+    const order = c.req.query("order") === "asc" ? "asc" : undefined;
+    const stub = c.env.CHANNEL_DO.get(c.env.CHANNEL_DO.idFromName(channelDoName(channelId)));
+    const res = await stub.history({ limit, beforeSeq, parentId, order });
+    return c.json({ messages: res.messages, oldestSeq: res.oldestSeq });
+  },
+);
+
 channelsRoutes.post(
   "/channels/:channelId/archive",
   requireSession,

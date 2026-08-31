@@ -32,6 +32,16 @@ class WsClient {
       useConnectionStore.getState().set("open");
       this.reconnectDelay = 1000;
       this.scheduleTokenRefresh();
+      const channels = Object.keys(useMessageStore.getState().channels);
+      if (channels.length > 0) {
+        this.send({
+          type: "sync",
+          channels: channels.map((channelId) => ({
+            channelId,
+            lastSeq: useMessageStore.getState().maxSeq(channelId),
+          })),
+        });
+      }
     };
     ws.onmessage = (ev) => this.dispatch(ev.data);
     ws.onclose = () => {
@@ -92,8 +102,21 @@ class WsClient {
         usePresenceStore.getState().applySnapshot(ev.states);
         break;
       case "ack":
-      case "error":
+        useMessageStore
+          .getState()
+          .ack(ev.channelId, ev.clientToken, { id: ev.messageId, seq: ev.seq });
+        break;
+      case "error": {
+        const channelId = (ev as { channelId?: string }).channelId;
+        if (ev.clientToken && channelId) {
+          useMessageStore.getState().fail(channelId, ev.clientToken);
+        }
+        this.emitLocal(ev);
+        break;
+      }
       case "sync.result":
+        this.emitLocal(ev);
+        break;
       case "sync.gap":
       case "channel.read":
       case "hello":
