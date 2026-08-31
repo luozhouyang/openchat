@@ -247,6 +247,9 @@ catalogs:
     '@testing-library/react':
       specifier: ^16.3.3
       version: 16.3.3
+    '@types/node':
+      specifier: ^26.4.0
+      version: 26.4.0
     '@types/react':
       specifier: ^19.2.18
       version: 19.2.18
@@ -504,6 +507,21 @@ importers:
     devDependencies:
       '@types/node':
         specifier: ^26.1.1
+        version: 26.4.0
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vite:
+        specifier: npm:@voidzero-dev/vite-plus-core@0.2.9
+        version: '@voidzero-dev/vite-plus-core@0.2.9(@types/node@26.4.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.12)(typescript@7.0.2)(yaml@2.9.0)'
+      vite-plus:
+        specifier: 'catalog:'
+        version: 0.2.9(@types/node@26.4.0)(@voidzero-dev/vite-plus-core@0.2.9(@types/node@26.4.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.12)(typescript@7.0.2)(yaml@2.9.0))(esbuild@0.28.1)(jiti@2.7.0)(jsdom@30.0.1(@noble/hashes@2.4.0))(tsx@4.23.12)(typescript@7.0.2)(yaml@2.9.0)
+
+  packages/realtime:
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
         version: 26.4.0
       typescript:
         specifier: 'catalog:'
