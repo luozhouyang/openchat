@@ -156,12 +156,12 @@ export class UserDO extends DurableObject<Env> {
       });
       for (const ws of sockets) ws.send(payload);
       if (body.channelId && e.type === "message.new" && e.message) {
-        const existing = await this.db
+        const existingRows = await this.db
           .select()
           .from(schema.sidebarCache)
           .where(eq(schema.sidebarCache.channelId, body.channelId))
           .limit(1);
-        const row = existing[0];
+        const row = existingRows[0];
         const unread = row ? Math.max(0, e.message.seq - row.lastReadSeq) : e.message.seq;
         const mentions = e.message.mentions?.includes(this.userId)
           ? (row?.mentionCount ?? 0) + 1

@@ -2,7 +2,7 @@ import { DurableObject } from "cloudflare:workers";
 import { drizzle } from "drizzle-orm/durable-sqlite";
 import { migrate } from "drizzle-orm/durable-sqlite/migrator";
 import { and, asc, count, desc, eq, gt, isNull, lt } from "drizzle-orm";
-import { id, userDoName, isAllowedEmoji } from "protocol";
+import { id, userDoName, isAllowedEmoji, type MessageType, type NotifPref } from "protocol";
 import migrations from "../../migrations/channel-do/migrations";
 import * as schema from "../db/schema-channel-do.ts";
 import { getDb } from "../db/client.ts";
@@ -15,7 +15,7 @@ interface HistoryMessage {
   seq: number;
   userId: string;
   parentId: string | null;
-  type: string;
+  type: MessageType;
   content: string;
   attachments: Record<string, string | number | boolean>[] | null;
   mentions: string[] | null;
@@ -119,13 +119,14 @@ export class ChannelDO extends DurableObject<Env> {
     userId: string;
     seq: number;
   }): Promise<{ error: string; status: 403 } | { lastReadSeq: number }> {
-    const member = await this.db
+    const memberRows = await this.db
       .select()
       .from(schema.memberState)
       .where(eq(schema.memberState.userId, body.userId))
       .limit(1);
-    if (member.length === 0) return { error: "not a member", status: 403 };
-    const newRead = Math.max(member[0].lastReadSeq, body.seq);
+    const member = memberRows[0];
+    if (!member) return { error: "not a member", status: 403 };
+    const newRead = Math.max(member.lastReadSeq, body.seq);
     await this.db
       .update(schema.memberState)
       .set({ lastReadSeq: newRead, mentionCount: 0 })
@@ -163,19 +164,20 @@ export class ChannelDO extends DurableObject<Env> {
   ): Promise<
     { error: string; status: 403 } | { maxSeq: number; lastReadSeq: number; mentionCount: number }
   > {
-    const member = await this.db
+    const memberRows = await this.db
       .select()
       .from(schema.memberState)
       .where(eq(schema.memberState.userId, userId))
       .limit(1);
-    if (member.length === 0) return { error: "not a member", status: 403 };
+    const member = memberRows[0];
+    if (!member) return { error: "not a member", status: 403 };
     const maxRow = await this.db
       .select({ seq: schema.messages.seq })
       .from(schema.messages)
       .orderBy(desc(schema.messages.seq))
       .limit(1);
     const maxSeq = maxRow[0]?.seq ?? 0;
-    return { maxSeq, lastReadSeq: member[0].lastReadSeq, mentionCount: member[0].mentionCount };
+    return { maxSeq, lastReadSeq: member.lastReadSeq, mentionCount: member.mentionCount };
   }
 
   async postMessage(
@@ -204,7 +206,7 @@ export class ChannelDO extends DurableObject<Env> {
     if (hits.length >= 5) return { error: "rate limited", status: 429 };
     hits.push(now);
     this.rates.set(senderUserId, hits);
-    const dup = await this.db
+    const dupRows = await this.db
       .select()
       .from(schema.dedupTokens)
       .where(
@@ -214,21 +216,24 @@ export class ChannelDO extends DurableObject<Env> {
         ),
       )
       .limit(1);
-    if (dup.length > 0) {
-      const msg = await this.db
+    const dup = dupRows[0];
+    if (dup) {
+      const msgRows = await this.db
         .select()
         .from(schema.messages)
-        .where(eq(schema.messages.seq, dup[0].messageSeq))
+        .where(eq(schema.messages.seq, dup.messageSeq))
         .limit(1);
-      return { messageId: msg[0].id, seq: msg[0].seq, deduplicated: true };
+      const msg = msgRows[0];
+      return { messageId: msg!.id, seq: msg!.seq, deduplicated: true };
     }
     if (body.parentId) {
-      const root = await this.db
+      const rootRows = await this.db
         .select({ id: schema.messages.id, deletedAt: schema.messages.deletedAt })
         .from(schema.messages)
         .where(eq(schema.messages.id, body.parentId))
         .limit(1);
-      if (root.length === 0 || root[0].deletedAt !== null) {
+      const root = rootRows[0];
+      if (!root || root.deletedAt !== null) {
         return { error: "parent not found", status: 422 };
       }
     }
@@ -270,15 +275,16 @@ export class ChannelDO extends DurableObject<Env> {
     await this.updateMeta(msg.id, senderUserId, body.content, now);
     for (const userId of validMentions) {
       if (userId === senderUserId) continue;
-      const member = await this.db
+      const memberRows = await this.db
         .select()
         .from(schema.memberState)
         .where(eq(schema.memberState.userId, userId))
         .limit(1);
-      if (member.length > 0) {
+      if (memberRows.length > 0) {
+        const m = memberRows[0];
         await this.db
           .update(schema.memberState)
-          .set({ mentionCount: member[0].mentionCount + 1 })
+          .set({ mentionCount: m.mentionCount + 1 })
           .where(eq(schema.memberState.userId, userId));
       }
     }
@@ -294,18 +300,19 @@ export class ChannelDO extends DurableObject<Env> {
   }
 
   private async upsertThread(postId: string, senderUserId: string, at: number) {
-    const existing = await this.db
+    const existingRows = await this.db
       .select()
       .from(schema.threads)
       .where(eq(schema.threads.postId, postId))
       .limit(1);
-    if (existing.length > 0) {
-      const participants = JSON.parse(existing[0].participants ?? "[]") as string[];
+    const existing = existingRows[0];
+    if (existing) {
+      const participants = JSON.parse(existing.participants ?? "[]") as string[];
       if (!participants.includes(senderUserId)) participants.push(senderUserId);
       await this.db
         .update(schema.threads)
         .set({
-          replyCount: existing[0].replyCount + 1,
+          replyCount: existing.replyCount + 1,
           lastReplyAt: at,
           participants: JSON.stringify(participants),
         })
@@ -337,12 +344,13 @@ export class ChannelDO extends DurableObject<Env> {
     if (rows.length === 0) return { error: "not found", status: 404 };
     const msg = rows[0];
     if (msg.deletedAt !== null) return { error: "deleted", status: 410 };
-    const caller = await this.db
+    const callerRows = await this.db
       .select()
       .from(schema.memberState)
       .where(eq(schema.memberState.userId, callerUserId))
       .limit(1);
-    const isAdmin = this.isChannelAdmin(caller[0]?.role);
+    const callerRole = callerRows[0]?.role;
+    const isAdmin = this.isChannelAdmin(callerRole);
     if (msg.userId !== callerUserId && !isAdmin) return { error: "forbidden", status: 403 };
     if (!body.content || body.content.length > 16384) return { error: "invalid", status: 422 };
     const editedAt = Date.now();
@@ -369,6 +377,7 @@ export class ChannelDO extends DurableObject<Env> {
       .where(eq(schema.messages.id, body.messageId))
       .limit(1);
     if (rows.length === 0) return { error: "not found", status: 404 };
+    const row = rows[0];
     await this.db
       .update(schema.messages)
       .set({ attachments: JSON.stringify(body.attachments) })
@@ -376,7 +385,7 @@ export class ChannelDO extends DurableObject<Env> {
     await this.broadcast({
       type: "message.edit",
       messageId: body.messageId,
-      content: rows[0].content,
+      content: row.content,
       editedAt: Date.now(),
     });
   }
@@ -438,12 +447,13 @@ export class ChannelDO extends DurableObject<Env> {
     if (rows.length === 0) return { error: "not found", status: 404 };
     const msg = rows[0];
     if (msg.deletedAt !== null) return { ok: true };
-    const caller = await this.db
+    const callerRows = await this.db
       .select()
       .from(schema.memberState)
       .where(eq(schema.memberState.userId, callerUserId))
       .limit(1);
-    const isAdmin = this.isChannelAdmin(caller[0]?.role);
+    const callerRole = callerRows[0]?.role;
+    const isAdmin = this.isChannelAdmin(callerRole);
     if (msg.userId !== callerUserId && !isAdmin) return { error: "forbidden", status: 403 };
     await this.db
       .update(schema.messages)
@@ -464,12 +474,13 @@ export class ChannelDO extends DurableObject<Env> {
       .limit(1);
     if (rows.length === 0) return { error: "not found", status: 404 };
     const msg = rows[0];
-    const caller = await this.db
+    const callerRows = await this.db
       .select()
       .from(schema.memberState)
       .where(eq(schema.memberState.userId, callerUserId))
       .limit(1);
-    const isAdmin = this.isChannelAdmin(caller[0]?.role);
+    const callerRole = callerRows[0]?.role;
+    const isAdmin = this.isChannelAdmin(callerRole);
     if (msg.userId !== callerUserId && !isAdmin) return { error: "forbidden", status: 403 };
     await this.db
       .update(schema.messages)
@@ -561,7 +572,8 @@ export class ChannelDO extends DurableObject<Env> {
       .where(eq(schema.messages.id, body.messageId))
       .limit(1);
     if (rows.length === 0) return { error: "message not found", status: 404 };
-    return this.toggleReactionCore(callerUserId, rows[0].seq, body.emoji);
+    const row = rows[0];
+    return this.toggleReactionCore(callerUserId, row.seq, body.emoji);
   }
 
   async reactionSnapshotByMessageId(
@@ -573,7 +585,8 @@ export class ChannelDO extends DurableObject<Env> {
       .where(eq(schema.messages.id, messageId))
       .limit(1);
     if (rows.length === 0) return { error: "message not found", status: 404 };
-    return this.reactionSnapshot(rows[0].seq);
+    const row = rows[0];
+    return this.reactionSnapshot(row.seq);
   }
 
   private async toggleReactionCore(
@@ -645,13 +658,14 @@ export class ChannelDO extends DurableObject<Env> {
       .where(eq(schema.threads.postId, postId))
       .limit(1);
     if (rows.length === 0) return { error: "not found", status: 404 };
+    const row = rows[0];
     return {
       thread: {
-        postId: rows[0].postId,
-        replyCount: rows[0].replyCount,
-        lastReplyAt: rows[0].lastReplyAt,
-        participants: JSON.parse(rows[0].participants ?? "[]") as string[],
-        channelId: rows[0].channelId,
+        postId: row.postId,
+        replyCount: row.replyCount,
+        lastReplyAt: row.lastReplyAt,
+        participants: JSON.parse(row.participants ?? "[]") as string[],
+        channelId: row.channelId,
       },
     };
   }
@@ -732,7 +746,7 @@ export class ChannelDO extends DurableObject<Env> {
       seq: r.seq,
       userId: r.userId,
       parentId: r.parentId,
-      type: r.type,
+      type: r.type as MessageType,
       content: r.deletedAt !== null ? "" : r.content,
       attachments: r.attachments ? JSON.parse(r.attachments) : null,
       mentions: r.mentions ? JSON.parse(r.mentions) : null,
@@ -753,8 +767,8 @@ export class ChannelDO extends DurableObject<Env> {
           notifPref: schema.memberState.notifPref,
         })
         .from(schema.memberState);
-      const prefs = new Map<string, "all" | "mention" | "none">();
-      for (const row of rows) prefs.set(row.userId, row.notifPref as "all" | "mention" | "none");
+      const prefs = new Map<string, NotifPref>();
+      for (const row of rows) prefs.set(row.userId, row.notifPref as NotifPref);
       await this.broadcaster.broadcast(event, prefs);
       return;
     }
