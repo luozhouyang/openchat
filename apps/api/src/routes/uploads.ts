@@ -4,7 +4,13 @@ import { id } from "protocol";
 import { requireSession } from "../auth/session.ts";
 import { getDb } from "../db/client.ts";
 import { getChannel, getChannelMember } from "../db/repos/channels.ts";
-import { createUpload, getUpload, completeUpload } from "../db/repos/uploads.ts";
+import {
+  createUploadSession,
+  getUploadSession,
+  completeUploadSession,
+  createFileInfo,
+  linkFileToPost,
+} from "../db/repos/uploads.ts";
 import { sanitizeFilename, presignPut, headObject, type R2Env } from "../r2.ts";
 import { postFileMessage } from "../user-do-sync.ts";
 
@@ -29,6 +35,11 @@ const UploadRequest = z.object({
   contentType: z.string().min(1),
 });
 
+function extensionOf(filename: string): string | null {
+  const dot = filename.lastIndexOf(".");
+  return dot > 0 ? filename.slice(dot + 1) : null;
+}
+
 export const uploadsRoutes = new Hono<{ Bindings: Env }>();
 
 uploadsRoutes.post("/uploads", requireSession, async (c) => {
@@ -49,14 +60,14 @@ uploadsRoutes.post("/uploads", requireSession, async (c) => {
   const uploadId = id("upl");
   const filename = sanitizeFilename(body.data.filename);
   const key = `uploads/${body.data.channelId}/${uploadId}/${filename}`;
-  await createUpload(db, {
+  await createUploadSession(db, {
     id: uploadId,
-    channelId: body.data.channelId,
+    type: body.data.contentType,
     userId,
-    key,
+    channelId: body.data.channelId,
     filename,
-    size: body.data.size,
-    contentType: body.data.contentType,
+    path: key,
+    fileSize: body.data.size,
   });
   const putUrl = await presignPut(c.env as unknown as R2Env, key, body.data.contentType, 900);
   return c.json({ uploadId, putUrl }, 201);
@@ -66,22 +77,35 @@ uploadsRoutes.post("/uploads/complete", requireSession, async (c) => {
   const body = z.object({ uploadId: z.string().min(1) }).safeParse(await c.req.json());
   if (!body.success) return c.json({ error: "invalid" }, 422);
   const db = getDb(c.env.DB);
-  const upload = await getUpload(db, body.data.uploadId);
-  if (!upload) return c.json({ error: "not found" }, 404);
-  if (upload.status !== "pending") return c.json({ error: "already processed" }, 409);
+  const session = await getUploadSession(db, body.data.uploadId);
+  if (!session) return c.json({ error: "not found" }, 404);
+  if (session.fileOffset === session.fileSize) return c.json({ error: "already processed" }, 409);
+  if (!session.path) return c.json({ error: "not found" }, 404);
 
-  const obj = await headObject(c.env.FILES, upload.key);
+  const obj = await headObject(c.env.FILES, session.path);
   if (!obj) return c.json({ error: "object missing" }, 404);
-  if (obj.size !== upload.size) return c.json({ error: "size mismatch" }, 422);
-  if (obj.contentType !== upload.contentType) return c.json({ error: "type mismatch" }, 422);
+  if (obj.size !== session.fileSize) return c.json({ error: "size mismatch" }, 422);
+  if (obj.contentType !== session.type) return c.json({ error: "type mismatch" }, 422);
 
-  await completeUpload(db, upload.id);
-  const messageId = await postFileMessage(c.env, upload.channelId, upload.userId, {
-    fileId: upload.id,
-    key: upload.key,
-    name: upload.filename,
-    size: upload.size,
-    mime: upload.contentType,
+  await completeUploadSession(db, session.id, { fileOffset: session.fileSize ?? 0 });
+  const messageId = await postFileMessage(c.env, session.channelId!, session.userId!, {
+    fileId: session.id,
+    key: session.path,
+    name: session.filename ?? "file",
+    size: session.fileSize ?? 0,
+    mime: session.type ?? "application/octet-stream",
   });
+  await createFileInfo(db, {
+    id: session.id,
+    creatorId: session.userId,
+    postId: null,
+    path: session.path,
+    name: session.filename,
+    extension: session.filename ? extensionOf(session.filename) : null,
+    size: session.fileSize,
+    mimeType: session.type,
+    createdAt: Date.now(),
+  });
+  await linkFileToPost(db, { fileId: session.id, postId: messageId });
   return c.json({ messageId }, 201);
 });

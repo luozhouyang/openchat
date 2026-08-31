@@ -5,6 +5,8 @@ import { and, asc, count, desc, eq, gt, isNull, lt } from "drizzle-orm";
 import { id, userDoName, isAllowedEmoji } from "protocol";
 import migrations from "../../migrations/channel-do/migrations";
 import * as schema from "../db/schema-channel-do.ts";
+import { getDb } from "../db/client.ts";
+import { setThumbnail } from "../db/repos/uploads.ts";
 import { createBroadcaster } from "./broadcast.ts";
 import { createReactionBatcher } from "./reaction-batch.ts";
 
@@ -338,6 +340,13 @@ export class ChannelDO extends DurableObject<Env> {
     thumbUrl: string;
     thumbKey: string;
   }): Promise<{ ok: boolean }> {
+    try {
+      await setThumbnail(getDb(this.env.DB), {
+        fileId: body.uploadId,
+        thumbnailPath: body.thumbKey,
+        previewPath: null,
+      });
+    } catch {}
     const rows = await this.db
       .select({
         id: schema.messages.id,

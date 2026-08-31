@@ -116,18 +116,18 @@ test("internal thumbnail endpoint writes thumbUrl for complete upload", async ()
   const uploadId = "up-complete";
   await postFileMessage(stub, uploadId, "file-att-4");
   await env.DB.prepare(
-    "INSERT INTO uploads (id, channel_id, user_id, key, filename, size, content_type, status, created_at, completed_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'complete', ?, ?)",
+    "INSERT INTO uploadsessions (id, type, created_at, user_id, channel_id, filename, path, file_size, file_offset) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
   )
     .bind(
       uploadId,
-      "c-file",
-      "alice",
-      `uploads/c-file/${uploadId}/a.png`,
-      "a.png",
-      10,
       "image/png",
       Date.now(),
-      Date.now(),
+      "alice",
+      "c-file",
+      "a.png",
+      `uploads/c-file/${uploadId}/a.png`,
+      10,
+      10,
     )
     .run();
 

@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { channelDoName, userDoName } from "protocol";
 import { getDb } from "../db/client.ts";
-import { getUpload } from "../db/repos/uploads.ts";
+import { getUploadSession } from "../db/repos/uploads.ts";
 
 export const internalRoutes = new Hono<{ Bindings: Env }>();
 
@@ -11,8 +11,9 @@ internalRoutes.post("/internal/thumbnail", async (c) => {
   }
   const body = (await c.req.json()) as { channelId: string; uploadId: string; thumbKey: string };
   const db = getDb(c.env.DB);
-  const upload = await getUpload(db, body.uploadId);
-  if (!upload || upload.status !== "complete") return c.json({ error: "not found" }, 404);
+  const session = await getUploadSession(db, body.uploadId);
+  if (!session || session.fileOffset !== session.fileSize)
+    return c.json({ error: "not found" }, 404);
   const id = c.env.CHANNEL_DO.idFromName(channelDoName(body.channelId));
   await c.env.CHANNEL_DO.get(id).updateThumbByUpload({
     uploadId: body.uploadId,
