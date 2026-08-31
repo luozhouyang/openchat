@@ -15,6 +15,13 @@
       "when": 1788081337766,
       "tag": "0001_user-do-tables",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1788172393775,
+      "tag": "0002_mm-sidebar-status",
+      "breakpoints": true
     }
   ]
 }

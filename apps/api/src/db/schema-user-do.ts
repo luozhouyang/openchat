@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, primaryKey, index } from "drizzle-orm/sqlite-core";
 
 export const schemaVersion = sqliteTable("schema_version", {
   version: integer("version").notNull(),
@@ -37,4 +37,39 @@ export const sidebarCache = sqliteTable("sidebar_cache", {
   lastReadSeq: integer("last_read_seq").notNull().default(0),
   mentionCount: integer("mention_count").notNull().default(0),
   updatedAt: integer("updated_at").notNull(),
+});
+
+export const sidebarcategories = sqliteTable("sidebarcategories", {
+  id: text("id", { length: 128 }).primaryKey(),
+  userId: text("user_id").notNull(),
+  teamId: text("team_id"),
+  sortOrder: integer("sort_order"),
+  sorting: text("sorting"),
+  type: text("type"),
+  displayName: text("display_name"),
+  muted: integer("muted", { mode: "boolean" }).notNull().default(false),
+  collapsed: integer("collapsed", { mode: "boolean" }).notNull().default(false),
+});
+
+export const sidebarchannels = sqliteTable(
+  "sidebarchannels",
+  {
+    channelId: text("channel_id").notNull(),
+    userId: text("user_id").notNull(),
+    categoryId: text("category_id").notNull(),
+    sortOrder: integer("sort_order"),
+  },
+  (t) => [
+    primaryKey({ columns: [t.channelId, t.userId, t.categoryId] }),
+    index("idx_sbc_user").on(t.userId),
+  ],
+);
+
+export const status = sqliteTable("status", {
+  userId: text("user_id").primaryKey(),
+  status: text("status").notNull().default("offline"),
+  manual: integer("manual", { mode: "boolean" }).notNull().default(false),
+  lastActivityAt: integer("last_activity_at"),
+  dndEndTime: integer("dnd_end_time"),
+  prevStatus: text("prev_status"),
 });

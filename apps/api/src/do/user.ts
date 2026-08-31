@@ -1,7 +1,7 @@
 import { DurableObject } from "cloudflare:workers";
 import { drizzle } from "drizzle-orm/durable-sqlite";
 import { migrate } from "drizzle-orm/durable-sqlite/migrator";
-import { count, eq } from "drizzle-orm";
+import { asc, count, eq } from "drizzle-orm";
 import {
   channelDoName,
   helloEvent,
@@ -12,7 +12,7 @@ import {
 import type { PresenceStatus } from "protocol";
 import migrations from "../../migrations/user-do/migrations";
 import { getDb } from "../db/client.ts";
-import { getChannel } from "../db/repos/channels.ts";
+import { getChannel, listChannelsByIds } from "../db/repos/channels.ts";
 import * as schema from "../db/schema-user-do.ts";
 
 interface SidebarEntry {
@@ -23,6 +23,37 @@ interface SidebarEntry {
   mentions: number;
   preview: string | null;
   lastMessageAt: number | null;
+}
+
+interface SidebarCategoryChannel {
+  channelId: string;
+  sortOrder: number;
+  unread: number;
+  mentions: number;
+  preview: string | null;
+  lastMessageAt: number | null;
+}
+
+interface SidebarCategory {
+  id: string;
+  userId: string;
+  teamId: string | null;
+  sortOrder: number | null;
+  sorting: string | null;
+  type: string | null;
+  displayName: string | null;
+  muted: boolean;
+  collapsed: boolean;
+  channels: SidebarCategoryChannel[];
+}
+
+interface UserStatus {
+  userId: string;
+  status: string;
+  manual: boolean;
+  lastActivityAt: number | null;
+  dndEndTime: number | null;
+  prevStatus: string | null;
 }
 
 export class UserDO extends DurableObject<Env> {
@@ -41,6 +72,40 @@ export class UserDO extends DurableObject<Env> {
     if (this.ctx.getWebSockets().length === 0) return "offline";
     if (Date.now() - this.lastActiveAt > 5 * 60_000) return "away";
     return "online";
+  }
+
+  private async persistStatus(status: PresenceStatus): Promise<void> {
+    const rows = await this.db
+      .select()
+      .from(schema.status)
+      .where(eq(schema.status.userId, this.userId))
+      .limit(1);
+    const existing = rows[0];
+    const lastActivityAt = this.lastActiveAt || existing?.lastActivityAt || null;
+    if (!existing) {
+      await this.db
+        .insert(schema.status)
+        .values({
+          userId: this.userId,
+          status,
+          manual: false,
+          lastActivityAt,
+          dndEndTime: null,
+          prevStatus: null,
+        })
+        .onConflictDoNothing();
+      return;
+    }
+    const effective = existing.manual ? existing.status : status;
+    if (existing.status === effective && existing.lastActivityAt === lastActivityAt) return;
+    await this.db
+      .update(schema.status)
+      .set({
+        status: effective,
+        lastActivityAt,
+        ...(existing.status !== effective ? { prevStatus: existing.status } : {}),
+      })
+      .where(eq(schema.status.userId, this.userId));
   }
 
   constructor(ctx: DurableObjectState, env: Env) {
@@ -230,6 +295,130 @@ export class UserDO extends DurableObject<Env> {
     await this.db.delete(schema.channelsCache);
     if (channelIds.length === 0) return;
     await this.db.insert(schema.channelsCache).values(channelIds.map((id) => ({ channelId: id })));
+    await this.ensureDefaultCategories(this.userId);
+  }
+
+  private async ensureDefaultCategories(userId: string): Promise<void> {
+    const existing = await this.db
+      .select()
+      .from(schema.sidebarcategories)
+      .where(eq(schema.sidebarcategories.userId, userId));
+    if (existing.length === 0) {
+      await this.db
+        .insert(schema.sidebarcategories)
+        .values([
+          {
+            id: `favorites:${userId}`,
+            userId,
+            teamId: null,
+            sortOrder: 0,
+            sorting: "default",
+            type: "favorite",
+            displayName: "Favorites",
+            muted: false,
+            collapsed: false,
+          },
+          {
+            id: `channels:${userId}`,
+            userId,
+            teamId: null,
+            sortOrder: 1,
+            sorting: "default",
+            type: "channels",
+            displayName: "Channels",
+            muted: false,
+            collapsed: false,
+          },
+          {
+            id: `direct_messages:${userId}`,
+            userId,
+            teamId: null,
+            sortOrder: 2,
+            sorting: "default",
+            type: "direct_messages",
+            displayName: "Direct Messages",
+            muted: false,
+            collapsed: false,
+          },
+        ])
+        .onConflictDoNothing();
+    }
+
+    const cacheRows = await this.db.select().from(schema.channelsCache);
+    if (cacheRows.length === 0) return;
+    const assigned = await this.db
+      .select()
+      .from(schema.sidebarchannels)
+      .where(eq(schema.sidebarchannels.userId, userId));
+    const assignedIds = new Set(assigned.map((r) => r.channelId));
+    const unassigned = cacheRows.filter((r) => !assignedIds.has(r.channelId));
+    if (unassigned.length === 0) return;
+
+    let typeByChannel = new Map<string, string>();
+    try {
+      const channels = await listChannelsByIds(
+        getDb(this.env.DB),
+        unassigned.map((r) => r.channelId),
+      );
+      typeByChannel = new Map(channels.map((c) => [c.id, c.type]));
+    } catch {}
+
+    const channelsCatId = `channels:${userId}`;
+    const dmCatId = `direct_messages:${userId}`;
+    await this.db
+      .insert(schema.sidebarchannels)
+      .values(
+        unassigned.map((row, i) => {
+          const type = typeByChannel.get(row.channelId);
+          const categoryId = type === "dm" || type === "gm" ? dmCatId : channelsCatId;
+          return { channelId: row.channelId, userId, categoryId, sortOrder: i };
+        }),
+      )
+      .onConflictDoNothing();
+  }
+
+  async sidebarCategories(userId: string): Promise<{ categories: SidebarCategory[] }> {
+    await this.ensureDefaultCategories(userId);
+    const cats = await this.db
+      .select()
+      .from(schema.sidebarcategories)
+      .where(eq(schema.sidebarcategories.userId, userId))
+      .orderBy(asc(schema.sidebarcategories.sortOrder));
+    const rows = await this.db
+      .select()
+      .from(schema.sidebarchannels)
+      .where(eq(schema.sidebarchannels.userId, userId))
+      .orderBy(asc(schema.sidebarchannels.sortOrder));
+    const cache = await this.db.select().from(schema.sidebarCache);
+    const cacheByChannel = new Map(cache.map((r) => [r.channelId, r]));
+    const channelsByCategory = new Map<string, SidebarCategoryChannel[]>();
+    for (const row of rows) {
+      const c = cacheByChannel.get(row.channelId);
+      const entry: SidebarCategoryChannel = {
+        channelId: row.channelId,
+        sortOrder: row.sortOrder ?? 0,
+        unread: c ? Math.max(0, c.maxSeq - c.lastReadSeq) : 0,
+        mentions: c?.mentionCount ?? 0,
+        preview: c?.lastMessagePreview ?? null,
+        lastMessageAt: c?.lastMessageAt ?? null,
+      };
+      const arr = channelsByCategory.get(row.categoryId) ?? [];
+      arr.push(entry);
+      channelsByCategory.set(row.categoryId, arr);
+    }
+    const categories = cats.map((cat) => ({
+      id: cat.id,
+      userId: cat.userId,
+      teamId: cat.teamId,
+      sortOrder: cat.sortOrder,
+      sorting: cat.sorting,
+      type: cat.type,
+      displayName: cat.displayName,
+      muted: cat.muted,
+      collapsed: cat.collapsed,
+      channels: channelsByCategory.get(cat.id) ?? [],
+    }));
+    return { categories };
   }
 
   async forceDisconnect(): Promise<void> {
@@ -283,6 +472,70 @@ export class UserDO extends DurableObject<Env> {
     return { status: this.status() };
   }
 
+  async setStatus(
+    userId: string,
+    body: { status: string; manual?: boolean; dndEndTime?: number | null },
+  ): Promise<{ ok: true }> {
+    const rows = await this.db
+      .select()
+      .from(schema.status)
+      .where(eq(schema.status.userId, userId))
+      .limit(1);
+    const existing = rows[0];
+    const manual = body.manual ?? false;
+    if (existing) {
+      await this.db
+        .update(schema.status)
+        .set({
+          status: body.status,
+          manual,
+          dndEndTime: body.dndEndTime !== undefined ? body.dndEndTime : existing.dndEndTime,
+          prevStatus: manual ? existing.status : existing.prevStatus,
+        })
+        .where(eq(schema.status.userId, userId));
+    } else {
+      await this.db.insert(schema.status).values({
+        userId,
+        status: body.status,
+        manual,
+        lastActivityAt: Date.now(),
+        dndEndTime: body.dndEndTime ?? null,
+        prevStatus: null,
+      });
+    }
+    if (body.status === "online" || body.status === "away" || body.status === "offline") {
+      await this.notifySubscribers(body.status);
+    }
+    return { ok: true };
+  }
+
+  async getStatus(userId: string): Promise<UserStatus> {
+    const rows = await this.db
+      .select()
+      .from(schema.status)
+      .where(eq(schema.status.userId, userId))
+      .limit(1);
+    const row = rows[0];
+    if (!row) {
+      return {
+        userId,
+        status: this.status(),
+        manual: false,
+        lastActivityAt: this.lastActiveAt || null,
+        dndEndTime: null,
+        prevStatus: null,
+      };
+    }
+    return {
+      userId,
+      status: row.status,
+      manual: row.manual,
+      lastActivityAt: row.lastActivityAt,
+      dndEndTime: row.dndEndTime,
+      prevStatus: row.prevStatus,
+    };
+  }
+
   async pushSubscribe(body: {
     deviceId: string;
     kind: "webpush" | "fcm" | "apns";
@@ -330,6 +583,7 @@ export class UserDO extends DurableObject<Env> {
   async alarm(): Promise<void> {
     if (this.ctx.getWebSockets().length > 0 && !this.awayNotified) {
       this.awayNotified = true;
+      await this.persistStatus("away");
       await this.notifySubscribers("away");
     }
   }
@@ -375,6 +629,7 @@ export class UserDO extends DurableObject<Env> {
       this.awayNotified = false;
       await this.ctx.storage.setAlarm(this.lastActiveAt + 5 * 60_000);
       void this.notifySubscribers("online");
+      await this.persistStatus("online");
       return new Response(null, { status: 101, webSocket: client });
     }
 
@@ -505,6 +760,7 @@ export class UserDO extends DurableObject<Env> {
       this.lastActiveAt = Date.now();
       this.awayNotified = false;
       await this.ctx.storage.setAlarm(this.lastActiveAt + 5 * 60_000);
+      await this.persistStatus("online");
       await this.notifySubscribers("online");
       const attachment = ws.deserializeAttachment() as { lastActivity?: number } | null;
       ws.serializeAttachment({ ...attachment, lastActivity: Date.now() });
@@ -549,6 +805,7 @@ export class UserDO extends DurableObject<Env> {
   async webSocketClose(ws: WebSocket, code: number, reason: string, _wasClean: boolean) {
     ws.close(code, reason);
     if (this.ctx.getWebSockets().length === 0) {
+      void this.persistStatus("offline");
       void this.notifySubscribers("offline");
     }
   }
