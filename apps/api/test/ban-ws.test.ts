@@ -1,7 +1,10 @@
 import { expect, test, beforeAll } from "vite-plus/test";
 import { env, runInDurableObject } from "cloudflare:test";
 import { exports } from "cloudflare:workers";
+import { eq } from "drizzle-orm";
 import { userDoName } from "protocol";
+import { getDb } from "../src/db/client.ts";
+import { users } from "../src/db/schema-d1.ts";
 
 let adminCookie = "";
 let victimCookie = "";
@@ -42,7 +45,7 @@ function wsRequest(token: string): Request {
 beforeAll(async () => {
   const admin = await signup("banws-admin@test.dev");
   adminCookie = admin.cookie;
-  await env.DB.prepare("UPDATE users SET role = 'admin' WHERE id = ?").bind(admin.id).run();
+  await getDb(env.DB).update(users).set({ role: "admin" }).where(eq(users.id, admin.id));
   const victim = await signup("banws-victim@test.dev");
   victimCookie = victim.cookie;
   victimId = victim.id;

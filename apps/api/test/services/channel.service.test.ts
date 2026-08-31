@@ -1,6 +1,8 @@
 import { expect, test } from "vite-plus/test";
 import { env } from "cloudflare:test";
+import { eq } from "drizzle-orm";
 import { getDb } from "../../src/db/client.ts";
+import { channels, channelMembers } from "../../src/db/schema-d1.ts";
 import {
   createChannel,
   openDirect,
@@ -12,6 +14,8 @@ import {
 } from "../../src/services/channel.service.ts";
 import { createTeam, joinTeam } from "../../src/services/team.service.ts";
 import { HttpError } from "../../src/lib/errors.ts";
+
+const db = getDb(env.DB);
 
 async function expectHttpError(p: Promise<unknown>, code: string, status: number) {
   try {
@@ -38,13 +42,12 @@ test("createChannel writes channel and creator admin member", async () => {
   expect(ch.id).toMatch(/^chn_/);
   expect(ch.purpose).toBe("hello");
 
-  const memberRows = (
-    await env.DB.prepare("SELECT user_id, roles FROM channel_members WHERE channel_id = ?1")
-      .bind(ch.id)
-      .all()
-  ).results;
+  const memberRows = await db
+    .select()
+    .from(channelMembers)
+    .where(eq(channelMembers.channelId, ch.id));
   expect(memberRows).toHaveLength(1);
-  expect(memberRows[0].user_id).toBe("user-svc-ch");
+  expect(memberRows[0].userId).toBe("user-svc-ch");
   expect(memberRows[0].roles).toBe("channel_admin");
 });
 
@@ -78,12 +81,11 @@ test("openDirect is idempotent for the same pair", async () => {
   expect(second.existing).toBe(true);
   expect(second.id).toBe(first.id);
 
-  const memberRows = (
-    await env.DB.prepare("SELECT user_id FROM channel_members WHERE channel_id = ?1")
-      .bind(first.id)
-      .all()
-  ).results;
-  expect(memberRows.map((r) => r.user_id).sort()).toEqual(["user-dm-a", "user-dm-b"]);
+  const memberRows = await db
+    .select()
+    .from(channelMembers)
+    .where(eq(channelMembers.channelId, first.id));
+  expect(memberRows.map((r) => r.userId).sort()).toEqual(["user-dm-a", "user-dm-b"]);
 });
 
 test("openGroup is idempotent and order-insensitive", async () => {
@@ -100,12 +102,11 @@ test("openGroup is idempotent and order-insensitive", async () => {
   expect(second.existing).toBe(true);
   expect(second.id).toBe(first.id);
 
-  const memberRows = (
-    await env.DB.prepare("SELECT user_id FROM channel_members WHERE channel_id = ?1")
-      .bind(first.id)
-      .all()
-  ).results;
-  expect(memberRows.map((r) => r.user_id).sort()).toEqual(["user-gm-a", "user-gm-b", "user-gm-c"]);
+  const memberRows = await db
+    .select()
+    .from(channelMembers)
+    .where(eq(channelMembers.channelId, first.id));
+  expect(memberRows.map((r) => r.userId).sort()).toEqual(["user-gm-a", "user-gm-b", "user-gm-c"]);
 });
 
 test("joinChannel joins public channel when team member", async () => {
@@ -202,12 +203,11 @@ test("leaveChannel removes membership", async () => {
   await joinChannel(db, { channelId: ch.id, userId: "user-svc-member4" });
   await leaveChannel(db, { channelId: ch.id, userId: "user-svc-member4" });
 
-  const memberRows = (
-    await env.DB.prepare("SELECT user_id FROM channel_members WHERE channel_id = ?1")
-      .bind(ch.id)
-      .all()
-  ).results;
-  expect(memberRows.map((r) => r.user_id)).not.toContain("user-svc-member4");
+  const memberRows = await db
+    .select()
+    .from(channelMembers)
+    .where(eq(channelMembers.channelId, ch.id));
+  expect(memberRows.map((r) => r.userId)).not.toContain("user-svc-member4");
 });
 
 test("archiveChannel and restoreChannel toggle archivedAt", async () => {
@@ -227,8 +227,6 @@ test("archiveChannel and restoreChannel toggle archivedAt", async () => {
 });
 
 async function archivedAtOf(channelId: string): Promise<number | null> {
-  const row = (
-    await env.DB.prepare("SELECT archived_at FROM channels WHERE id = ?1").bind(channelId).all()
-  ).results[0];
-  return (row?.archived_at as number | null) ?? null;
+  const rows = await db.select().from(channels).where(eq(channels.id, channelId)).limit(1);
+  return rows[0]?.archivedAt ?? null;
 }

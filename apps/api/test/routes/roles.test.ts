@@ -1,7 +1,10 @@
 import { expect, test, beforeAll } from "vite-plus/test";
 import { env } from "cloudflare:test";
 import { exports } from "cloudflare:workers";
+import { and, eq } from "drizzle-orm";
 import { signup, userIdOf } from "../helpers/setup.ts";
+import { getDb } from "../../src/db/client.ts";
+import { channelMembers, teamMembers, users } from "../../src/db/schema-d1.ts";
 
 let sysAdminCookie = "";
 let sysAdminId = "";
@@ -34,7 +37,7 @@ beforeAll(async () => {
     "SysAdmin",
   );
   sysAdminId = await userIdOf(exports.default, sysAdminCookie);
-  await env.DB.prepare("UPDATE users SET role = 'admin' WHERE id = ?").bind(sysAdminId).run();
+  await getDb(env.DB).update(users).set({ role: "admin" }).where(eq(users.id, sysAdminId));
 
   ownerCookie = await signup(exports.default, "roles-owner@test.dev", "roles-test-password");
   memberCookie = await signup(exports.default, "roles-member@test.dev", "roles-test-password");
@@ -106,12 +109,12 @@ test("PUT team member roles as team_admin updates team_members.roles", async () 
   expect(res.status).toBe(200);
   expect(await res.json()).toEqual({ ok: true });
 
-  const row = await env.DB.prepare(
-    "SELECT roles FROM team_members WHERE team_id = ?1 AND user_id = ?2",
-  )
-    .bind(teamId, memberId)
-    .first();
-  expect(row?.roles).toBe("team_admin");
+  const row = await getDb(env.DB)
+    .select()
+    .from(teamMembers)
+    .where(and(eq(teamMembers.teamId, teamId), eq(teamMembers.userId, memberId)))
+    .limit(1);
+  expect(row[0]?.roles).toBe("team_admin");
 });
 
 test("PUT team member roles as non-admin returns 403", async () => {
@@ -136,12 +139,12 @@ test("PUT channel member roles as channel_admin updates channel_members.roles", 
   expect(res.status).toBe(200);
   expect(await res.json()).toEqual({ ok: true });
 
-  const row = await env.DB.prepare(
-    "SELECT roles FROM channel_members WHERE channel_id = ?1 AND user_id = ?2",
-  )
-    .bind(channelId, memberId)
-    .first();
-  expect(row?.roles).toBe("channel_admin");
+  const row = await getDb(env.DB)
+    .select()
+    .from(channelMembers)
+    .where(and(eq(channelMembers.channelId, channelId), eq(channelMembers.userId, memberId)))
+    .limit(1);
+  expect(row[0]?.roles).toBe("channel_admin");
 });
 
 test("PUT channel member roles as non-admin returns 403", async () => {
@@ -166,8 +169,8 @@ test("PUT user roles as system admin maps system_admin to users.role admin", asy
   expect(res.status).toBe(200);
   expect(await res.json()).toEqual({ ok: true });
 
-  const row = await env.DB.prepare("SELECT role FROM users WHERE id = ?1").bind(memberId).first();
-  expect(row?.role).toBe("admin");
+  const row = await getDb(env.DB).select().from(users).where(eq(users.id, memberId)).limit(1);
+  expect(row[0]?.role).toBe("admin");
 });
 
 test("PUT /users/me/roles wildcard resolves to the session user", async () => {
@@ -179,8 +182,8 @@ test("PUT /users/me/roles wildcard resolves to the session user", async () => {
   expect(res.status).toBe(200);
   expect(await res.json()).toEqual({ ok: true });
 
-  const row = await env.DB.prepare("SELECT role FROM users WHERE id = ?1").bind(sysAdminId).first();
-  expect(row?.role).toBe("admin");
+  const row = await getDb(env.DB).select().from(users).where(eq(users.id, sysAdminId)).limit(1);
+  expect(row[0]?.role).toBe("admin");
 });
 
 test("PUT team member roles for a missing member returns 404", async () => {

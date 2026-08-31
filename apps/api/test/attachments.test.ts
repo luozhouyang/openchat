@@ -2,6 +2,8 @@ import { expect, test } from "vite-plus/test";
 import { env } from "cloudflare:test";
 import { exports } from "cloudflare:workers";
 import { channelDoName } from "protocol";
+import { getDb } from "../src/db/client.ts";
+import { uploadsessions } from "../src/db/schema-d1.ts";
 
 function channelStub(channelId: string) {
   return env.CHANNEL_DO.get(env.CHANNEL_DO.idFromName(channelDoName(channelId)));
@@ -115,21 +117,19 @@ test("internal thumbnail endpoint writes thumbUrl for complete upload", async ()
   const stub = channelStub("c-file");
   const uploadId = "up-complete";
   await postFileMessage(stub, uploadId, "file-att-4");
-  await env.DB.prepare(
-    "INSERT INTO uploadsessions (id, type, created_at, user_id, channel_id, filename, path, file_size, file_offset) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-  )
-    .bind(
-      uploadId,
-      "image/png",
-      Date.now(),
-      "alice",
-      "c-file",
-      "a.png",
-      `uploads/c-file/${uploadId}/a.png`,
-      10,
-      10,
-    )
-    .run();
+  await getDb(env.DB)
+    .insert(uploadsessions)
+    .values({
+      id: uploadId,
+      type: "image/png",
+      createdAt: Date.now(),
+      userId: "alice",
+      channelId: "c-file",
+      filename: "a.png",
+      path: `uploads/c-file/${uploadId}/a.png`,
+      fileSize: 10,
+      fileOffset: 10,
+    });
 
   const res = await exports.default.fetch("http://localhost/internal/thumbnail", {
     method: "POST",

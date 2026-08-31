@@ -1,11 +1,14 @@
 import { expect, test } from "vite-plus/test";
 import { env } from "cloudflare:test";
+import { sql } from "drizzle-orm";
+import { getDb } from "../../src/db/client.ts";
 
 test("structure tables exist after migration", async () => {
-  const { results } = await env.DB.prepare(
-    "SELECT name FROM sqlite_master WHERE type='table'",
-  ).all<{ name: string }>();
-  const names = results.map((r) => r.name);
+  const db = getDb(env.DB);
+  const rows = await db.all<{ name: string }>(
+    sql`SELECT name FROM sqlite_master WHERE type='table'`,
+  );
+  const names = rows.map((r) => r.name);
   for (const table of [
     "teams",
     "team_members",

@@ -1,7 +1,9 @@
 import { expect, test, beforeAll } from "vite-plus/test";
 import { env } from "cloudflare:test";
 import { exports } from "cloudflare:workers";
+import { and, eq } from "drizzle-orm";
 import { getDb } from "../../src/db/client.ts";
+import { teamMembers, users } from "../../src/db/schema-d1.ts";
 import { listRoles } from "../../src/db/repos/roles.ts";
 import { PERMISSIONS, resolvePermissions } from "../../src/auth/rbac.ts";
 
@@ -61,11 +63,11 @@ test("bootstrap seeds the 6 built-in roles idempotently", async () => {
 });
 
 test("resolvePermissions maps system admin and team roles", async () => {
-  await env.DB.prepare("UPDATE users SET role = 'admin' WHERE id = ?").bind(userId).run();
+  await db.update(users).set({ role: "admin" }).where(eq(users.id, userId));
   const systemPerms = await resolvePermissions(db, userId, {});
   expect(systemPerms.has(PERMISSIONS.MANAGE_SYSTEM)).toBe(true);
 
-  await env.DB.prepare("UPDATE users SET role = 'user' WHERE id = ?").bind(userId).run();
+  await db.update(users).set({ role: "user" }).where(eq(users.id, userId));
   const teamPerms = await resolvePermissions(db, userId, { teamId });
   expect(teamPerms.has(PERMISSIONS.MANAGE_TEAMS)).toBe(true);
   expect(teamPerms.has(PERMISSIONS.MANAGE_CHANNEL_ROLES)).toBe(false);
@@ -91,11 +93,10 @@ test("requirePermission via endpoint: team patch needs MANAGE_TEAMS", async () =
     headers: { cookie: plainCookie },
   });
   const plainId = ((await me.json()) as { user: { id: string } }).user.id;
-  await env.DB.prepare(
-    "UPDATE team_members SET roles = 'team_admin' WHERE team_id = ?1 AND user_id = ?2",
-  )
-    .bind(teamId, plainId)
-    .run();
+  await db
+    .update(teamMembers)
+    .set({ roles: "team_admin" })
+    .where(and(eq(teamMembers.teamId, teamId), eq(teamMembers.userId, plainId)));
 
   const allowed = await exports.default.fetch(`http://localhost/api/v1/teams/${teamId}/patch`, {
     method: "PUT",

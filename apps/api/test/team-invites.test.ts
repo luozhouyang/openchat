@@ -1,6 +1,8 @@
 import { expect, test, beforeAll } from "vite-plus/test";
 import { env } from "cloudflare:test";
 import { exports } from "cloudflare:workers";
+import { getDb } from "../src/db/client.ts";
+import { invites, teamMembers } from "../src/db/schema-d1.ts";
 
 let aliceCookie = "";
 let teamId = "";
@@ -29,11 +31,15 @@ async function insertInvite(
   createdAt: number,
   expiresAt: number,
 ) {
-  await env.DB.prepare(
-    "INSERT INTO invites (id, team_id, token_hash, email, created_by, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-  )
-    .bind(id, teamId, tokenHash, email, "alice-inviter", createdAt, expiresAt)
-    .run();
+  await getDb(env.DB).insert(invites).values({
+    id,
+    teamId,
+    tokenHash,
+    email,
+    createdBy: "alice-inviter",
+    createdAt,
+    expiresAt,
+  });
 }
 
 async function accept(cookie: string, token: string) {
@@ -104,11 +110,12 @@ test("non-admin member cannot create invite", async () => {
     headers: { cookie: carol },
   });
   const { user } = (await me.json()) as { user: { id: string } };
-  await env.DB.prepare(
-    "INSERT INTO team_members (team_id, user_id, roles, joined_at) VALUES (?, ?, 'team_user', ?)",
-  )
-    .bind(teamId, user.id, Date.now())
-    .run();
+  await getDb(env.DB).insert(teamMembers).values({
+    teamId,
+    userId: user.id,
+    roles: "team_user",
+    joinedAt: Date.now(),
+  });
   const res = await exports.default.fetch(`http://localhost/api/v1/teams/${teamId}/invite/email`, {
     method: "POST",
     headers: { cookie: carol, "content-type": "application/json" },
@@ -241,11 +248,12 @@ test("already member accept returns ok without consuming", async () => {
     headers: { cookie: bob },
   });
   const { user } = (await me.json()) as { user: { id: string } };
-  await env.DB.prepare(
-    "INSERT INTO team_members (team_id, user_id, roles, joined_at) VALUES (?, ?, 'team_user', ?)",
-  )
-    .bind(teamId, user.id, Date.now())
-    .run();
+  await getDb(env.DB).insert(teamMembers).values({
+    teamId,
+    userId: user.id,
+    roles: "team_user",
+    joinedAt: Date.now(),
+  });
 
   const res = await accept(bob, memberToken);
   expect(res.status).toBe(200);

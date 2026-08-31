@@ -1,6 +1,8 @@
 import { expect, test } from "vite-plus/test";
 import { env } from "cloudflare:test";
 import { exports } from "cloudflare:workers";
+import { sql } from "drizzle-orm";
+import { getDb } from "../src/db/client.ts";
 
 test("GET /health returns ok", async () => {
   const res = await exports.default.fetch("http://localhost/health");
@@ -18,8 +20,9 @@ test("/ws upgrade without token returns 401", async () => {
 });
 
 test("d1 migrations applied: teams table exists", async () => {
-  const { results } = await env.DB.prepare(
-    "SELECT name FROM sqlite_master WHERE type='table' AND name='teams'",
-  ).all();
-  expect(results).toHaveLength(1);
+  const db = getDb(env.DB);
+  const rows = await db.all<{ name: string }>(
+    sql`SELECT name FROM sqlite_master WHERE type='table' AND name='teams'`,
+  );
+  expect(rows).toHaveLength(1);
 });

@@ -1,6 +1,8 @@
 import { expect, test } from "vite-plus/test";
 import { env } from "cloudflare:test";
+import { eq } from "drizzle-orm";
 import { getDb } from "../../src/db/client.ts";
+import { teams, teamMembers } from "../../src/db/schema-d1.ts";
 import { createTeam, joinTeam, leaveTeam, updateTeam } from "../../src/services/team.service.ts";
 import { HttpError } from "../../src/lib/errors.ts";
 
@@ -26,19 +28,13 @@ test("createTeam writes team and admin member rows", async () => {
   expect(teamId).toMatch(/^team_/);
   expect(inviteCode).toBeUndefined();
 
-  const teamRows = (
-    await env.DB.prepare("SELECT id, name, creator_id FROM teams WHERE id = ?1").bind(teamId).all()
-  ).results;
+  const teamRows = await db.select().from(teams).where(eq(teams.id, teamId)).limit(1);
   expect(teamRows).toHaveLength(1);
-  expect(teamRows[0].creator_id).toBe("user-svc-1");
+  expect(teamRows[0].creatorId).toBe("user-svc-1");
 
-  const memberRows = (
-    await env.DB.prepare("SELECT user_id, roles FROM team_members WHERE team_id = ?1")
-      .bind(teamId)
-      .all()
-  ).results;
+  const memberRows = await db.select().from(teamMembers).where(eq(teamMembers.teamId, teamId));
   expect(memberRows).toHaveLength(1);
-  expect(memberRows[0].user_id).toBe("user-svc-1");
+  expect(memberRows[0].userId).toBe("user-svc-1");
   expect(memberRows[0].roles).toBe("team_admin");
 });
 
@@ -51,10 +47,8 @@ test("invite team generates invite code", async () => {
     creatorId: "user-svc-inv",
   });
   expect(inviteCode).toBeTruthy();
-  const row = (
-    await env.DB.prepare("SELECT invite_code FROM teams WHERE id = ?1").bind(teamId).all()
-  ).results[0];
-  expect(row.invite_code).toBe(inviteCode);
+  const row = await db.select().from(teams).where(eq(teams.id, teamId)).limit(1);
+  expect(row[0].inviteCode).toBe(inviteCode);
 });
 
 test("createTeam duplicate name throws HttpError 409", async () => {
@@ -87,11 +81,7 @@ test("joinTeam adds member to open team", async () => {
   });
   await joinTeam(db, { teamId, userId: "user-svc-joiner" });
 
-  const rows = (
-    await env.DB.prepare("SELECT user_id, roles FROM team_members WHERE team_id = ?1")
-      .bind(teamId)
-      .all()
-  ).results;
+  const rows = await db.select().from(teamMembers).where(eq(teamMembers.teamId, teamId));
   expect(rows).toHaveLength(2);
   expect(rows.map((r) => r.roles)).toContain("team_user");
 });
@@ -107,9 +97,7 @@ test("joinTeam is idempotent for existing member", async () => {
   await joinTeam(db, { teamId, userId: "user-svc-joiner2" });
   await joinTeam(db, { teamId, userId: "user-svc-joiner2" });
 
-  const rows = (
-    await env.DB.prepare("SELECT user_id FROM team_members WHERE team_id = ?1").bind(teamId).all()
-  ).results;
+  const rows = await db.select().from(teamMembers).where(eq(teamMembers.teamId, teamId));
   expect(rows).toHaveLength(2);
 });
 
@@ -165,9 +153,7 @@ test("leaveTeam non-admin member leaves", async () => {
   await joinTeam(db, { teamId, userId: "user-svc-leaver" });
   await leaveTeam(db, { teamId, userId: "user-svc-leaver" });
 
-  const rows = (
-    await env.DB.prepare("SELECT user_id FROM team_members WHERE team_id = ?1").bind(teamId).all()
-  ).results;
+  const rows = await db.select().from(teamMembers).where(eq(teamMembers.teamId, teamId));
   expect(rows).toHaveLength(1);
 });
 
@@ -192,17 +178,11 @@ test("updateTeam archives and renames", async () => {
   });
   await updateTeam(db, { teamId, patch: { displayName: "Updated", archived: true } });
 
-  const row = (
-    await env.DB.prepare("SELECT display_name, archived_at FROM teams WHERE id = ?1")
-      .bind(teamId)
-      .all()
-  ).results[0];
-  expect(row.display_name).toBe("Updated");
-  expect(row.archived_at).toBeTruthy();
+  const row = await db.select().from(teams).where(eq(teams.id, teamId)).limit(1);
+  expect(row[0].displayName).toBe("Updated");
+  expect(row[0].archivedAt).toBeTruthy();
 
   await updateTeam(db, { teamId, patch: { archived: false } });
-  const row2 = (
-    await env.DB.prepare("SELECT archived_at FROM teams WHERE id = ?1").bind(teamId).all()
-  ).results[0];
-  expect(row2.archived_at).toBeNull();
+  const row2 = await db.select().from(teams).where(eq(teams.id, teamId)).limit(1);
+  expect(row2[0].archivedAt).toBeNull();
 });

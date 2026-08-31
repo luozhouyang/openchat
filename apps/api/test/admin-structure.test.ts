@@ -1,6 +1,9 @@
 import { expect, test, beforeAll } from "vite-plus/test";
 import { env } from "cloudflare:test";
 import { exports } from "cloudflare:workers";
+import { eq } from "drizzle-orm";
+import { getDb } from "../src/db/client.ts";
+import { users } from "../src/db/schema-d1.ts";
 
 let adminCookie = "";
 let adminId = "";
@@ -44,7 +47,7 @@ beforeAll(async () => {
   const admin = await signup("struct-admin@test.dev");
   adminCookie = admin.cookie;
   adminId = admin.id;
-  await env.DB.prepare("UPDATE users SET role = 'admin' WHERE id = ?").bind(adminId).run();
+  await getDb(env.DB).update(users).set({ role: "admin" }).where(eq(users.id, adminId));
 
   const archTeam = await createTeam(adminCookie, "arch", "Arch");
   archTeamId = archTeam.id!;
