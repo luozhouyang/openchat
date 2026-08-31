@@ -8,10 +8,10 @@ import type { SessionContext } from "../../auth/session.ts";
 import { requireChannelRole } from "../../auth/guards.ts";
 import { getDb } from "../../db/client.ts";
 import {
-  postMessageService,
-  editMessageService,
-  deleteMessageService,
-  messageHistory,
+  postMessage,
+  editMessage,
+  deleteMessage,
+  getMessageHistory,
 } from "../../services/message.service.ts";
 import { HttpError } from "../../lib/errors.ts";
 
@@ -46,7 +46,7 @@ postsV1.post(
     const db = getDb(c.env.DB);
     const channelId = c.req.param("channelId");
     try {
-      const { messageId, seq } = await postMessageService(db, c.env, {
+      const { messageId, seq } = await postMessage(db, c.env, {
         channelId,
         userId: c.get("session")!.user.id,
         content: body.data.message,
@@ -76,7 +76,7 @@ postsV1.get(
     const beforeSeq = q.get("before_seq") ? Number(q.get("before_seq")) : undefined;
     const parentId = q.get("parent_id") || undefined;
     const order = q.get("order") === "asc" ? "asc" : undefined;
-    const res = await messageHistory(c.env, { channelId, limit, beforeSeq, parentId, order });
+    const res = await getMessageHistory(c.env, { channelId, limit, beforeSeq, parentId, order });
     return c.json({ messages: res.messages, oldestSeq: res.oldestSeq });
   },
 );
@@ -86,7 +86,7 @@ postsV1.put("/posts/:postId/patch", requireSession, async (c) => {
   if (!body.success) return c.json({ error: "invalid" }, 422);
   const db = getDb(c.env.DB);
   try {
-    await editMessageService(db, c.env, {
+    await editMessage(db, c.env, {
       channelId: body.data.channel_id,
       callerUserId: c.get("session")!.user.id,
       messageId: c.req.param("postId"),
@@ -105,7 +105,7 @@ postsV1.delete("/posts/:postId", requireSession, async (c) => {
   if (!body.success) return c.json({ error: "invalid" }, 422);
   const db = getDb(c.env.DB);
   try {
-    await deleteMessageService(db, c.env, {
+    await deleteMessage(db, c.env, {
       channelId: body.data.channel_id,
       callerUserId: c.get("session")!.user.id,
       messageId: c.req.param("postId"),

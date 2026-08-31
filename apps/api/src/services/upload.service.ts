@@ -1,5 +1,4 @@
 import { id } from "protocol";
-import { getDb } from "../db/client.ts";
 import { getChannel, getChannelMember } from "../db/repos/channels.ts";
 import {
   createUploadSession,
@@ -12,7 +11,7 @@ import { apiError } from "../lib/errors.ts";
 import { sanitizeFilename, presignPut, headObject, type R2Env } from "../r2.ts";
 import { postFileMessage } from "../user-do-sync.ts";
 
-type Db = ReturnType<typeof getDb>;
+type Db = import("../db/types.ts").Db;
 
 const MAX_SIZE = 100 * 1024 * 1024;
 const ALLOWED_TYPES = new Set([

@@ -5,10 +5,10 @@ import { getDb } from "../../src/db/client.ts";
 import { addChannelMember, createChannel } from "../../src/db/repos/channels.ts";
 import { createTeam } from "../../src/db/repos/teams.ts";
 import {
-  postMessageService,
-  editMessageService,
-  deleteMessageService,
-  messageHistory,
+  postMessage,
+  editMessage,
+  deleteMessage,
+  getMessageHistory,
 } from "../../src/services/message.service.ts";
 
 const OWNER = "msg-svc-alice";
@@ -42,10 +42,10 @@ beforeAll(async () => {
   await channelStub().membersAdd({ userId: OWNER, role: "admin" });
 });
 
-test("postMessageService rejects non-member with 403", async () => {
+test("postMessage rejects non-member with 403", async () => {
   const db = getDb(env.DB);
   await expect(
-    postMessageService(db, env, {
+    postMessage(db, env, {
       channelId: CHANNEL,
       userId: OUTSIDER,
       content: "should fail",
@@ -54,9 +54,9 @@ test("postMessageService rejects non-member with 403", async () => {
   ).rejects.toMatchObject({ status: 403, code: "forbidden" });
 });
 
-test("postMessageService happy path returns messageId and seq", async () => {
+test("postMessage happy path returns messageId and seq", async () => {
   const db = getDb(env.DB);
-  const res = await postMessageService(db, env, {
+  const res = await postMessage(db, env, {
     channelId: CHANNEL,
     userId: OWNER,
     content: "hello from service",
@@ -67,47 +67,47 @@ test("postMessageService happy path returns messageId and seq", async () => {
   expect(res.seq).toBeGreaterThanOrEqual(1);
 });
 
-test("editMessageService happy path updates content", async () => {
+test("editMessage happy path updates content", async () => {
   const db = getDb(env.DB);
-  const { messageId } = await postMessageService(db, env, {
+  const { messageId } = await postMessage(db, env, {
     channelId: CHANNEL,
     userId: OWNER,
     content: "original",
     clientToken: "svc-edit-1",
   });
   await expect(
-    editMessageService(db, env, {
+    editMessage(db, env, {
       channelId: CHANNEL,
       callerUserId: OWNER,
       messageId,
       content: "edited",
     }),
   ).resolves.toEqual({ ok: true });
-  const { messages } = await messageHistory(env, { channelId: CHANNEL, limit: 10 });
+  const { messages } = await getMessageHistory(env, { channelId: CHANNEL, limit: 10 });
   const target = messages.find((m) => m.id === messageId)!;
   expect(target.content).toBe("edited");
 });
 
-test("deleteMessageService happy path soft-deletes", async () => {
+test("deleteMessage happy path soft-deletes", async () => {
   const db = getDb(env.DB);
-  const { messageId } = await postMessageService(db, env, {
+  const { messageId } = await postMessage(db, env, {
     channelId: CHANNEL,
     userId: OWNER,
     content: "to delete",
     clientToken: "svc-del-1",
   });
   await expect(
-    deleteMessageService(db, env, { channelId: CHANNEL, callerUserId: OWNER, messageId }),
+    deleteMessage(db, env, { channelId: CHANNEL, callerUserId: OWNER, messageId }),
   ).resolves.toEqual({ ok: true });
-  const { messages } = await messageHistory(env, { channelId: CHANNEL, limit: 10 });
+  const { messages } = await getMessageHistory(env, { channelId: CHANNEL, limit: 10 });
   const target = messages.find((m) => m.id === messageId)!;
   expect(target.deletedAt).not.toBeNull();
   expect(target.content).toBe("");
 });
 
-test("editMessageService non-author rejected with 403", async () => {
+test("editMessage non-author rejected with 403", async () => {
   const db = getDb(env.DB);
-  const { messageId } = await postMessageService(db, env, {
+  const { messageId } = await postMessage(db, env, {
     channelId: CHANNEL,
     userId: OWNER,
     content: "mine",
@@ -116,7 +116,7 @@ test("editMessageService non-author rejected with 403", async () => {
   await channelStub().membersAdd({ userId: OUTSIDER, role: "member" });
   await addChannelMember(db, { channelId: CHANNEL, userId: OUTSIDER, roles: "channel_user" });
   await expect(
-    editMessageService(db, env, {
+    editMessage(db, env, {
       channelId: CHANNEL,
       callerUserId: OUTSIDER,
       messageId,

@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { id } from "protocol";
+import { id, type ChannelType } from "protocol";
 import { channels, channelMembers } from "../db/schema-d1.ts";
 import type { Db } from "../db/types.ts";
 import {
@@ -14,7 +14,7 @@ import { apiError } from "../lib/errors.ts";
 
 type Channel = typeof channels.$inferSelect;
 
-export async function dedupKeyFor(kind: "dm" | "gm", ids: string[]): Promise<string> {
+export async function dedupKeyFor(kind: ChannelType, ids: string[]): Promise<string> {
   const sorted = [...ids].sort();
   const data = new TextEncoder().encode(`${kind}:${sorted.join(",")}`);
   const digest = await crypto.subtle.digest("SHA-256", data);

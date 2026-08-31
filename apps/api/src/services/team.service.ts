@@ -1,6 +1,5 @@
 import { eq } from "drizzle-orm";
-import { id } from "protocol";
-import { getDb } from "../db/client.ts";
+import { id, type TeamType } from "protocol";
 import { teams, teamMembers } from "../db/schema-d1.ts";
 import {
   getTeam,
@@ -11,7 +10,7 @@ import {
 } from "../db/repos/teams.ts";
 import { apiError } from "../lib/errors.ts";
 
-type Db = ReturnType<typeof getDb>;
+type Db = import("../db/types.ts").Db;
 
 function inviteCode(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(24));
@@ -24,7 +23,7 @@ function inviteCode(): string {
 export type CreateTeamInput = {
   name: string;
   displayName: string;
-  type: "open" | "invite";
+  type: TeamType;
   description?: string;
   creatorId: string;
 };

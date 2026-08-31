@@ -1,14 +1,12 @@
-import { and, eq, gt, isNull } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { id } from "protocol";
-import { getDb } from "../db/client.ts";
-import { invites, teamMembers, users } from "../db/schema-d1.ts";
+import type { Db } from "../db/types.ts";
+import { users } from "../db/schema-d1.ts";
 import * as repo from "../db/repos/invites.ts";
-import { getTeam, getTeamMember } from "../db/repos/teams.ts";
+import { getTeam, getTeamMember, addTeamMember } from "../db/repos/teams.ts";
 import { sendInviteEmail } from "../email.ts";
 import { generateInviteToken, hashToken, maskEmail, normalizeEmail } from "../invites.ts";
 import { apiError } from "../lib/errors.ts";
-
-type Db = ReturnType<typeof getDb>;
 
 const TTL_MS = 48 * 3600_000;
 
@@ -70,9 +68,12 @@ export async function previewInvite(db: Db, { token }: { token: string }) {
 }
 
 export async function acceptInvite(db: Db, { token, userId }: { token: string; userId: string }) {
-  const user = (
-    await db.select({ email: users.email }).from(users).where(eq(users.id, userId)).limit(1)
-  )[0];
+  const userRows = await db
+    .select({ email: users.email })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  const user = userRows[0];
   if (!user) throw apiError("unauthorized", "unauthorized", 401);
   const tokenHash = await hashToken(token);
   const invite = await repo.getInviteByTokenHash(db, tokenHash);
@@ -90,22 +91,8 @@ export async function acceptInvite(db: Db, { token, userId }: { token: string; u
   if (!team || team.archivedAt) throw apiError("invitation invalid", "invitation invalid", 400);
   if (await getTeamMember(db, invite.teamId, userId)) return { ok: true, teamId: invite.teamId };
 
-  const [consumed] = await db.batch([
-    db
-      .update(invites)
-      .set({ consumedAt: Date.now(), acceptedBy: userId })
-      .where(
-        and(
-          eq(invites.tokenHash, tokenHash),
-          isNull(invites.consumedAt),
-          isNull(invites.revokedAt),
-          gt(invites.expiresAt, Date.now()),
-        ),
-      ),
-    db
-      .insert(teamMembers)
-      .values({ teamId: invite.teamId, userId, roles: "team_user", joinedAt: Date.now() }),
-  ]);
-  if (consumed.meta.changes === 0) throw apiError("invitation invalid", "invitation invalid", 400);
+  const consumed = await repo.consumeInvite(db, tokenHash, userId);
+  if (!consumed) throw apiError("invitation invalid", "invitation invalid", 400);
+  await addTeamMember(db, { teamId: invite.teamId, userId, roles: "team_user" });
   return { ok: true, teamId: invite.teamId };
 }

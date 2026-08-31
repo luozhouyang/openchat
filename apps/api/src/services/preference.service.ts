@@ -1,11 +1,15 @@
 import { and, eq } from "drizzle-orm";
-import { getDb } from "../db/client.ts";
 import { preferences } from "../db/schema-d1.ts";
 import { listPreferences } from "../db/repos/preferences.ts";
 
-type Db = ReturnType<typeof getDb>;
+type Db = import("../db/types.ts").Db;
 
 type PreferenceItem = { category: string; name: string; value?: string };
+
+function asBatch<T>(arr: T[]): [T, ...T[]] {
+  if (arr.length === 0) throw new Error("empty batch");
+  return arr as [T, ...T[]];
+}
 
 export async function getPreferences(db: Db, userId: string) {
   const rows = await listPreferences(db, userId);
@@ -23,7 +27,7 @@ export async function setPreferences(db: Db, userId: string, items: PreferenceIt
       }),
   );
   if (stmts.length === 0) return { ok: true };
-  await db.batch(stmts as [(typeof stmts)[number], ...(typeof stmts)[number][]]);
+  await db.batch(asBatch(stmts));
   return { ok: true };
 }
 
@@ -40,6 +44,6 @@ export async function deletePreferences(db: Db, userId: string, items: Preferenc
       ),
   );
   if (stmts.length === 0) return { ok: true };
-  await db.batch(stmts as [(typeof stmts)[number], ...(typeof stmts)[number][]]);
+  await db.batch(asBatch(stmts));
   return { ok: true };
 }
