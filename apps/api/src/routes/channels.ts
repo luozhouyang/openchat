@@ -40,7 +40,7 @@ channelsRoutes.post(
         creatorId: c.get("session")!.user.id,
       });
       if (ch) {
-        await syncChannelMember(c.env, ch.id, ch.creatorId!, "admin");
+        await syncChannelMember(c.env, ch.id, ch.creatorId!, "channel_admin");
       }
       return c.json({ id: ch?.id }, 201);
     } catch {
@@ -86,8 +86,8 @@ channelsRoutes.post("/channels/:channelId/join", requireSession, async (c) => {
   if (ch.teamId && !(await getTeamMember(db, ch.teamId, userId)))
     return c.json({ error: "forbidden" }, 403);
   if (!(await getChannelMember(db, ch.id, userId))) {
-    await addChannelMember(db, { channelId: ch.id, userId, role: "member" });
-    await syncChannelMember(c.env, ch.id, userId, "member");
+    await addChannelMember(db, { channelId: ch.id, userId, roles: "channel_user" });
+    await syncChannelMember(c.env, ch.id, userId, "channel_user");
     await syncUserChannels(c.env, userId);
   }
   return c.json({ ok: true });
@@ -234,10 +234,10 @@ channelsRoutes.post("/channels/dm", requireSession, async (c) => {
     dedupKey: key,
     creatorId: null,
   });
-  await addChannelMember(db, { channelId: ch!.id, userId: me, role: "member" });
-  await addChannelMember(db, { channelId: ch!.id, userId: withUserId, role: "member" });
-  await syncChannelMember(c.env, ch!.id, me, "member");
-  await syncChannelMember(c.env, ch!.id, withUserId, "member");
+  await addChannelMember(db, { channelId: ch!.id, userId: me, roles: "channel_user" });
+  await addChannelMember(db, { channelId: ch!.id, userId: withUserId, roles: "channel_user" });
+  await syncChannelMember(c.env, ch!.id, me, "channel_user");
+  await syncChannelMember(c.env, ch!.id, withUserId, "channel_user");
   await syncUserChannels(c.env, me);
   await syncUserChannels(c.env, withUserId);
   return c.json({ id: ch!.id, existing: false }, 201);
@@ -262,8 +262,8 @@ channelsRoutes.post("/channels/gm", requireSession, async (c) => {
     creatorId: null,
   });
   for (const userId of ids) {
-    await addChannelMember(db, { channelId: ch!.id, userId, role: "member" });
-    await syncChannelMember(c.env, ch!.id, userId, "member");
+    await addChannelMember(db, { channelId: ch!.id, userId, roles: "channel_user" });
+    await syncChannelMember(c.env, ch!.id, userId, "channel_user");
     await syncUserChannels(c.env, userId);
   }
   return c.json({ id: ch!.id, existing: false }, 201);

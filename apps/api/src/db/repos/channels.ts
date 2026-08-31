@@ -21,7 +21,7 @@ export async function createChannel(
   if (row.creatorId) {
     await db
       .insert(channelMembers)
-      .values({ channelId: row.id, userId: row.creatorId, role: "admin", joinedAt: now });
+      .values({ channelId: row.id, userId: row.creatorId, roles: "channel_admin", joinedAt: now });
   }
   return getChannel(db, row.id);
 }
@@ -60,7 +60,7 @@ export async function getChannelMember(db: Db, channelId: string, userId: string
 
 export async function addChannelMember(
   db: Db,
-  row: { channelId: string; userId: string; role: string },
+  row: { channelId: string; userId: string; roles: string },
 ) {
   await db.insert(channelMembers).values({ ...row, joinedAt: Date.now() });
 }

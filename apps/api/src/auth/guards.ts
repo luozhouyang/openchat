@@ -31,7 +31,8 @@ export function requireTeamRole(min: "member" | "admin") {
     if (!team) return c.json({ error: "team not found" }, 404);
     const member = await getTeamMember(db, teamId, session.user.id);
     if (!member) return c.json({ error: "forbidden" }, 403);
-    if (min === "admin" && member.role !== "admin") return c.json({ error: "forbidden" }, 403);
+    if (min === "admin" && !member.roles.split(" ").includes("team_admin"))
+      return c.json({ error: "forbidden" }, 403);
     c.set("teamMember", member);
     return next();
   });
@@ -48,7 +49,8 @@ export function requireChannelRole(min: "member" | "admin") {
     if (!channel) return c.json({ error: "channel not found" }, 404);
     const member = await getChannelMember(db, channelId, session.user.id);
     if (!member) return c.json({ error: "forbidden" }, 403);
-    if (min === "admin" && member.role !== "admin") return c.json({ error: "forbidden" }, 403);
+    if (min === "admin" && !member.roles.split(" ").includes("channel_admin"))
+      return c.json({ error: "forbidden" }, 403);
     c.set("channelMember", member);
     return next();
   });

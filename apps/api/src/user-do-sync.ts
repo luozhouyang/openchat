@@ -10,9 +10,14 @@ export async function syncUserChannels(env: Env, userId: string) {
   await env.USER_DO.get(id).channelsSubscribe(channelIds);
 }
 
-export async function syncChannelMember(env: Env, channelId: string, userId: string, role: string) {
+export async function syncChannelMember(
+  env: Env,
+  channelId: string,
+  userId: string,
+  roles: string,
+) {
   const id = env.CHANNEL_DO.idFromName(channelDoName(channelId));
-  await env.CHANNEL_DO.get(id).membersAdd({ userId, role });
+  await env.CHANNEL_DO.get(id).membersAdd({ userId, role: roles });
   await env.CHANNEL_DO.get(id).subscribe({ userId });
 }
 

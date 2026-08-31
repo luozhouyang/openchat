@@ -122,6 +122,6 @@ inviteRoutes.post("/teams/invites/accept", requireSession, async (c) => {
     return c.json({ ok: true, teamId: invite.teamId });
   if (!(await repo.consumeInvite(db, invite.tokenHash, userId)))
     return c.json({ error: "invitation invalid" }, 400);
-  await addTeamMember(db, { teamId: invite.teamId, userId, role: "member" });
+  await addTeamMember(db, { teamId: invite.teamId, userId, roles: "team_user" });
   return c.json({ ok: true, teamId: invite.teamId });
 });

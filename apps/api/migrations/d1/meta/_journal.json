@@ -36,6 +36,62 @@
       "when": 1788104321924,
       "tag": "0004_team-invites",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1788167175868,
+      "tag": "0005_mm-align-1",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1788167181874,
+      "tag": "0006_mm-backfill-roles",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1788167197348,
+      "tag": "0007_mm-drop-role",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1788167529916,
+      "tag": "0008_mm-align-2",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1788167658867,
+      "tag": "0009_mm-uploads",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1788167664918,
+      "tag": "0010_mm-backfill-uploads",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1788167678634,
+      "tag": "0011_mm-drop-uploads",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1788167826178,
+      "tag": "0012_mm-users",
+      "breakpoints": true
     }
   ]
 }

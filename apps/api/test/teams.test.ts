@@ -44,9 +44,9 @@ test("create and list team", async () => {
   const list = await exports.default.fetch("http://localhost/teams", {
     headers: { cookie: ownerCookie },
   });
-  const body = (await list.json()) as { teams: { id: string; name: string; role: string }[] };
+  const body = (await list.json()) as { teams: { id: string; name: string; roles: string }[] };
   expect(body.teams.map((t) => t.name)).toContain("acme");
-  expect(body.teams.find((t) => t.name === "acme")?.role).toBe("admin");
+  expect(body.teams.find((t) => t.name === "acme")?.roles).toBe("team_admin");
 });
 
 test("open team joinable, invite team needs code", async () => {

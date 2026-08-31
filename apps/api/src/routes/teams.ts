@@ -55,7 +55,7 @@ teamsRoutes.get("/teams", requireSession, async (c) => {
       name: r.team.name,
       displayName: r.team.displayName,
       type: r.team.type,
-      role: r.role,
+      roles: r.roles,
       archivedAt: r.team.archivedAt,
     })),
   });
@@ -79,7 +79,7 @@ teamsRoutes.post("/teams/:teamId/join", requireSession, async (c) => {
   }
   const userId = c.get("session")!.user.id;
   if (await getTeamMember(db, team.id, userId)) return c.json({ ok: true });
-  await addTeamMember(db, { teamId: team.id, userId, role: "member" });
+  await addTeamMember(db, { teamId: team.id, userId, roles: "team_user" });
   return c.json({ ok: true });
 });
 
@@ -88,7 +88,7 @@ teamsRoutes.post("/teams/:teamId/leave", requireSession, requireTeamRole("member
   const teamId = c.req.param("teamId");
   const userId = c.get("session")!.user.id;
   const member = await getTeamMember(db, teamId, userId);
-  if (member?.role === "admin" && (await countTeamAdmins(db, teamId)) <= 1) {
+  if (member?.roles.split(" ").includes("team_admin") && (await countTeamAdmins(db, teamId)) <= 1) {
     return c.json({ error: "transfer admin first" }, 409);
   }
   await removeTeamMember(db, teamId, userId);

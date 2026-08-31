@@ -20,7 +20,7 @@ workspacesRoutes.get("/me/workspaces", requireSession, async (c) => {
       name: t.team.name,
       displayName: t.team.displayName,
       type: t.team.type,
-      role: t.role,
+      roles: t.roles,
       archivedAt: t.team.archivedAt,
       channels: chs.map((ch) => ({
         id: ch.id,

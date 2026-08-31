@@ -1,4 +1,11 @@
-import { sqliteTable, text, integer, primaryKey, uniqueIndex } from "drizzle-orm/sqlite-core";
+import {
+  sqliteTable,
+  text,
+  integer,
+  primaryKey,
+  uniqueIndex,
+  index,
+} from "drizzle-orm/sqlite-core";
 
 export * from "./schema-auth.ts";
 
@@ -11,6 +18,13 @@ export const teams = sqliteTable("teams", {
   archivedAt: integer("archived_at"),
   creatorId: text("creator_id").notNull(),
   createdAt: integer("created_at").notNull(),
+  description: text("description"),
+  email: text("email"),
+  companyName: text("company_name"),
+  allowedDomains: text("allowed_domains"),
+  schemeId: text("scheme_id"),
+  groupConstrained: integer("group_constrained", { mode: "boolean" }).default(false),
+  updatedAt: integer("updated_at"),
 });
 
 export const teamMembers = sqliteTable(
@@ -18,10 +32,18 @@ export const teamMembers = sqliteTable(
   {
     teamId: text("team_id").notNull(),
     userId: text("user_id").notNull(),
-    role: text("role").notNull().default("member"),
+    roles: text("roles").notNull().default("team_user"),
     joinedAt: integer("joined_at").notNull(),
+    deleteAt: integer("delete_at"),
+    schemeUser: integer("scheme_user", { mode: "boolean" }).default(false),
+    schemeAdmin: integer("scheme_admin", { mode: "boolean" }).default(false),
+    schemeGuest: integer("scheme_guest", { mode: "boolean" }).default(false),
   },
-  (t) => [primaryKey({ columns: [t.teamId, t.userId] })],
+  (t) => [
+    primaryKey({ columns: [t.teamId, t.userId] }),
+    index("idx_tm_user").on(t.userId),
+    index("idx_tm_team").on(t.teamId),
+  ],
 );
 
 export const channels = sqliteTable(
@@ -36,10 +58,22 @@ export const channels = sqliteTable(
     archivedAt: integer("archived_at"),
     creatorId: text("creator_id"),
     createdAt: integer("created_at").notNull(),
+    header: text("header"),
+    purpose: text("purpose"),
+    lastPostAt: integer("last_post_at"),
+    totalMsgCount: integer("total_msg_count").default(0),
+    totalMsgCountRoot: integer("total_msg_count_root").default(0),
+    lastRootPostAt: integer("last_root_post_at"),
+    extraUpdateAt: integer("extra_update_at"),
+    schemeId: text("scheme_id"),
+    shared: integer("shared", { mode: "boolean" }).default(false),
+    groupConstrained: integer("group_constrained", { mode: "boolean" }).default(false),
+    updatedAt: integer("updated_at"),
   },
   (t) => [
     uniqueIndex("uq_channel_team_name").on(t.teamId, t.name),
     uniqueIndex("uq_channel_dedup").on(t.dedupKey),
+    index("idx_channel_team").on(t.teamId),
   ],
 );
 
@@ -48,10 +82,24 @@ export const channelMembers = sqliteTable(
   {
     channelId: text("channel_id").notNull(),
     userId: text("user_id").notNull(),
-    role: text("role").notNull().default("member"),
+    roles: text("roles").notNull().default("channel_user"),
     joinedAt: integer("joined_at").notNull(),
+    lastViewedAt: integer("last_viewed_at"),
+    msgCount: integer("msg_count").default(0),
+    msgCountRoot: integer("msg_count_root").default(0),
+    mentionCount: integer("mention_count").default(0),
+    mentionCountRoot: integer("mention_count_root").default(0),
+    notifyProps: text("notify_props"),
+    lastUpdateAt: integer("last_update_at"),
+    schemeUser: integer("scheme_user", { mode: "boolean" }).default(false),
+    schemeAdmin: integer("scheme_admin", { mode: "boolean" }).default(false),
+    schemeGuest: integer("scheme_guest", { mode: "boolean" }).default(false),
   },
-  (t) => [primaryKey({ columns: [t.channelId, t.userId] })],
+  (t) => [
+    primaryKey({ columns: [t.channelId, t.userId] }),
+    index("idx_cm_user").on(t.userId),
+    index("idx_cm_channel").on(t.channelId),
+  ],
 );
 
 export const integrations = sqliteTable("integrations", {
@@ -70,18 +118,51 @@ export const systemSettings = sqliteTable("system_settings", {
   updatedAt: integer("updated_at").notNull(),
 });
 
-export const uploads = sqliteTable("uploads", {
-  id: text("id").primaryKey(),
-  channelId: text("channel_id").notNull(),
-  userId: text("user_id").notNull(),
-  key: text("key").notNull(),
-  filename: text("filename").notNull(),
-  size: integer("size").notNull(),
-  contentType: text("content_type").notNull(),
-  status: text("status").notNull().default("pending"),
-  createdAt: integer("created_at").notNull(),
-  completedAt: integer("completed_at"),
-});
+export const uploadsessions = sqliteTable(
+  "uploadsessions",
+  {
+    id: text("id").primaryKey(),
+    type: text("type"),
+    createdAt: integer("created_at"),
+    userId: text("user_id"),
+    channelId: text("channel_id"),
+    filename: text("filename"),
+    path: text("path"),
+    fileSize: integer("file_size"),
+    fileOffset: integer("file_offset").default(0),
+    reqFileId: text("req_file_id"),
+  },
+  (t) => [
+    index("idx_upl_user").on(t.userId),
+    index("idx_upl_channel").on(t.channelId),
+    index("idx_upl_create").on(t.createdAt),
+  ],
+);
+
+export const fileinfo = sqliteTable(
+  "fileinfo",
+  {
+    id: text("id").primaryKey(),
+    creatorId: text("creator_id"),
+    postId: text("post_id"),
+    createdAt: integer("created_at"),
+    updatedAt: integer("updated_at"),
+    deletedAt: integer("deleted_at"),
+    path: text("path"),
+    thumbnailPath: text("thumbnail_path"),
+    previewPath: text("preview_path"),
+    name: text("name"),
+    extension: text("extension"),
+    size: integer("size"),
+    mimeType: text("mime_type"),
+    width: integer("width"),
+    height: integer("height"),
+    hasPreviewImage: integer("has_preview_image", { mode: "boolean" }),
+    miniPreview: text("mini_preview"),
+    content: text("content"),
+  },
+  (t) => [index("idx_fi_post").on(t.postId), index("idx_fi_creator").on(t.creatorId)],
+);
 
 export const invites = sqliteTable("invites", {
   id: text("id").primaryKey(),
@@ -94,4 +175,46 @@ export const invites = sqliteTable("invites", {
   consumedAt: integer("consumed_at"),
   revokedAt: integer("revoked_at"),
   acceptedBy: text("accepted_by"),
+});
+
+export const preferences = sqliteTable(
+  "preferences",
+  {
+    userId: text("user_id").notNull(),
+    category: text("category").notNull(),
+    name: text("name").notNull(),
+    value: text("value").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.category, t.name] }),
+    index("idx_pref_category").on(t.category),
+    index("idx_pref_user").on(t.userId),
+  ],
+);
+
+export const roles = sqliteTable("roles", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  displayName: text("display_name").notNull(),
+  description: text("description"),
+  permissions: text("permissions").notNull(),
+  builtIn: integer("built_in", { mode: "boolean" }).default(false),
+  createdAt: integer("created_at"),
+  updatedAt: integer("updated_at"),
+  deletedAt: integer("deleted_at"),
+});
+
+export const schemes = sqliteTable("schemes", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  displayName: text("display_name").notNull(),
+  description: text("description"),
+  scope: text("scope").notNull(),
+  defaultTeamAdminRole: text("default_team_admin_role"),
+  defaultTeamUserRole: text("default_team_user_role"),
+  defaultChannelAdminRole: text("default_channel_admin_role"),
+  defaultChannelUserRole: text("default_channel_user_role"),
+  createdAt: integer("created_at"),
+  updatedAt: integer("updated_at"),
+  deletedAt: integer("deleted_at"),
 });

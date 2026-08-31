@@ -105,7 +105,7 @@ test("non-admin member cannot create invite", async () => {
   });
   const { user } = (await me.json()) as { user: { id: string } };
   await env.DB.prepare(
-    "INSERT INTO team_members (team_id, user_id, role, joined_at) VALUES (?, ?, 'member', ?)",
+    "INSERT INTO team_members (team_id, user_id, roles, joined_at) VALUES (?, ?, 'team_user', ?)",
   )
     .bind(teamId, user.id, Date.now())
     .run();
@@ -242,7 +242,7 @@ test("already member accept returns ok without consuming", async () => {
   });
   const { user } = (await me.json()) as { user: { id: string } };
   await env.DB.prepare(
-    "INSERT INTO team_members (team_id, user_id, role, joined_at) VALUES (?, ?, 'member', ?)",
+    "INSERT INTO team_members (team_id, user_id, roles, joined_at) VALUES (?, ?, 'team_user', ?)",
   )
     .bind(teamId, user.id, Date.now())
     .run();

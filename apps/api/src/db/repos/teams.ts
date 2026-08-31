@@ -1,4 +1,4 @@
-import { eq, and } from "drizzle-orm";
+import { eq, and, like } from "drizzle-orm";
 import { getDb } from "../client.ts";
 import { teams, teamMembers, channels, channelMembers } from "../schema-d1.ts";
 
@@ -19,7 +19,7 @@ export async function createTeam(
   await db.insert(teams).values({ ...row, createdAt: now });
   await db
     .insert(teamMembers)
-    .values({ teamId: row.id, userId: row.creatorId, role: "admin", joinedAt: now });
+    .values({ teamId: row.id, userId: row.creatorId, roles: "team_admin", joinedAt: now });
   return getTeam(db, row.id);
 }
 
@@ -29,7 +29,7 @@ export async function getTeam(db: Db, teamId: string) {
 
 export async function listTeamsForUser(db: Db, userId: string) {
   return db
-    .select({ team: teams, role: teamMembers.role })
+    .select({ team: teams, roles: teamMembers.roles })
     .from(teamMembers)
     .innerJoin(teams, eq(teams.id, teamMembers.teamId))
     .where(eq(teamMembers.userId, userId));
@@ -47,7 +47,10 @@ export async function getTeamMember(db: Db, teamId: string, userId: string) {
   );
 }
 
-export async function addTeamMember(db: Db, row: { teamId: string; userId: string; role: string }) {
+export async function addTeamMember(
+  db: Db,
+  row: { teamId: string; userId: string; roles: string },
+) {
   await db.insert(teamMembers).values({ ...row, joinedAt: Date.now() });
 }
 
@@ -61,7 +64,7 @@ export async function countTeamAdmins(db: Db, teamId: string) {
   const rows = await db
     .select()
     .from(teamMembers)
-    .where(and(eq(teamMembers.teamId, teamId), eq(teamMembers.role, "admin")));
+    .where(and(eq(teamMembers.teamId, teamId), like(teamMembers.roles, "%team_admin%")));
   return rows.length;
 }
 

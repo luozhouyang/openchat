@@ -38,7 +38,7 @@ test("workspaces returns team with empty channels", async () => {
       name: string;
       displayName: string;
       type: string;
-      role: string;
+      roles: string;
       archivedAt: number | null;
       channels: {
         id: string;
@@ -55,7 +55,7 @@ test("workspaces returns team with empty channels", async () => {
   expect(body.teams[0].name).toBe("guideteam");
   expect(body.teams[0].displayName).toBe("Guide Team");
   expect(body.teams[0].type).toBe("open");
-  expect(body.teams[0].role).toBe("admin");
+  expect(body.teams[0].roles).toBe("team_admin");
   expect(body.teams[0].channels).toHaveLength(0);
 });
 
