@@ -54,7 +54,11 @@ ON CONFLICT (channel_id, message_id) DO UPDATE SET
 `;
 
 export class SqliteMessageDB implements MessageDB {
-  constructor(private d: SqliteDriver) {}
+  private d: SqliteDriver;
+
+  constructor(d: SqliteDriver) {
+    this.d = d;
+  }
 
   async init(_channelId: string) {
     for (const m of MIGRATIONS) await this.d.exec(m);

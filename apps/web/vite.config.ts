@@ -20,6 +20,9 @@ export default defineConfig({
       "/ws": { target: "ws://localhost:8787", ws: true },
     },
   },
+  optimizeDeps: {
+    exclude: ["@sqlite.org/sqlite-wasm"],
+  },
   fmt: {
     ignorePatterns: ["src/routeTree.gen.ts"],
   },

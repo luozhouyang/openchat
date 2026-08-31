@@ -1,5 +1,6 @@
 import { RealtimeClient } from "realtime";
 import { platform } from "../lib/platform";
+import { persistEdit, persistMessage, persistRemove } from "../lib/message-db";
 import { useConnectionStore } from "../stores/connection";
 import { useMessageStore } from "../stores/messages";
 import { useSidebarStore } from "../stores/sidebar";
@@ -60,16 +61,20 @@ class WsClient {
           useMessageStore.getState().ingest(ev.channelId, message);
           if (message.parentId) useMessageStore.getState().ingestThread(ev.channelId, message);
           useSidebarStore.getState().bump(ev.channelId);
+          void persistMessage(ev.channelId, message);
         } else if (inner.type === "message.edit") {
           useMessageStore.getState().edit(ev.channelId, inner.messageId, inner.content);
+          void persistEdit(ev.channelId, inner.messageId, inner.content, inner.editedAt);
         } else if (inner.type === "message.delete") {
           useMessageStore.getState().remove(ev.channelId, inner.messageId);
+          void persistRemove(ev.channelId, inner.messageId);
         } else if (inner.type === "reaction.update") {
           const e = inner as { messageSeq: number; reactions: Record<string, string[]> };
           useMessageStore.getState().setReactions(ev.channelId, e.messageSeq, e.reactions);
         } else if (inner.type === "thread.reply") {
           const e = inner as { message: Message };
           useMessageStore.getState().ingestThread(ev.channelId, e.message);
+          void persistMessage(ev.channelId, e.message);
         } else if (inner.type === "typing.start") {
           useTypingStore.getState().mark(ev.channelId, inner.userId, inner.expiresAt);
         }
