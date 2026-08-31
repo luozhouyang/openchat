@@ -1,3 +1,5 @@
+import type { MessageType } from "./enums.ts";
+
 export type PresenceStatus = "online" | "away" | "offline";
 
 export interface Message {
@@ -5,7 +7,7 @@ export interface Message {
   seq: number;
   userId: string;
   parentId: string | null;
-  type: "text" | "file" | "system";
+  type: MessageType;
   content: string;
   attachments: unknown[] | null;
   mentions: string[] | null;

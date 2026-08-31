@@ -1,5 +1,5 @@
 import { expect, test } from "vite-plus/test";
-import { CreateTeamInput, OpenGmInput } from "../src/index.ts";
+import { CreateTeamInput, OpenGroupInput } from "../src/index.ts";
 
 test("create team input validates", () => {
   expect(CreateTeamInput.parse({ name: "acme", displayName: "Acme", type: "open" }).name).toBe(
@@ -10,7 +10,7 @@ test("create team input validates", () => {
   ).toThrow();
 });
 
-test("gm input bounds", () => {
-  expect(() => OpenGmInput.parse({ userIds: ["a", "b"] })).toThrow();
-  expect(OpenGmInput.parse({ userIds: ["a", "b", "c"] }).userIds).toHaveLength(3);
+test("group input bounds", () => {
+  expect(OpenGroupInput.parse({ userIds: ["a", "b"] }).userIds).toHaveLength(2);
+  expect(() => OpenGroupInput.parse({ userIds: ["a"] })).toThrow();
 });
