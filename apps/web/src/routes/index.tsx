@@ -1,5 +1,10 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
+import { api } from "../lib/api";
 
 export const Route = createFileRoute("/")({
-  component: () => <div className="p-8 text-lg">openchat</div>,
+  beforeLoad: async () => {
+    const workspaces = await api.workspaces().catch(() => null);
+    if (!workspaces || workspaces.teams.length === 0) throw redirect({ to: "/login" });
+    throw redirect({ to: "/$teamId", params: { teamId: workspaces.teams[0].id } });
+  },
 });

@@ -1,3 +1,5 @@
+import type { WorkspaceResponse } from "protocol";
+
 export class ApiError extends Error {
   status: number;
   body: unknown;
@@ -17,14 +19,7 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
 
 export const api = {
   me: () => apiFetch<{ user: { id: string; email: string } }>("/me"),
-  workspaces: () =>
-    apiFetch<{
-      teams: Array<{
-        id: string;
-        displayName: string;
-        channels: Array<{ id: string; displayName: string; type: string; member: boolean }>;
-      }>;
-    }>("/me/workspaces"),
+  workspaces: () => apiFetch<WorkspaceResponse>("/me/workspaces"),
   sidebar: () =>
     apiFetch<{
       channels: Array<{

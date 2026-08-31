@@ -10,12 +10,21 @@
 
 import { Route as rootRouteImport } from "./routes/__root";
 import { Route as IndexRouteImport } from "./routes/index";
+import { Route as TeamIdRouteImport } from "./routes/$teamId";
 import { Route as LoginRouteImport } from "./routes/login";
 import { Route as SignupRouteImport } from "./routes/signup";
+import { Route as TeamIdIndexRouteImport } from "./routes/$teamId/index";
+import { Route as TeamIdCChannelIdRouteImport } from "./routes/$teamId/c.$channelId";
+import { Route as TeamIdDmChannelIdRouteImport } from "./routes/$teamId/dm.$channelId";
 
 const IndexRoute = IndexRouteImport.update({
   id: "/",
   path: "/",
+  getParentRoute: () => rootRouteImport,
+} as any);
+const TeamIdRoute = TeamIdRouteImport.update({
+  id: "/$teamId",
+  path: "/$teamId",
   getParentRoute: () => rootRouteImport,
 } as any);
 const LoginRoute = LoginRouteImport.update({
@@ -28,33 +37,75 @@ const SignupRoute = SignupRouteImport.update({
   path: "/signup",
   getParentRoute: () => rootRouteImport,
 } as any);
+const TeamIdIndexRoute = TeamIdIndexRouteImport.update({
+  id: "/",
+  path: "/",
+  getParentRoute: () => TeamIdRoute,
+} as any);
+const TeamIdCChannelIdRoute = TeamIdCChannelIdRouteImport.update({
+  id: "/c/$channelId",
+  path: "/c/$channelId",
+  getParentRoute: () => TeamIdRoute,
+} as any);
+const TeamIdDmChannelIdRoute = TeamIdDmChannelIdRouteImport.update({
+  id: "/dm/$channelId",
+  path: "/dm/$channelId",
+  getParentRoute: () => TeamIdRoute,
+} as any);
 
 export interface FileRoutesByFullPath {
   "/": typeof IndexRoute;
+  "/$teamId": typeof TeamIdRouteWithChildren;
   "/login": typeof LoginRoute;
   "/signup": typeof SignupRoute;
+  "/$teamId/": typeof TeamIdIndexRoute;
+  "/$teamId/c/$channelId": typeof TeamIdCChannelIdRoute;
+  "/$teamId/dm/$channelId": typeof TeamIdDmChannelIdRoute;
 }
 export interface FileRoutesByTo {
   "/": typeof IndexRoute;
   "/login": typeof LoginRoute;
   "/signup": typeof SignupRoute;
+  "/$teamId": typeof TeamIdIndexRoute;
+  "/$teamId/c/$channelId": typeof TeamIdCChannelIdRoute;
+  "/$teamId/dm/$channelId": typeof TeamIdDmChannelIdRoute;
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport;
   "/": typeof IndexRoute;
+  "/$teamId": typeof TeamIdRouteWithChildren;
   "/login": typeof LoginRoute;
   "/signup": typeof SignupRoute;
+  "/$teamId/": typeof TeamIdIndexRoute;
+  "/$teamId/c/$channelId": typeof TeamIdCChannelIdRoute;
+  "/$teamId/dm/$channelId": typeof TeamIdDmChannelIdRoute;
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath;
-  fullPaths: "/" | "/login" | "/signup";
+  fullPaths:
+    | "/"
+    | "/$teamId"
+    | "/login"
+    | "/signup"
+    | "/$teamId/"
+    | "/$teamId/c/$channelId"
+    | "/$teamId/dm/$channelId";
   fileRoutesByTo: FileRoutesByTo;
-  to: "/" | "/login" | "/signup";
-  id: "__root__" | "/" | "/login" | "/signup";
+  to: "/" | "/login" | "/signup" | "/$teamId" | "/$teamId/c/$channelId" | "/$teamId/dm/$channelId";
+  id:
+    | "__root__"
+    | "/"
+    | "/$teamId"
+    | "/login"
+    | "/signup"
+    | "/$teamId/"
+    | "/$teamId/c/$channelId"
+    | "/$teamId/dm/$channelId";
   fileRoutesById: FileRoutesById;
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute;
+  TeamIdRoute: typeof TeamIdRouteWithChildren;
   LoginRoute: typeof LoginRoute;
   SignupRoute: typeof SignupRoute;
 }
@@ -66,6 +117,13 @@ declare module "@tanstack/react-router" {
       path: "/";
       fullPath: "/";
       preLoaderRoute: typeof IndexRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/$teamId": {
+      id: "/$teamId";
+      path: "/$teamId";
+      fullPath: "/$teamId";
+      preLoaderRoute: typeof TeamIdRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     "/login": {
@@ -82,11 +140,47 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof SignupRouteImport;
       parentRoute: typeof rootRouteImport;
     };
+    "/$teamId/": {
+      id: "/$teamId/";
+      path: "/";
+      fullPath: "/$teamId/";
+      preLoaderRoute: typeof TeamIdIndexRouteImport;
+      parentRoute: typeof TeamIdRoute;
+    };
+    "/$teamId/c/$channelId": {
+      id: "/$teamId/c/$channelId";
+      path: "/c/$channelId";
+      fullPath: "/$teamId/c/$channelId";
+      preLoaderRoute: typeof TeamIdCChannelIdRouteImport;
+      parentRoute: typeof TeamIdRoute;
+    };
+    "/$teamId/dm/$channelId": {
+      id: "/$teamId/dm/$channelId";
+      path: "/dm/$channelId";
+      fullPath: "/$teamId/dm/$channelId";
+      preLoaderRoute: typeof TeamIdDmChannelIdRouteImport;
+      parentRoute: typeof TeamIdRoute;
+    };
   }
 }
 
+interface TeamIdRouteChildren {
+  TeamIdIndexRoute: typeof TeamIdIndexRoute;
+  TeamIdCChannelIdRoute: typeof TeamIdCChannelIdRoute;
+  TeamIdDmChannelIdRoute: typeof TeamIdDmChannelIdRoute;
+}
+
+const TeamIdRouteChildren: TeamIdRouteChildren = {
+  TeamIdIndexRoute: TeamIdIndexRoute,
+  TeamIdCChannelIdRoute: TeamIdCChannelIdRoute,
+  TeamIdDmChannelIdRoute: TeamIdDmChannelIdRoute,
+};
+
+const TeamIdRouteWithChildren = TeamIdRoute._addFileChildren(TeamIdRouteChildren);
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  TeamIdRoute: TeamIdRouteWithChildren,
   LoginRoute: LoginRoute,
   SignupRoute: SignupRoute,
 };

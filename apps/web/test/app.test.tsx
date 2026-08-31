@@ -16,12 +16,12 @@ vi.mock("../src/lib/auth-client", () => ({
 const router = createRouter({ routeTree });
 
 describe("app", () => {
-  it("renders the root route when authenticated", async () => {
+  it("redirects an authenticated user without workspaces to login", async () => {
     render(
       <QueryClientProvider client={new QueryClient()}>
         <RouterProvider router={router} />
       </QueryClientProvider>,
     );
-    expect(await screen.findByText("openchat")).toBeInTheDocument();
+    expect(await screen.findByText("登录 openchat")).toBeInTheDocument();
   });
 });
