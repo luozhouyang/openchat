@@ -72,7 +72,7 @@ beforeAll(async () => {
   memberBId = await userIdOf(memberBCookie);
   channelId = await createChannel();
   stub = env.CHANNEL_DO.get(env.CHANNEL_DO.idFromName(channelDoName(channelId)));
-  await stub.membersAdd({ userId: ownerId, role: "admin" });
+  await stub.membersAdd({ userId: ownerId, role: "channel_admin" });
   const post = await stub.postMessage(ownerId, { content: "root post", clientToken: "td1-root" });
   if ("error" in post) throw new Error(post.error);
   rootId = post.messageId;
@@ -145,8 +145,8 @@ test("pinMessage by non-author non-admin is forbidden", async () => {
   expect(res).toEqual({ error: "forbidden", status: 403 });
 });
 
-test("pinMessage by admin succeeds and flips isPinned", async () => {
-  await stub.membersAdd({ userId: memberAId, role: "admin" });
+test("pinMessage by channel_admin succeeds and flips isPinned", async () => {
+  await stub.membersAdd({ userId: memberAId, role: "channel_admin" });
   const res = await stub.pinMessage(memberAId, { messageId: rootId, pinned: true });
   expect(res).toEqual({ ok: true });
   const pinned = (await stub.history({ limit: 50 })).messages.find((m) => m.id === rootId);
@@ -167,4 +167,33 @@ test("message author can pin own message without admin", async () => {
   if ("error" in own) throw new Error(own.error);
   const res = await stub.pinMessage(memberBId, { messageId: own.messageId, pinned: true });
   expect(res).toEqual({ ok: true });
+});
+
+test("channel_user cannot edit or delete another member's message", async () => {
+  await stub.membersAdd({ userId: memberBId, role: "channel_user" });
+  expect(await stub.editMessage(memberBId, { messageId: rootId, content: "hacked" })).toEqual({
+    error: "forbidden",
+    status: 403,
+  });
+  expect(await stub.deleteMessage(memberBId, { messageId: rootId })).toEqual({
+    error: "forbidden",
+    status: 403,
+  });
+});
+
+test("channel_admin can edit and delete another member's message", async () => {
+  const victim = await stub.postMessage(memberBId, {
+    content: "victim message",
+    clientToken: "td1-admin-edit",
+  });
+  if ("error" in victim) throw new Error(victim.error);
+  await stub.membersAdd({ userId: memberAId, role: "channel_admin" });
+  expect(
+    await stub.editMessage(memberAId, { messageId: victim.messageId, content: "edited by admin" }),
+  ).toEqual({ ok: true });
+  expect(await stub.deleteMessage(memberAId, { messageId: victim.messageId })).toEqual({
+    ok: true,
+  });
+  const hist = (await stub.history({ limit: 50 })).messages.find((m) => m.id === victim.messageId);
+  expect(hist?.deletedAt).not.toBeNull();
 });

@@ -9,7 +9,7 @@ let adminMsgId = "";
 beforeAll(async () => {
   await stub.membersAdd({ userId: "alice", role: "member" });
   await stub.membersAdd({ userId: "bob", role: "member" });
-  await stub.membersAdd({ userId: "carol", role: "admin" });
+  await stub.membersAdd({ userId: "carol", role: "channel_admin" });
   const post = await stub.postMessage("alice", { content: "original", clientToken: "ed-msg" });
   if ("error" in post) throw new Error(post.error);
   msgId = post.messageId;

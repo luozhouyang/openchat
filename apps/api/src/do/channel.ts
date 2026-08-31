@@ -321,6 +321,10 @@ export class ChannelDO extends DurableObject<Env> {
     }
   }
 
+  private isChannelAdmin(role: string | null | undefined): boolean {
+    return role?.split(" ").includes("channel_admin") ?? false;
+  }
+
   async editMessage(
     callerUserId: string,
     body: { messageId: string; content: string },
@@ -338,7 +342,7 @@ export class ChannelDO extends DurableObject<Env> {
       .from(schema.memberState)
       .where(eq(schema.memberState.userId, callerUserId))
       .limit(1);
-    const isAdmin = caller[0]?.role === "admin";
+    const isAdmin = this.isChannelAdmin(caller[0]?.role);
     if (msg.userId !== callerUserId && !isAdmin) return { error: "forbidden", status: 403 };
     if (!body.content || body.content.length > 16384) return { error: "invalid", status: 422 };
     const editedAt = Date.now();
@@ -439,7 +443,7 @@ export class ChannelDO extends DurableObject<Env> {
       .from(schema.memberState)
       .where(eq(schema.memberState.userId, callerUserId))
       .limit(1);
-    const isAdmin = caller[0]?.role === "admin";
+    const isAdmin = this.isChannelAdmin(caller[0]?.role);
     if (msg.userId !== callerUserId && !isAdmin) return { error: "forbidden", status: 403 };
     await this.db
       .update(schema.messages)
@@ -465,7 +469,7 @@ export class ChannelDO extends DurableObject<Env> {
       .from(schema.memberState)
       .where(eq(schema.memberState.userId, callerUserId))
       .limit(1);
-    const isAdmin = caller[0]?.role === "admin";
+    const isAdmin = this.isChannelAdmin(caller[0]?.role);
     if (msg.userId !== callerUserId && !isAdmin) return { error: "forbidden", status: 403 };
     await this.db
       .update(schema.messages)
