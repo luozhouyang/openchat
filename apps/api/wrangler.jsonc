@@ -64,6 +64,7 @@
   ],
   "vars": {
     "BETTER_AUTH_URL": "http://localhost:8787",
+    "BETTER_AUTH_TRUSTED_ORIGINS": "http://localhost:5173,http://localhost:4173",
     "R2_BUCKET_NAME": "openchat-files",
     "VAPID_PUBLIC_KEY": "local-vapid-public-key",
     "INVITE_FROM_EMAIL": "noreply@openchat.local",

@@ -9,6 +9,7 @@ import type {
   CreateTeamInput,
   CreateTeamOutput,
   CreateUploadOutput,
+  CreatePostInput,
   DeletePostInput,
   JoinTeamInput,
   ListMembersQuery,
@@ -21,6 +22,7 @@ import type {
   OpenGroupInput,
   PatchPostInput,
   PatchTeamInput,
+  PostOutput,
   PushSubscribeInput,
   PutStatusInput,
   StatusIdsInput,
@@ -108,6 +110,8 @@ export const api = {
   },
 
   posts: {
+    create: (channelId: string, input: CreatePostInput) =>
+      apiFetch<PostOutput>(`/api/v1/channels/${channelId}/posts`, json("POST", input)),
     list: (channelId: string, query?: ListPostsQuery) =>
       apiFetch<ListPostsOutput>(
         `/api/v1/channels/${channelId}/posts?limit=${query?.limit ?? 30}${query?.beforeSeq !== undefined ? `&beforeSeq=${query.beforeSeq}` : ""}${query?.parentId ? `&parentId=${query.parentId}` : ""}${query?.order ? `&order=${query.order}` : ""}`,

@@ -14,7 +14,7 @@ class WsClient {
   constructor() {
     this.realtime = new RealtimeClient({
       getToken: () => platform.getAuthToken(),
-      buildUrl: (deviceId) => `${platform.serverUrl}?deviceId=${deviceId}`,
+      buildUrl: (deviceId, token) => `${platform.serverUrl}?deviceId=${deviceId}&token=${token}`,
       onAuthMissing: () => {
         window.location.href = "/login";
       },

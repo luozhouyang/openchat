@@ -5,8 +5,13 @@ import { users } from "../db/schema-d1.ts";
 import { verifyAuthJwt } from "../jwks.ts";
 
 export async function handleWsUpgrade(request: Request, env: Env): Promise<Response> {
+  // Browsers cannot set custom headers on WebSocket, so the bearer token is
+  // accepted from the query string as well (see platform §4.2 in the spec).
   const authHeader = request.headers.get("authorization") ?? "";
-  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  const url = new URL(request.url);
+  const token =
+    (authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null) ??
+    url.searchParams.get("token");
   if (!token) return new Response("missing token", { status: 401 });
 
   const claims = await verifyAuthJwt(token, env);
@@ -21,7 +26,6 @@ export async function handleWsUpgrade(request: Request, env: Env): Promise<Respo
   const row = rows[0];
   if (row?.banned) return new Response("banned", { status: 403 });
 
-  const url = new URL(request.url);
   const internal = await issueInternalToken({
     subject: `user:${claims.sub}`,
     secret: env.INTERNAL_TOKEN_KEY,

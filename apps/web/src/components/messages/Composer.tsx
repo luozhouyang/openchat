@@ -1,15 +1,15 @@
 import { useRef, useState } from "react";
+import { api } from "../../lib/api";
 import { wsClient } from "../../ws/client";
 import { useMessageStore } from "../../stores/messages";
 import { Button } from "../ui/button";
 import { UploadButton } from "../upload/UploadButton";
-import type { ClientFrame } from "protocol";
 
 export function Composer({ channelId }: { channelId: string }) {
   const [text, setText] = useState("");
   const lastTypingSent = useRef(0);
 
-  function send() {
+  async function send() {
     const content = text.trim();
     if (!content) return;
     const clientToken = crypto.randomUUID();
@@ -27,13 +27,14 @@ export function Composer({ channelId }: { channelId: string }) {
       deletedAt: null,
       createdAt: Date.now(),
     });
-    wsClient.send({
-      type: "post_message",
-      channelId,
-      content,
-      clientToken,
-    } as unknown as ClientFrame);
     setText("");
+    try {
+      const posted = await api.posts.create(channelId, { message: content, clientToken });
+      useMessageStore.getState().ack(channelId, clientToken, { id: posted.id, seq: posted.seq });
+    } catch {
+      useMessageStore.getState().fail(channelId, clientToken);
+      setText(content);
+    }
   }
 
   return (
@@ -54,11 +55,11 @@ export function Composer({ channelId }: { channelId: string }) {
         onKeyDown={(e) => {
           if (e.key === "Enter" && !e.shiftKey) {
             e.preventDefault();
-            send();
+            void send();
           }
         }}
       />
-      <Button onClick={send}>发送</Button>
+      <Button onClick={() => void send()}>发送</Button>
     </div>
   );
 }

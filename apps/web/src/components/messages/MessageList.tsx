@@ -1,11 +1,13 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useCallback, useEffect, useRef } from "react";
+import { useShallow } from "zustand/react/shallow";
 import { useMessageStore } from "../../stores/messages";
 import { api } from "../../lib/api";
 import { MessageRow } from "./MessageRow";
 
 export function MessageList({ channelId }: { channelId: string }) {
-  const list = useMessageStore((s) => s.list(channelId));
+  // list() derives a fresh array; shallow-compare so unchanged state stays snapshot-stable.
+  const list = useMessageStore(useShallow((s) => s.list(channelId)));
   const parentRef = useRef<HTMLDivElement>(null);
   const loadingOlder = useRef(false);
   const autoScroll = useRef(true);
