@@ -49,6 +49,20 @@ test("dm is idempotent", async () => {
   expect(secondBody.existing).toBe(true);
 });
 
+test("dm rejects a pair that does not include the caller", async () => {
+  const c = await signup("dm-e@test.dev");
+  const d = await signup("dm-f@test.dev");
+  const cId = await userIdOf(c);
+  const dId = await userIdOf(d);
+
+  const res = await exports.default.fetch("http://localhost/api/v1/channels/direct", {
+    method: "POST",
+    headers: { cookie: a, "content-type": "application/json" },
+    body: JSON.stringify({ userIds: [cId, dId] }),
+  });
+  expect(res.status).toBe(422);
+});
+
 test("gm is idempotent and order-insensitive", async () => {
   const c = await signup("dm-c@test.dev");
   const d = await signup("dm-d@test.dev");

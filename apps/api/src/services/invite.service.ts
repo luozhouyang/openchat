@@ -3,7 +3,7 @@ import { id } from "protocol";
 import type { Db } from "../db/types.ts";
 import { users } from "../db/schema-d1.ts";
 import * as repo from "../db/repos/invites.ts";
-import { getTeam, getTeamMember, addTeamMember } from "../db/repos/teams.ts";
+import { getTeam, getTeamMember } from "../db/repos/teams.ts";
 import { sendInviteEmail } from "../email.ts";
 import { generateInviteToken, hashToken, maskEmail, normalizeEmail } from "../invites.ts";
 import { apiError } from "../lib/errors.ts";
@@ -91,8 +91,11 @@ export async function acceptInvite(db: Db, { token, userId }: { token: string; u
   if (!team || team.archivedAt) throw apiError("invitation invalid", "invitation invalid", 400);
   if (await getTeamMember(db, invite.teamId, userId)) return { ok: true, teamId: invite.teamId };
 
-  const consumed = await repo.consumeInvite(db, tokenHash, userId);
+  const consumed = await repo.consumeInviteAndAddMember(db, {
+    tokenHash,
+    userId,
+    teamId: invite.teamId,
+  });
   if (!consumed) throw apiError("invitation invalid", "invitation invalid", 400);
-  await addTeamMember(db, { teamId: invite.teamId, userId, roles: "team_user" });
   return { ok: true, teamId: invite.teamId };
 }

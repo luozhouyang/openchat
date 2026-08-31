@@ -141,7 +141,7 @@ channelsV1.post(
   async (c) => {
     const me = c.get("session")!.user.id;
     const body = c.req.valid("json");
-    if (body.userIds.every((u) => u === me)) throw apiError("invalid", "invalid", 422);
+    if (!body.userIds.includes(me)) throw apiError("invalid", "invalid", 422);
     const withUserId = body.userIds.find((u) => u !== me);
     if (!withUserId) throw apiError("invalid", "invalid", 422);
     const db = getDb(c.env.DB);

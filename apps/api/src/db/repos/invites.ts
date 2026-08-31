@@ -1,6 +1,6 @@
 import { eq, and, gt, isNull } from "drizzle-orm";
 import type { Invite, InviteInsert, Db } from "../types.ts";
-import { invites } from "../schema-d1.ts";
+import { invites, teamMembers } from "../schema-d1.ts";
 
 export async function createInvite(db: Db, row: InviteInsert) {
   await db.insert(invites).values(row);
@@ -33,21 +33,30 @@ export async function hasPendingInvite(db: Db, teamId: string, email: string): P
   return rows.length > 0;
 }
 
-export async function consumeInvite(db: Db, tokenHash: string, userId: string): Promise<boolean> {
-  const existing = await getInviteByTokenHash(db, tokenHash);
-  if (
-    !existing ||
-    existing.consumedAt !== null ||
-    existing.revokedAt !== null ||
-    existing.expiresAt < Date.now()
-  ) {
-    return false;
-  }
-  await db
-    .update(invites)
-    .set({ consumedAt: Date.now(), acceptedBy: userId })
-    .where(eq(invites.tokenHash, tokenHash));
-  return true;
+export async function consumeInviteAndAddMember(
+  db: Db,
+  input: { tokenHash: string; userId: string; teamId: string },
+): Promise<boolean> {
+  const [consumed] = await db.batch([
+    db
+      .update(invites)
+      .set({ consumedAt: Date.now(), acceptedBy: input.userId })
+      .where(
+        and(
+          eq(invites.tokenHash, input.tokenHash),
+          isNull(invites.consumedAt),
+          isNull(invites.revokedAt),
+          gt(invites.expiresAt, Date.now()),
+        ),
+      ),
+    db.insert(teamMembers).values({
+      teamId: input.teamId,
+      userId: input.userId,
+      roles: "team_user",
+      joinedAt: Date.now(),
+    }),
+  ]);
+  return consumed.meta.changes > 0;
 }
 
 export async function revokeInvite(db: Db, id: string) {
