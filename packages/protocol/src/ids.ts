@@ -1,7 +1,20 @@
-import { ulid } from "ulid";
+import { v7 as uuidv7 } from "uuid";
 
-export function newId(): string {
-  return ulid();
+export type IdKind =
+  | "usr"
+  | "team"
+  | "chn"
+  | "msg"
+  | "fil"
+  | "upl"
+  | "inv"
+  | "emo"
+  | "rol"
+  | "sch"
+  | "int";
+
+export function id(kind: IdKind): string {
+  return `${kind}_${uuidv7()}`;
 }
 
 export function userDoName(userId: string): string {
