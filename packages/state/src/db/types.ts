@@ -16,6 +16,8 @@ export interface MessageDB {
   applyGap(channelId: string, messages: Message[]): Promise<void>;
   query(channelId: string, opts: ChannelQuery): Promise<MessagePage>;
   maxSeq(channelId: string): Promise<number>;
+  /** Every channel that has at least one locally stored message (sync source). */
+  listChannels(): Promise<string[]>;
   edit(channelId: string, messageId: string, content: string, editedAt: number): Promise<void>;
   remove(channelId: string, messageId: string): Promise<void>;
   close(): Promise<void>;

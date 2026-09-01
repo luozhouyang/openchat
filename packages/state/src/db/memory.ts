@@ -58,6 +58,10 @@ export class MemoryMessageDB implements MessageDB {
     return max;
   }
 
+  async listChannels(): Promise<string[]> {
+    return [...this.channels.keys()];
+  }
+
   async edit(channelId: string, messageId: string, content: string, editedAt: number) {
     const ch = this.channels.get(channelId);
     const m = ch?.byId.get(messageId);

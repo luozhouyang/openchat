@@ -46,6 +46,9 @@ export async function runMessageDBContract(db: MessageDB) {
   await db.append("c2", mk(1, "x1"));
   expect((await db.query("c2", { limit: 10 })).rows[0].id).toBe("x1");
 
+  // listChannels enumerates every channel that has rows
+  expect(new Set(await db.listChannels())).toEqual(new Set(["c1", "c2"]));
+
   // JSON column round-trip (attachments/mentions)
   await db.append("c1", {
     ...mk(5),

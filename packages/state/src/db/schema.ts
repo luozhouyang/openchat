@@ -17,4 +17,8 @@ CREATE TABLE IF NOT EXISTS messages (
 CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_id ON messages (channel_id, message_id);
 `;
 
-export const MIGRATIONS: string[] = [SCHEMA];
+export const MIGRATIONS: string[] = [
+  SCHEMA,
+  // v2 (p10 spec §3.3): thread lookups by (channel_id, parent_id).
+  `CREATE INDEX IF NOT EXISTS idx_messages_thread ON messages (channel_id, parent_id);`,
+];

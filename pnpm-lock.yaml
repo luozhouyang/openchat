@@ -606,6 +606,12 @@ importers:
       protocol:
         specifier: workspace:*
         version: link:../protocol
+      realtime:
+        specifier: workspace:*
+        version: link:../realtime
+      zustand:
+        specifier: 'catalog:'
+        version: 5.0.15(@types/react@19.2.18)(react@19.2.8)(use-sync-external-store@1.6.0(react@19.2.8))
     devDependencies:
       '@types/node':
         specifier: 'catalog:'

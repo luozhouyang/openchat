@@ -69,7 +69,17 @@ export class SqliteMessageDB implements MessageDB {
   }
 
   async applyGap(channelId: string, messages: Message[]) {
-    for (const m of messages) await this.d.run(UPSERT, this.params(channelId, m));
+    if (messages.length === 0) return;
+    // One transaction per gap: without it a 500-message refill costs one
+    // implicit transaction (and driver round-trip) per row.
+    await this.d.exec("BEGIN");
+    try {
+      for (const m of messages) await this.d.run(UPSERT, this.params(channelId, m));
+      await this.d.exec("COMMIT");
+    } catch (err) {
+      await this.d.exec("ROLLBACK").catch(() => {});
+      throw err;
+    }
   }
 
   async query(channelId: string, opts: ChannelQuery): Promise<MessagePage> {
@@ -93,6 +103,13 @@ export class SqliteMessageDB implements MessageDB {
       [channelId],
     );
     return row?.v ?? 0;
+  }
+
+  async listChannels(): Promise<string[]> {
+    const rows = await this.d.all<{ channel_id: string }>(
+      "SELECT DISTINCT channel_id FROM messages",
+    );
+    return rows.map((r) => r.channel_id);
   }
 
   async edit(channelId: string, messageId: string, content: string, editedAt: number) {
