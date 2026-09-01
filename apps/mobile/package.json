@@ -35,7 +35,8 @@
     "babel-preset-expo": "^57.0.9",
     "jest": "^30.5.0",
     "jest-expo": "^57.0.5",
-    "typescript": "~6.0.3"
+    "typescript": "~6.0.3",
+    "zod": "catalog:"
   },
   "jest": {
     "moduleNameMapper": {
@@ -43,11 +44,16 @@
       "^realtime$": "<rootDir>/../../packages/realtime/src/index.ts",
       "^state$": "<rootDir>/../../packages/state/src/index.ts",
       "^platform$": "<rootDir>/../../packages/platform/src/index.ts",
-      "^@babel/runtime/(.*)$": "<rootDir>/node_modules/@babel/runtime/$1"
+      "^@babel/runtime/(.*)$": "<rootDir>/node_modules/@babel/runtime/$1",
+      "^zod$": "<rootDir>/node_modules/zod",
+      "^uuid$": "<rootDir>/node_modules/uuid"
     },
     "preset": "jest-expo",
+    "transform": {
+      "\\.mjs$": "babel-jest"
+    },
     "transformIgnorePatterns": [
-      "node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@sentry/react-native|native-base|react-native-svg|state|protocol|realtime|uuid|\\.pnpm/(uuid|zod))"
+      "node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@sentry/react-native|native-base|react-native-svg|state|protocol|realtime|uuid|zod|better-auth|@better-auth/.*|@better-fetch|nanostores|\\.pnpm/)"
     ]
   }
 }

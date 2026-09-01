@@ -52,9 +52,15 @@ test("auth service (bearer mode): sign-in stores the token, WS JWT cached per se
   await svc.signIn("a@b.c", "pw");
   expect(setSessionToken).toHaveBeenCalledWith("session-1");
   const signIn = fetchMock.mock.calls[0];
-  expect(signIn?.[0]).toContain("/api/auth/sign-in/email");
-  const headers = signIn?.[1]?.headers as Record<string, string>;
-  expect(headers.authorization).toBeUndefined(); // no session yet at sign-in
+  expect(String(signIn?.[0])).toContain("/api/auth/sign-in/email");
+  const signInHeaders = signIn?.[1]?.headers;
+  const signInAuth =
+    signInHeaders instanceof Headers
+      ? signInHeaders.get("authorization")
+      : (signInHeaders as Record<string, string> | undefined)?.authorization;
+  // The mode fetch injects any stored session on every call — harmless on
+  // credential endpoints (server logs in with the submitted credentials).
+  expect(signInAuth).toBe("Bearer session-1");
 
   fetchMock.mockResolvedValueOnce(
     new Response(JSON.stringify({ token: "jwt-1" }), { status: 200 }),
@@ -62,8 +68,12 @@ test("auth service (bearer mode): sign-in stores the token, WS JWT cached per se
   await expect(svc.getWsJwt()).resolves.toBe("jwt-1");
   const jwtCall = fetchMock.mock.calls[1];
   expect(String(jwtCall?.[0])).toContain("/api/auth/token");
-  const jwtHeaders = jwtCall?.[1]?.headers as Record<string, string>;
-  expect(jwtHeaders.authorization).toBe("Bearer session-1");
+  const jwtHeaders = jwtCall?.[1]?.headers;
+  const jwtAuth =
+    jwtHeaders instanceof Headers
+      ? jwtHeaders.get("authorization")
+      : (jwtHeaders as Record<string, string> | undefined)?.authorization;
+  expect(jwtAuth).toBe("Bearer session-1");
   expect(jwtCall?.[1]?.credentials).toBe("omit");
 
   // Cached within the TTL — no extra fetch.

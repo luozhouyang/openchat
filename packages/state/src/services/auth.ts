@@ -1,11 +1,12 @@
+import { createAuthClient } from "better-auth/client";
+import { jwtClient } from "better-auth/client/plugins";
+
 /**
- * Shared authentication flows for every client (P12-C). One implementation
- * of the WS-JWT exchange with its session-keyed cache — previously written
- * twice (mobile lib/auth and web desktop-mode).
- *
- * Modes (derived from apiBaseUrl):
- *  - ""          cookie mode (browser): requests are same-origin with
- *                credentials; sign-in relies on the better-auth cookie.
+ * Shared authentication flows for every client (P12-C), implemented on the
+ * official better-auth client (vanilla, framework-free). Endpoint
+ * construction, error normalization and the WS-JWT endpoint all come from
+ * the library; only the dual mode is ours:
+ *  - ""          cookie mode (browser): same-origin, credentials included.
  *  - "<origin>"  bearer mode (mobile, Electron file://): Authorization from
  *                getSessionToken(), credentials omitted so anonymous CORS
  *                responses are accepted.
@@ -22,13 +23,8 @@ export interface AuthService {
   signUp(email: string, password: string): Promise<void>;
   signOut(): Promise<void>;
   hasSession(): Promise<boolean>;
-  /** Short-lived better-auth JWT for the WebSocket upgrade (GET /api/auth/token). */
+  /** Short-lived better-auth JWT for the WebSocket upgrade. */
   getWsJwt(): Promise<string | null>;
-}
-
-interface AuthResponseBody {
-  token?: string;
-  error?: { message?: string } | null;
 }
 
 const WS_JWT_TTL_MS = 10 * 60_000; // JWT lives 15min; rotate a bit early
@@ -37,61 +33,50 @@ export function createAuthService(deps: AuthServiceDeps): AuthService {
   const cookieMode = deps.apiBaseUrl === "";
   let wsJwt: { session: string; token: string; fetchedAt: number } | null = null;
 
-  async function authFetch(path: string, init?: RequestInit): Promise<Response> {
-    const headers = new Headers(init?.headers);
-    if (!cookieMode) {
-      const session = await deps.getSessionToken();
-      if (session) headers.set("authorization", `Bearer ${session}`);
-    }
-    return fetch(`${deps.apiBaseUrl}${path}`, {
-      ...init,
-      headers,
-      credentials: cookieMode ? "include" : "omit",
-    });
-  }
+  const authClient = createAuthClient({
+    baseURL: deps.apiBaseUrl || undefined,
+    plugins: [jwtClient()],
+    fetchOptions: {
+      customFetchImpl: async (url, init) => {
+        const headers = new Headers(init?.headers);
+        if (!cookieMode) {
+          const session = await deps.getSessionToken();
+          if (session) headers.set("authorization", `Bearer ${session}`);
+        }
+        return fetch(url, { ...init, headers, credentials: cookieMode ? "include" : "omit" });
+      },
+    },
+  });
 
-  async function postCredentials(
-    path: string,
-    body: Record<string, string>,
-  ): Promise<AuthResponseBody> {
-    const res = await authFetch(path, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    const parsed = (await res.json().catch(() => ({}))) as AuthResponseBody;
-    if (!res.ok) {
-      throw new Error(parsed.error?.message ?? `auth request failed (${res.status})`);
-    }
-    return parsed;
+  async function persistBearerToken(data: unknown): Promise<void> {
+    // The server-side bearer plugin puts the session token in the response
+    // body; the client type does not know about it.
+    const token = (data as { token?: string } | null | undefined)?.token;
+    if (!token) throw new Error("auth response did not carry a bearer token");
+    await deps.setSessionToken?.(token);
+    wsJwt = null;
   }
 
   return {
     async signIn(email, password) {
-      const body = await postCredentials("/api/auth/sign-in/email", { email, password });
-      if (!cookieMode) {
-        if (!body.token) throw new Error("sign-in did not return a token");
-        await deps.setSessionToken?.(body.token);
-        wsJwt = null;
-      }
+      const res = await authClient.signIn.email({ email, password });
+      if (res.error) throw new Error(res.error.message ?? "sign-in failed");
+      if (!cookieMode) await persistBearerToken(res.data);
     },
 
     async signUp(email, password) {
-      const body = await postCredentials("/api/auth/sign-up/email", {
+      const res = await authClient.signUp.email({
         email,
         password,
         name: email.split("@")[0],
       });
-      if (!cookieMode) {
-        if (!body.token) throw new Error("sign-up did not return a token");
-        await deps.setSessionToken?.(body.token);
-        wsJwt = null;
-      }
+      if (res.error) throw new Error(res.error.message ?? "sign-up failed");
+      if (!cookieMode) await persistBearerToken(res.data);
     },
 
     async signOut() {
       try {
-        await authFetch("/api/auth/sign-out", { method: "POST" });
+        await authClient.signOut();
       } catch {
         // best effort — local state is cleared regardless
       }
@@ -101,8 +86,8 @@ export function createAuthService(deps: AuthServiceDeps): AuthService {
 
     async hasSession() {
       try {
-        const res = await authFetch("/api/v1/users/me");
-        return res.ok;
+        const { data } = await authClient.getSession();
+        return !!data;
       } catch {
         return false;
       }
@@ -110,15 +95,8 @@ export function createAuthService(deps: AuthServiceDeps): AuthService {
 
     async getWsJwt() {
       if (cookieMode) {
-        try {
-          const res = await fetch(`${deps.apiBaseUrl}/api/auth/token`, {
-            credentials: "include",
-          });
-          if (!res.ok) return null;
-          return ((await res.json()) as { token?: string }).token ?? null;
-        } catch {
-          return null;
-        }
+        const { data } = await authClient.token();
+        return data?.token ?? null;
       }
       const session = await deps.getSessionToken();
       if (!session) return null;
@@ -126,15 +104,10 @@ export function createAuthService(deps: AuthServiceDeps): AuthService {
         return wsJwt.token;
       }
       try {
-        const res = await fetch(`${deps.apiBaseUrl}/api/auth/token`, {
-          headers: { authorization: `Bearer ${session}` },
-          credentials: "omit",
-        });
-        if (!res.ok) return null;
-        const body = (await res.json()) as { token?: string };
-        if (!body.token) return null;
-        wsJwt = { session, token: body.token, fetchedAt: Date.now() };
-        return body.token;
+        const { data } = await authClient.token();
+        if (!data?.token) return null;
+        wsJwt = { session, token: data.token, fetchedAt: Date.now() };
+        return data.token;
       } catch {
         return null;
       }

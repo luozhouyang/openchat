@@ -13,6 +13,7 @@
     "check": "vp check"
   },
   "dependencies": {
+    "better-auth": "catalog:",
     "protocol": "workspace:*",
     "realtime": "workspace:*",
     "zustand": "catalog:"
