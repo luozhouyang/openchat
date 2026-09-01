@@ -1,0 +1,22 @@
+# Standalone pnpm workspace: the mobile app plus the monorepo's shared source
+# packages (protocol/realtime/state/platform), which it consumes via
+# `workspace:*`. Lives outside the repo-root workspace because React Native
+# needs a hoisted node_modules layout while the root toolchain needs pnpm's
+# isolated layout.
+packages:
+  - .
+  - ../../packages/protocol
+  - ../../packages/realtime
+  - ../../packages/state
+  - ../../packages/platform
+nodeLinker: hoisted
+catalog:
+  "@types/node": ^26.4.0
+  typescript: ^7.0.2
+  vite: npm:@voidzero-dev/vite-plus-core@0.2.9
+  vite-plus: 0.2.9
+  uuid: ^14.0.2
+  zod: ^4.5.4
+allowBuilds:
+  "@parcel/watcher": true
+  unrs-resolver: true

@@ -2,6 +2,9 @@ packages:
   - apps/*
   - packages/*
   - tools/*
+  # apps/mobile is a standalone Expo app (React Native requires a flat
+  # node_modules layout; see apps/mobile/README.md) and manages its own deps.
+  - "!apps/mobile"
 
 catalogMode: prefer
 

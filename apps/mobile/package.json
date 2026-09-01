@@ -1,0 +1,53 @@
+{
+  "name": "openchat-mobile",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.ts",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "test": "jest",
+    "e2e": "maestro test e2e/",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "expo": "~57.0.18",
+    "expo-asset": "^57.0.15",
+    "expo-notifications": "~57.0.15",
+    "expo-secure-store": "~57.0.2",
+    "expo-sqlite": "~57.0.2",
+    "expo-status-bar": "~57.0.1",
+    "platform": "workspace:*",
+    "protocol": "workspace:*",
+    "react": "19.2.3",
+    "react-native": "0.86.3",
+    "realtime": "workspace:*",
+    "state": "workspace:*",
+    "zustand": "^5.0.15"
+  },
+  "devDependencies": {
+    "@react-native/jest-preset": "^0.86.3",
+    "@testing-library/react-native": "^14.0.1",
+    "@types/jest": "^30.0.0",
+    "@types/react": "~19.2.2",
+    "babel-preset-expo": "^57.0.9",
+    "jest": "^30.5.0",
+    "jest-expo": "^57.0.5",
+    "typescript": "~6.0.3"
+  },
+  "jest": {
+    "moduleNameMapper": {
+      "^protocol$": "<rootDir>/../../packages/protocol/src/index.ts",
+      "^realtime$": "<rootDir>/../../packages/realtime/src/index.ts",
+      "^state$": "<rootDir>/../../packages/state/src/index.ts",
+      "^platform$": "<rootDir>/../../packages/platform/src/index.ts",
+      "^@babel/runtime/(.*)$": "<rootDir>/node_modules/@babel/runtime/$1"
+    },
+    "preset": "jest-expo",
+    "transformIgnorePatterns": [
+      "node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@sentry/react-native|native-base|react-native-svg|state|protocol|realtime)"
+    ]
+  }
+}

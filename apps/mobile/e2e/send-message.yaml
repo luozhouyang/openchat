@@ -1,0 +1,13 @@
+# Maestro E2E: login → open first channel → send a message → it renders.
+appId: dev.openchat.mobile
+env:
+  EMAIL: u-e2e@openchat.dev
+  PASSWORD: Password123!
+---
+- runFlow: login.yaml
+- tapOn:
+    contains: "#"
+- tapOn: "输入消息…"
+- inputText: "hello from maestro"
+- tapOn: "发送"
+- assertVisible: "hello from maestro"
