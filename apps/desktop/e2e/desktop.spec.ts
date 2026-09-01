@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+import { pathToFileURL } from "node:url";
 import { expect, test } from "@playwright/test";
 import { _electron as electron, type ElectronApplication, type Page } from "@playwright/test";
 import { createChannel, createTeam, signupUser } from "../../web/e2e/fixtures";
@@ -53,7 +55,7 @@ test.describe("openchat desktop shell", () => {
         | undefined;
       return b ? Object.keys(b).sort() : null;
     });
-    expect(bridge).toEqual(["clearToken", "getToken", "notify", "onNavigate", "setToken"]);
+    expect(bridge).toEqual(["clearToken", "getToken", "notify", "serverUrl", "setToken"]);
   });
 
   test("safeStorage-backed token store round-trips through IPC", async () => {
@@ -88,6 +90,10 @@ test.describe("openchat desktop shell", () => {
   });
 
   test("deep link event reaches the renderer navigation hook", async () => {
+    // The main process dispatches this exact event shape via
+    // webContents.executeJavaScript (queued until did-finish-load); here we
+    // verify the renderer-side listener wiring the web app installs in
+    // main.tsx (listenForOpenchatLinks).
     const handled = await page.evaluate(
       () =>
         new Promise<boolean>((resolve) => {
@@ -135,5 +141,58 @@ test.describe("openchat desktop shell", () => {
         )
         .toBe(true);
     }
+  });
+});
+
+test.describe("openchat desktop file:// renderer mode (packaged web-dist)", () => {
+  let app: ElectronApplication;
+  let page: Page;
+  // Requires the desktop web build (pnpm run build:web in apps/desktop)
+  // and a running API on :8787 (the shared webServer above provides it).
+  const dist = `${__dirname.replace(/\/e2e$/, "")}/web-dist/index.html`;
+
+  test.beforeAll(async () => {
+    test.skip(!existsSync(dist), "web-dist missing — run `pnpm run build:web` first");
+    app = await electron.launch({
+      args: [".vite/build/main.js"],
+      cwd: __dirname.replace(/\/e2e$/, ""),
+      env: {
+        ...process.env,
+        OPENCHAT_DESKTOP_FILE: dist,
+        OPENCHAT_API_URL: "http://localhost:8787",
+        DISPLAY: process.env.DISPLAY ?? ":0",
+      } as Record<string, string>,
+    });
+    page = await app.firstWindow();
+    await page.waitForLoadState("domcontentloaded");
+  });
+
+  test.afterAll(async () => {
+    await app?.close();
+  });
+
+  test("loads the renderer from file:// with the injected API origin", async () => {
+    await expect(page).toHaveURL(/^file:\/\//);
+    const serverUrl = await page.evaluate(
+      () =>
+        (window as unknown as { openchatDesktop: { serverUrl: string } }).openchatDesktop.serverUrl,
+    );
+    expect(serverUrl).toBe("http://localhost:8787");
+  });
+
+  test("bearer sign-in lands in a channel (hash routes, no cookies)", async ({ request }) => {
+    const seq = Date.now();
+    const email = `desktop-file-${seq}@test.dev`;
+    const password = "Password123!";
+    const user = await signupUser(request, email, password);
+    const team = await createTeam(request, user.token, `file-team-${seq}`);
+    const channel = await createChannel(request, user.token, team.id, `general-${seq}`);
+
+    await page.goto(`${pathToFileURL(dist).href}#/login`);
+    await page.getByPlaceholder("邮箱").fill(email);
+    await page.getByPlaceholder("密码").fill(password);
+    await page.getByRole("button", { name: "登录" }).click();
+    await expect(page.getByPlaceholder("输入消息…")).toBeVisible({ timeout: 20_000 });
+    await expect(page).toHaveURL(new RegExp(`#/.*${channel.id}`));
   });
 });

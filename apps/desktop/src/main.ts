@@ -1,13 +1,34 @@
-import { app, BrowserWindow, ipcMain, Menu, Notification, safeStorage, Tray } from "electron";
+import {
+  app,
+  BrowserWindow,
+  ipcMain,
+  Menu,
+  Notification,
+  safeStorage,
+  session,
+  Tray,
+} from "electron";
 import * as path from "node:path";
 import * as fs from "node:fs";
 import { parseOpenchatLink } from "./lib/deep-link";
 import { createTokenStore } from "./lib/token-store";
 
-// This shell loads the web renderer over http(s) (cookie auth works) or a
-// local file build via OPENCHAT_DESKTOP_FILE (spec §6.2).
+// This shell loads the web renderer over http(s) (cookie auth works) or the
+// packaged local build from file:// (bearer auth via the preload bridge),
+// per p10 spec §6.2. OPENCHAT_DESKTOP_FILE overrides for testing; production
+// prefers the bundled web-dist when present.
 const DEV_RENDERER_URL = process.env.OPENCHAT_DESKTOP_URL ?? "http://localhost:8787";
 const PACKAGED_RENDERER_URL = process.env.OPENCHAT_DESKTOP_URL ?? "https://chat.openchat.dev";
+// API origin for the file:// renderer (REST/WS target). Derived from the
+// remote renderer URL unless overridden via OPENCHAT_API_URL.
+function resolveApiUrl(): string {
+  if (process.env.OPENCHAT_API_URL) return process.env.OPENCHAT_API_URL;
+  try {
+    return new URL(app.isPackaged ? PACKAGED_RENDERER_URL : DEV_RENDERER_URL).origin;
+  } catch {
+    return "http://localhost:8787";
+  }
+}
 
 const tokenStore = createTokenStore(
   {
@@ -26,11 +47,31 @@ const tokenStore = createTokenStore(
 
 let tray: Tray | null = null;
 let quitting = false;
+// Deep links arriving before the renderer finished loading (cold start via
+// notification tap) are queued and replayed on did-finish-load — otherwise
+// executeJavaScript would dispatch into a page with no listeners yet.
+const pendingLinks: string[] = [];
+let rendererReady = false;
 
 function resolveRendererTarget(): { url?: string; file?: string } {
   const fileOverride = process.env.OPENCHAT_DESKTOP_FILE;
   if (fileOverride) return { file: fileOverride };
+  if (app.isPackaged) {
+    const bundled = path.join(__dirname, "../web-dist/index.html");
+    if (fs.existsSync(bundled)) return { file: bundled };
+  }
   return { url: app.isPackaged ? PACKAGED_RENDERER_URL : DEV_RENDERER_URL };
+}
+
+function dispatchLinkToRenderer(win: BrowserWindow, link: string) {
+  void win.webContents
+    .executeJavaScript(
+      `window.dispatchEvent(new CustomEvent("openchat:navigate", { detail: ${JSON.stringify(link)} }))`,
+      true,
+    )
+    .catch((error: unknown) => {
+      console.error("deep link dispatch failed", error);
+    });
 }
 
 function navigateToLink(link: string) {
@@ -40,9 +81,11 @@ function navigateToLink(link: string) {
   if (!win) return;
   if (win.isMinimized()) win.restore();
   win.show();
-  void win.webContents.executeJavaScript(
-    `window.dispatchEvent(new CustomEvent("openchat:navigate", { detail: ${JSON.stringify(link)} }))`,
-  );
+  if (rendererReady) {
+    dispatchLinkToRenderer(win, link);
+  } else {
+    pendingLinks.push(link);
+  }
 }
 
 function showWindow() {
@@ -87,6 +130,9 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      // API origin for the file:// renderer (sandboxed preloads keep their
+      // argv, including these injected switches).
+      additionalArguments: [`--openchat-api=${resolveApiUrl()}`],
     },
   });
 
@@ -96,6 +142,14 @@ function createWindow() {
     if (!quitting && tray) {
       event.preventDefault();
       win.hide();
+    }
+  });
+
+  win.webContents.on("did-finish-load", () => {
+    rendererReady = true;
+    while (pendingLinks.length > 0) {
+      const link = pendingLinks.shift();
+      if (link) dispatchLinkToRenderer(win, link);
     }
   });
 
@@ -116,6 +170,38 @@ if (!gotLock) {
   });
 
   void app.whenReady().then(() => {
+    // file:// renderer → API calls are cross-origin with the literal origin
+    // "null". Rewrite the request Origin to the API origin (better-auth
+    // trusted-origins checks it) and answer with matching CORS headers, so
+    // the bearer-based web renderer works without opening CORS to null on
+    // the server side.
+    const apiUrl = resolveApiUrl();
+    const filter = { urls: [`${apiUrl}/*`] };
+    session.defaultSession.webRequest.onBeforeSendHeaders(filter, (details, callback) => {
+      // Header names arrive lower-cased from the network stack.
+      const originKey = Object.keys(details.requestHeaders).find(
+        (k) => k.toLowerCase() === "origin",
+      );
+      if (originKey && details.requestHeaders[originKey] === "null") {
+        details.requestHeaders[originKey] = apiUrl;
+      }
+      const refererKey = Object.keys(details.requestHeaders).find(
+        (k) => k.toLowerCase() === "referer",
+      );
+      if (refererKey) details.requestHeaders[refererKey] = `${apiUrl}/`;
+      else details.requestHeaders["Referer"] = `${apiUrl}/`;
+      callback({ requestHeaders: details.requestHeaders });
+    });
+    session.defaultSession.webRequest.onHeadersReceived(filter, (details, callback) => {
+      const headers = details.responseHeaders ?? {};
+      if (headers["access-control-allow-origin"] === undefined) {
+        headers["access-control-allow-origin"] = ["*"];
+        headers["access-control-allow-headers"] = ["authorization, content-type"];
+        headers["access-control-allow-methods"] = ["GET, POST, PUT, DELETE, OPTIONS"];
+      }
+      callback({ responseHeaders: headers });
+    });
+
     createWindow();
     try {
       createTray();

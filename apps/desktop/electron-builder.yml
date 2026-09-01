@@ -6,9 +6,16 @@ productName: openchat
 directories:
   output: release
   buildResources: assets
+# Deep-link scheme registration (macOS Info.plist CFBundleURLTypes, Linux
+# .desktop): without this, setAsDefaultProtocolClient has no effect in
+# packaged macOS builds.
+protocols:
+  - name: openchat
+    schemes: [openchat]
 files:
   - ".vite/build/**"
   - "assets/**"
+  - "web-dist/**"
   - "package.json"
 mac:
   category: public.app-category.social-networking
@@ -21,8 +28,10 @@ mac:
   gatekeeperAssess: false
   entitlements: entitlements.mac.plist
   entitlementsInherit: entitlements.mac.plist
-  identity: null
-  notarize: false
+  # Signing/notarization are env-driven (deliberately not forced off): with
+  # CSC_NAME set, builds sign; without it electron-builder falls back to an
+  # ad-hoc identity. Notarization engages automatically when APPLE_ID /
+  # APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID are present.
 win:
   target:
     - target: nsis
