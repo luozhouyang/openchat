@@ -1,7 +1,6 @@
 import { useRef, useState } from "react";
-import { api } from "../../lib/api";
+import { appClient } from "../../app-client";
 import { wsClient } from "../../ws/client";
-import { useMessageStore } from "../../stores/messages";
 import { Button } from "../ui/button";
 import { UploadButton } from "../upload/UploadButton";
 
@@ -12,28 +11,9 @@ export function Composer({ channelId }: { channelId: string }) {
   async function send() {
     const content = text.trim();
     if (!content) return;
-    const clientToken = crypto.randomUUID();
-    useMessageStore.getState().appendPending(channelId, clientToken, {
-      id: `pending-${clientToken}`,
-      seq: 0,
-      userId: "me",
-      parentId: null,
-      type: "text",
-      content,
-      attachments: null,
-      mentions: null,
-      editedAt: null,
-      deletedAt: null,
-      createdAt: Date.now(),
-    });
     setText("");
-    try {
-      const posted = await api.posts.create(channelId, { message: content, clientToken });
-      useMessageStore.getState().ack(channelId, clientToken, { id: posted.id, seq: posted.seq });
-    } catch {
-      useMessageStore.getState().fail(channelId, clientToken);
-      setText(content);
-    }
+    const ok = await appClient.messages.send(channelId, content, crypto.randomUUID());
+    if (!ok) setText(content); // failed send restores the draft
   }
 
   return (

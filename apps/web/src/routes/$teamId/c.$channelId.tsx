@@ -1,8 +1,8 @@
 import { createFileRoute, Outlet } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect } from "react";
+import { appClient } from "../../app-client";
 import { api } from "../../lib/api";
-import { hydrateChannel, persistMessages } from "../../lib/message-db";
 import { wsClient } from "../../ws/client";
 import { useMessageStore } from "../../stores/messages";
 import { useSidebarStore } from "../../stores/sidebar";
@@ -22,14 +22,13 @@ function ChannelView() {
     queryKey: ["history", channelId],
     queryFn: async () => {
       const res = await api.posts.list(channelId, { limit: 30 });
-      useMessageStore.getState().applySync(channelId, res.messages);
-      void persistMessages(channelId, res.messages);
+      await appClient.channels.applyHistory(channelId, res.messages);
       return res;
     },
   });
 
   useEffect(() => {
-    void hydrateChannel(channelId);
+    void appClient.channels.hydrate(channelId);
   }, [channelId]);
 
   useEffect(() => {

@@ -12,9 +12,9 @@ import {
 } from "react-native";
 import type { StoreMessage } from "state";
 import { useSidebarStore, useStructureStore } from "state";
-import { api, signIn } from "./src/lib/auth";
+import { appClient } from "./src/app-client";
 import { consumeDeepLink, registerPush } from "./src/lib/push";
-import { hydrateChannel, persistMessage, persistMessages } from "./src/lib/message-db";
+
 import { createMobilePlatform } from "./src/platform";
 import { useMessages } from "./src/stores/messages";
 import { closeRealtime, connectRealtime, sendActivity, sendFrame } from "./src/ws/client";
@@ -40,7 +40,7 @@ export default function App() {
   useEffect(() => {
     (async () => {
       try {
-        await api("/api/v1/users/me/workspaces");
+        await appClient.auth.hasSession();
         setHasSession(true);
       } catch {
         setHasSession(false);
@@ -108,7 +108,7 @@ function LoginScreen({ onLoggedIn }: { onLoggedIn: () => void }) {
     setBusy(true);
     setError(null);
     try {
-      await signIn(email.trim(), password);
+      await appClient.auth.signIn(email.trim(), password);
       onLoggedIn();
     } catch (e) {
       setError(e instanceof Error ? e.message : "登录失败");
@@ -160,8 +160,8 @@ function WorkspaceScreen({
   useEffect(() => {
     (async () => {
       try {
-        const res = await api<{ teams: TeamSummary[] }>("/api/v1/users/me/workspaces");
-        setTeams(res.teams);
+        const res = await appClient.api.workspaces();
+        setTeams(res.teams as TeamSummary[]);
         setError(null);
       } catch (e) {
         setError(e instanceof Error ? e.message : "加载失败");
@@ -175,15 +175,7 @@ function WorkspaceScreen({
   useEffect(() => {
     void (async () => {
       try {
-        const res = await api<{
-          channels: Array<{
-            channelId: string;
-            unread: number;
-            mentions: number;
-            preview: string | null;
-            lastMessageAt: number | null;
-          }>;
-        }>("/api/v1/users/me/sidebar");
+        const res = await appClient.api.sidebar();
         useSidebarStore.getState().loadAll(res.channels);
       } catch {
         // offline: badges resume from live events
@@ -288,18 +280,12 @@ function ChannelScreen({
   useEffect(() => {
     useMessages.getState().reset(channelId);
     setHasOlder(true);
-    void hydrateChannel(channelId, (rows) => {
-      useMessages.getState().applySync(channelId, rows);
-      refresh();
-    });
+    void appClient.channels.hydrate(channelId).then(refresh);
     // 2) …then REST history fills anything the cache missed.
     void (async () => {
       try {
-        const res = await api<{ messages: StoreMessage[] }>(
-          `/api/v1/channels/${channelId}/posts?limit=30`,
-        );
-        useMessages.getState().applySync(channelId, res.messages);
-        void persistMessages(channelId, res.messages);
+        const res = await appClient.api.posts.list(channelId, { limit: 30 });
+        await appClient.channels.applyHistory(channelId, res.messages);
         refresh();
       } catch {
         // offline: keep showing cached rows
@@ -323,13 +309,9 @@ function ChannelScreen({
     }
     setLoadingOlder(true);
     try {
-      const res = await api<{ messages: StoreMessage[] }>(
-        `/api/v1/channels/${channelId}/posts?limit=30&beforeSeq=${oldest}`,
-      );
-      useMessages.getState().applySync(channelId, res.messages);
-      void persistMessages(channelId, res.messages);
+      const mayHaveMore = await appClient.channels.loadOlder(channelId);
       refresh();
-      if (res.messages.length < 30) setHasOlder(false);
+      if (!mayHaveMore) setHasOlder(false);
     } catch {
       // offline: keep what we have
     } finally {
@@ -349,35 +331,12 @@ function ChannelScreen({
     const content = draft.trim();
     if (!content) return;
     const clientToken = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    useMessages.getState().appendPending(channelId, clientToken, {
-      id: `pending-${clientToken}`,
-      seq: 0,
-      userId: "me",
-      parentId: null,
-      type: "text",
-      content,
-      attachments: null,
-      mentions: null,
-      editedAt: null,
-      deletedAt: null,
-      createdAt: Date.now(),
-    });
     setDraft("");
     refresh();
     sendActivity(); // sending is an interaction signal
-    try {
-      const posted = await api<StoreMessage>(`/api/v1/channels/${channelId}/posts`, {
-        method: "POST",
-        body: JSON.stringify({ message: content, clientToken }),
-      });
-      useMessages.getState().ack(channelId, clientToken, { id: posted.id, seq: posted.seq });
-      void persistMessage(channelId, posted);
-      refresh();
-    } catch {
-      useMessages.getState().fail(channelId, clientToken);
-      setDraft(content);
-      refresh();
-    }
+    const ok = await appClient.messages.send(channelId, content, clientToken);
+    if (!ok) setDraft(content); // failed send restores the draft
+    refresh();
   }, [channelId, draft, refresh]);
 
   return (

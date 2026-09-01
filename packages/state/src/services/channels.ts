@@ -2,13 +2,20 @@ import type { Message } from "protocol";
 import type { LocalDatabase } from "../db/database.ts";
 import { useMessageStore } from "../stores/messages.ts";
 
-export function normalizeMessage(m: Message): Message {
-  return { ...m, attachments: m.attachments ?? null };
+/**
+ * History sources vary in shape: the REST list output omits the attachments
+ * column while WS events carry it. Services accept the wider type and
+ * normalize on persist.
+ */
+export type MessageLike = Omit<Message, "attachments"> & { attachments?: unknown[] | null };
+
+export function normalizeMessage(m: MessageLike): Message {
+  return { ...m, attachments: m.attachments ?? null } as Message;
 }
 
 export interface ChannelsServiceDeps {
   getDb(): Promise<LocalDatabase>;
-  fetchHistory(channelId: string, beforeSeq?: number): Promise<Message[]>;
+  fetchHistory(channelId: string, beforeSeq?: number): Promise<MessageLike[]>;
   pageSize?: number;
 }
 
@@ -16,7 +23,7 @@ export interface ChannelsService {
   /** Seeds the store from the local database (instant, offline-capable). */
   hydrate(channelId: string): Promise<number>;
   /** Applies a page of history to store + local DB (REST results, refills). */
-  applyHistory(channelId: string, messages: Message[]): Promise<void>;
+  applyHistory(channelId: string, messages: MessageLike[]): Promise<void>;
   /** Pages older history backwards; returns whether more pages may exist. */
   loadOlder(channelId: string): Promise<boolean>;
 }
@@ -24,7 +31,7 @@ export interface ChannelsService {
 export function createChannelsService(deps: ChannelsServiceDeps): ChannelsService {
   const pageSize = deps.pageSize ?? 30;
 
-  async function applyHistory(channelId: string, messages: Message[]): Promise<void> {
+  async function applyHistory(channelId: string, messages: MessageLike[]): Promise<void> {
     if (messages.length === 0) return;
     useMessageStore.getState().applySync(channelId, messages);
     const db = await deps.getDb();

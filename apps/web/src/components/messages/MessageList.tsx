@@ -1,8 +1,8 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useCallback, useEffect, useRef } from "react";
 import { useShallow } from "zustand/react/shallow";
+import { appClient } from "../../app-client";
 import { useMessageStore } from "../../stores/messages";
-import { api } from "../../lib/api";
 import { MessageRow } from "./MessageRow";
 
 export function MessageList({ channelId }: { channelId: string }) {
@@ -35,8 +35,12 @@ export function MessageList({ channelId }: { channelId: string }) {
     const anchorSeq = list[0].seq;
     const scrollTop = parentRef.current?.scrollTop ?? 0;
     try {
-      const res = await api.posts.list(channelId, { beforeSeq: anchorSeq, limit: 30 });
-      useMessageStore.getState().applySync(channelId, res.messages);
+      // Shared history application (store + local DB persistence).
+      const res = await appClient.api.posts.list(channelId, {
+        beforeSeq: anchorSeq,
+        limit: 30,
+      });
+      await appClient.channels.applyHistory(channelId, res.messages);
       const idx = useMessageStore
         .getState()
         .list(channelId)

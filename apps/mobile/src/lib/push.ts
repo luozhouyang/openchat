@@ -1,6 +1,6 @@
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
-import { api } from "./auth";
+import { appClient } from "../app-client";
 import { getDeviceId } from "./secure";
 
 /** Deep link (openchat://c/<channelId>) carried by a tapped notification. */
@@ -32,13 +32,10 @@ export async function registerPush(): Promise<void> {
     // endpoint must be a URL (protocol PushSubscribeInput); the Expo push
     // service send endpoint carries the token in the device query param.
     const endpoint = `https://exp.host/--/api/v2/push/send?device=${encodeURIComponent(expoToken)}`;
-    await api("/api/v1/users/me/push_subscriptions", {
-      method: "POST",
-      body: JSON.stringify({
-        deviceId: await getDeviceId(),
-        kind: "expo",
-        endpoint,
-      }),
+    await appClient.api.push.subscribe({
+      deviceId: await getDeviceId(),
+      kind: "expo",
+      endpoint,
     });
 
     if (Platform.OS === "android") {

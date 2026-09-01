@@ -24,11 +24,12 @@ export function createMobilePlatform(): PlatformAdapter {
     platform: Platform.OS === "ios" ? "ios" : "android",
     apiBaseUrl: API_URL,
     wsUrl: deriveWsUrl(API_URL),
-    // REST bearer session token; the WS upgrade JWT comes from getWsJwt
-    // (replaced by the shared auth service in P12-C).
     getSessionToken: () => tokenStore.get(),
+    setSessionToken: (token) => (token === null ? tokenStore.clear() : tokenStore.set(token)),
     storage: secureStorage,
     openLocalDatabase,
+    usesHashRouting: false,
+    notify: () => false, // in-app notification taps are handled by expo-notifications
     onAppStateChange(cb) {
       const handler = AppState.addEventListener("change", (state) => {
         cb(state === "active" ? "active" : "background");

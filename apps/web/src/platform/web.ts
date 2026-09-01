@@ -27,6 +27,8 @@ export function createWebPlatform(opts: WebPlatformOptions = {}): PlatformAdapte
     getSessionToken: async () => null, // cookie mode
     storage: new LocalStorageAdapter(),
     openLocalDatabase,
+    usesHashRouting: false,
+    notify: () => false, // web notifications go through the PWA service worker
     onAppStateChange: visibilityAppState,
   } satisfies PlatformAdapter;
 }

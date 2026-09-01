@@ -32,6 +32,9 @@ test("web platform derives urls from location and runs cookie mode", () => {
   expect(p.apiBaseUrl).toBe("https://example.com");
   expect(p.wsUrl).toBe("wss://example.com/ws");
   expect(p.getSessionToken()).resolves.toBeNull();
+  expect(p.setSessionToken).toBeUndefined();
+  expect(p.usesHashRouting).toBe(false);
+  expect(p.notify({ title: "t", body: "b" })).toBe(false);
   expect(p.desktopBridge).toBeUndefined();
 });
 
@@ -40,13 +43,17 @@ test("web platform honors apiBaseUrl override", () => {
   expect(p.wsUrl).toBe("ws://localhost:8787/ws");
 });
 
-test("desktop-file platform routes auth through the bridge", async () => {
+test("desktop-file platform routes auth and notifications through the bridge", async () => {
   const bridge = mockBridge();
   const p = createDesktopFilePlatform({ serverUrl: bridge.serverUrl, bridge });
   expect(p.platform).toBe("desktop");
   expect(p.apiBaseUrl).toBe("http://localhost:8787");
   expect(p.wsUrl).toBe("ws://localhost:8787/ws");
   expect(await p.getSessionToken()).toBe("session-token");
+  expect(p.setSessionToken).toBeDefined();
+  expect(p.usesHashRouting).toBe(true);
+  expect(p.notify({ title: "t", body: "b", link: "openchat://c/x" })).toBe(true);
+  expect(bridge.notify).toHaveBeenCalledWith("t", "b", "openchat://c/x");
   expect(p.desktopBridge).toBe(bridge);
 });
 

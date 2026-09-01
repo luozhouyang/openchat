@@ -2,15 +2,16 @@ import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider, createHashHistory, createRouter } from "@tanstack/react-router";
 import { routeTree } from "./routeTree.gen";
+import { platform } from "./lib/platform";
 import { listenForOpenchatLinks } from "./lib/deep-link";
 import "./app.css";
 
 const queryClient = new QueryClient();
-// file:// (Electron packaged shell) has no URL rewriting server: deep routes
-// like /t/c/x cannot resolve, so the router runs on hash history there.
+// file:// shells (Electron packaged renderer) have no URL rewriting server:
+// deep routes cannot resolve, so the router runs on hash history there.
 const router = createRouter({
   routeTree,
-  history: window.location.protocol === "file:" ? createHashHistory() : undefined,
+  history: platform.usesHashRouting ? createHashHistory() : undefined,
 });
 
 declare module "@tanstack/react-router" {
@@ -19,7 +20,7 @@ declare module "@tanstack/react-router" {
   }
 }
 
-if (window.location.protocol !== "file:" && "serviceWorker" in navigator) {
+if (!platform.usesHashRouting && "serviceWorker" in navigator) {
   void navigator.serviceWorker.register("/sw.js").catch(() => {});
 }
 

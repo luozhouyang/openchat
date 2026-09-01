@@ -1,15 +1,7 @@
-import { createApi } from "protocol";
-import { desktopFileMode, desktopServerUrl, getDesktopToken } from "./desktop-mode";
+// One REST surface for both web modes, constructed by the composition root
+// (P12 reviewed decision #3): cookies + relative paths in the browser,
+// bearer + injected origin in the Electron file:// shell.
+import { appClient } from "../app-client";
 
-// One REST surface for both web modes: cookies + relative paths in the
-// browser, bearer + injected origin in the Electron file:// shell (cookie
-// credentials are omitted there so anonymous CORS responses are accepted).
-export const api = desktopFileMode
-  ? createApi({
-      baseUrl: desktopServerUrl,
-      getToken: getDesktopToken,
-      credentials: "omit",
-    })
-  : createApi();
-export { apiFetch, ApiError } from "protocol";
+export const api = appClient.api;
 export type { WorkspaceResponse } from "protocol";

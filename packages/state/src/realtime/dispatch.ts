@@ -43,12 +43,18 @@ export function createDispatcher(deps: DispatcherDeps) {
           if (message.parentId) useMessageStore.getState().ingestThread(ev.channelId, message);
           // Instant badge; the authoritative sidebar.update follows right after.
           useSidebarStore.getState().bump(ev.channelId);
-          void deps.getDb().then((db) => db.messages.append(ev.channelId, normalize(message)));
+          void deps
+            .getDb()
+            .then((db) => db.messages.append(ev.channelId, normalize(message)))
+            .catch(() => {});
           deps.onMessageNew?.(ev.channelId, message);
         } else if (inner.type === "thread.reply") {
           const message = (inner as unknown as { message: Message }).message;
           useMessageStore.getState().ingestThread(ev.channelId, message);
-          void deps.getDb().then((db) => db.messages.append(ev.channelId, normalize(message)));
+          void deps
+            .getDb()
+            .then((db) => db.messages.append(ev.channelId, normalize(message)))
+            .catch(() => {});
           deps.onMessageNew?.(ev.channelId, message);
         } else if (inner.type === "message.edit") {
           useMessageStore
@@ -58,10 +64,14 @@ export function createDispatcher(deps: DispatcherDeps) {
             .getDb()
             .then((db) =>
               db.messages.edit(ev.channelId, inner.messageId, inner.content, inner.editedAt),
-            );
+            )
+            .catch(() => {});
         } else if (inner.type === "message.delete") {
           useMessageStore.getState().remove(ev.channelId, inner.messageId);
-          void deps.getDb().then((db) => db.messages.remove(ev.channelId, inner.messageId));
+          void deps
+            .getDb()
+            .then((db) => db.messages.remove(ev.channelId, inner.messageId))
+            .catch(() => {});
         } else if (inner.type === "reaction.update") {
           const e = inner as unknown as { messageSeq: number; reactions: Record<string, string[]> };
           useMessageStore.getState().setReactions(ev.channelId, e.messageSeq, e.reactions);

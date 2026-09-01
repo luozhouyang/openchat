@@ -1,10 +1,26 @@
 import { useEffect } from "react";
 import { createRootRoute, Outlet, redirect, useRouterState } from "@tanstack/react-router";
-import { authClient } from "../lib/auth-client";
-import { desktopFileMode, hasDesktopSession } from "../lib/desktop-mode";
+import { appClient } from "../app-client";
 import { wsClient } from "../ws/client";
 
 const PUBLIC_PATHS = ["/login", "/signup"];
+
+// beforeLoad runs on every navigation; probe cheaply with a short-lived
+// positive cache (the cookie-mode equivalent of better-auth's cookieCache).
+let sessionProbedAt = 0;
+let sessionProbedOk = false;
+
+export async function guardSession(): Promise<boolean> {
+  if (sessionProbedOk && Date.now() - sessionProbedAt < 60_000) return true;
+  const ok = await appClient.auth.hasSession();
+  if (ok) {
+    sessionProbedAt = Date.now();
+    sessionProbedOk = true;
+  } else {
+    sessionProbedOk = false;
+  }
+  return ok;
+}
 
 /**
  * App-level realtime connection (p10 §4.1): one socket per tab for the whole
@@ -47,16 +63,7 @@ export const Route = createRootRoute({
   ),
   beforeLoad: async ({ location }) => {
     if (PUBLIC_PATHS.some((p) => location.pathname.startsWith(p))) return;
-    if (desktopFileMode) {
-      // Electron file:// shell: bearer session probe instead of the cookie
-      // session lookup.
-      if (!(await hasDesktopSession())) {
-        throw redirect({ to: "/login" });
-      }
-      return;
-    }
-    const session = await authClient.getSession();
-    if (!session.data) {
+    if (!(await guardSession())) {
       throw redirect({ to: "/login" });
     }
   },

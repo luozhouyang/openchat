@@ -42,9 +42,21 @@ export interface PlatformAdapter {
   wsUrl: string;
   /** REST bearer session token; null in cookie mode. */
   getSessionToken(): Promise<string | null>;
+  /**
+   * Persists the bearer session token (SecureStore / desktop bridge);
+   * absent in cookie mode (the better-auth cookie owns the session).
+   */
+  setSessionToken?(token: string | null): Promise<void>;
   storage: StorageAdapter;
   /** Opens (and memoizes) the local database; degradation chain lives here. */
   openLocalDatabase(): Promise<LocalDatabase>;
+  /** True when the router must run on hash history (file:// shells). */
+  usesHashRouting: boolean;
+  /**
+   * Best-effort background notification (desktop native notifications,
+   * no-op where the platform has no channel). Returns false when dropped.
+   */
+  notify(payload: { title: string; body: string; link?: string }): boolean;
   push?: PushAdapter;
   desktopBridge?: DesktopBridge;
   onAppStateChange(cb: (s: AppLifecycle) => void): () => void;

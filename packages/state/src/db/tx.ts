@@ -8,8 +8,11 @@ import type { SqliteDriver } from "./driver.ts";
  */
 export class SqliteTxRunner {
   private depth = 0;
+  private readonly d: SqliteDriver;
 
-  constructor(private readonly d: SqliteDriver) {}
+  constructor(d: SqliteDriver) {
+    this.d = d;
+  }
 
   get inTransaction(): boolean {
     return this.depth > 0;

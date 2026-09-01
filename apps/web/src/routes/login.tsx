@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
-import { authClient } from "../lib/auth-client";
-import { desktopFileMode, signInDesktop } from "../lib/desktop-mode";
+import { appClient } from "../app-client";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 
@@ -21,15 +20,9 @@ function LoginPage() {
     setBusy(true);
     setError(null);
     try {
-      if (desktopFileMode) {
-        await signInDesktop(email, password);
-      } else {
-        const res = await authClient.signIn.email({ email, password });
-        if (res.error) {
-          setError(res.error.message ?? null);
-          return;
-        }
-      }
+      // Shared auth service: cookie session in the browser, safeStorage
+      // bearer token in the Electron file:// shell.
+      await appClient.auth.signIn(email, password);
       void router.navigate({ to: "/" });
     } catch (err) {
       setError(err instanceof Error ? err.message : "登录失败");
