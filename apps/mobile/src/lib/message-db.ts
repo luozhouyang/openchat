@@ -1,18 +1,13 @@
 import type { Message } from "protocol";
-import { createSqliteDatabase, type LocalDatabase, type StoreMessage } from "state";
-import { ExpoSqliteDriver } from "../db/expo-driver";
+import type { LocalDatabase, StoreMessage } from "state";
+import { createMobilePlatform } from "../platform";
 
-let cached: Promise<LocalDatabase> | null = null;
+// The platform adapter owns database provisioning (memoized; expo-sqlite is
+// always present on device, so there is no degradation chain here).
+const platform = createMobilePlatform();
 
 export async function getMessageDB(): Promise<LocalDatabase> {
-  cached ??= create();
-  return cached;
-}
-
-async function create(): Promise<LocalDatabase> {
-  const db = createSqliteDatabase(new ExpoSqliteDriver());
-  await db.migrate();
-  return db;
+  return platform.openLocalDatabase();
 }
 
 /** Seeds the store from the on-device DB; returns the hydrated row count. */

@@ -1,6 +1,7 @@
 import type { Message } from "protocol";
-import { createMemoryDatabase, createSqliteDatabase, type LocalDatabase } from "state";
+import type { LocalDatabase } from "state";
 import { useMessageStore } from "../stores/messages";
+import { platform } from "./platform";
 
 type MessageLike = Omit<Message, "attachments"> & { attachments?: unknown[] | null };
 
@@ -8,27 +9,9 @@ function toMessage(m: MessageLike): Message {
   return { ...m, attachments: m.attachments ?? null };
 }
 
-let cached: Promise<LocalDatabase> | null = null;
-
-async function create(): Promise<LocalDatabase> {
-  try {
-    if (typeof Worker === "undefined") throw new Error("workers unavailable");
-    const { SqliteWasmDriver } = await import("./sqlite-wasm-driver");
-    const driver = new SqliteWasmDriver();
-    await driver.ready();
-    const db = createSqliteDatabase(driver);
-    await db.migrate();
-    return db;
-  } catch {
-    // No worker/OPFS support (e.g. tests, old browsers): degrade to an
-    // in-memory, session-scoped database.
-    return createMemoryDatabase();
-  }
-}
-
+/** Delegates to the platform adapter (owns the fallback chain, memoized). */
 export async function getMessageDB(): Promise<LocalDatabase> {
-  cached ??= create();
-  return cached;
+  return platform.openLocalDatabase();
 }
 
 export async function hydrateChannel(channelId: string, db?: LocalDatabase): Promise<number> {

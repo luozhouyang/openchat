@@ -2,7 +2,7 @@ import { RealtimeClient } from "realtime";
 import { createDispatcher, createSyncGapHandler, buildSyncChannels } from "state";
 import type { ClientFrame } from "protocol";
 import { api } from "../lib/api";
-import { platform } from "../lib/platform";
+import { platform, getWsToken } from "../lib/platform";
 import { desktopBridge } from "../lib/desktop-bridge";
 import { getMessageDB } from "../lib/message-db";
 import { useConnectionStore } from "../stores/connection";
@@ -30,8 +30,8 @@ class WsClient {
 
   constructor() {
     this.realtime = new RealtimeClient({
-      getToken: () => platform.getAuthToken(),
-      buildUrl: (deviceId, token) => `${platform.serverUrl}?deviceId=${deviceId}&token=${token}`,
+      getToken: () => getWsToken(),
+      buildUrl: (deviceId, token) => `${platform.wsUrl}?deviceId=${deviceId}&token=${token}`,
       onAuthMissing: () => {
         // file:// (hash router) must not navigate to a filesystem path.
         if (window.location.protocol === "file:") window.location.hash = "#/login";

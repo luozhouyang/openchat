@@ -1,7 +1,7 @@
 import { RealtimeClient } from "realtime";
 import { buildSyncChannels, createDispatcher, createSyncGapHandler } from "state";
 import type { ClientFrame, Message } from "protocol";
-import { api } from "../lib/auth";
+import { api, getWsJwt } from "../lib/auth";
 import { getMessageDB } from "../lib/message-db";
 import { getDeviceId } from "../lib/secure";
 import { createMobilePlatform } from "../platform";
@@ -41,8 +41,8 @@ export const dispatch = createDispatcher({
 });
 
 const realtime = new RealtimeClient({
-  getToken: () => platform.getAuthToken(),
-  buildUrl: (deviceId, token) => `${platform.serverUrl}?deviceId=${deviceId}&token=${token}`,
+  getToken: () => getWsJwt(), // replaced by the shared auth service in P12-C
+  buildUrl: (deviceId, token) => `${platform.wsUrl}?deviceId=${deviceId}&token=${token}`,
   // Token gone (signed out): RealtimeClient parks itself in "closed"; the
   // login flow reconnects via connectRealtime() after a fresh sign-in.
   onAuthMissing: () => {},

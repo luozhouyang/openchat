@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+// Imports lib/platform (→ auth-client) which reads window.location at init.
 import { expect, test } from "vite-plus/test";
 import { createMemoryDatabase } from "state";
 import { getMessageDB, hydrateChannel, persistMessage } from "../src/lib/message-db";

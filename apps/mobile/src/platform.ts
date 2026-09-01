@@ -1,39 +1,39 @@
-import * as SecureStore from "expo-secure-store";
 import { AppState, Platform } from "react-native";
-import type { AppLifecycle, PlatformAdapter, StorageAdapter } from "platform";
-import { API_URL, wsUrl } from "./lib/config";
-import { getWsJwt } from "./lib/auth";
+import { deriveWsUrl, type PlatformAdapter } from "platform";
+import { createSqliteDatabase, type LocalDatabase } from "state";
+import { ExpoSqliteDriver } from "./db/expo-driver";
+import { API_URL } from "./lib/config";
+import { hydrateSecureCache, secureStorage, tokenStore } from "./lib/secure";
 
-const secureStorage: StorageAdapter = {
-  get: (key) => {
-    // SecureStore is async-only; platform consumers use getAuthToken()/async
-    // flows, so the sync StorageAdapter surface is backed by a warm cache.
-    return cache.get(key) ?? null;
-  },
-  set: (key, value) => {
-    cache.set(key, value);
-    void SecureStore.setItemAsync(key, value);
-  },
-  remove: (key) => {
-    cache.delete(key);
-    void SecureStore.deleteItemAsync(key);
-  },
-};
-const cache = new Map<string, string>();
+let cachedDb: Promise<LocalDatabase> | null = null;
+
+/** expo-sqlite is always present on device: no degradation chain. */
+function openLocalDatabase(): Promise<LocalDatabase> {
+  cachedDb ??= (async () => {
+    const db = createSqliteDatabase(new ExpoSqliteDriver());
+    await db.migrate();
+    return db;
+  })();
+  return cachedDb;
+}
 
 export function createMobilePlatform(): PlatformAdapter {
+  // Warm the sync StorageAdapter cache (SecureStore is async-only).
+  void hydrateSecureCache();
   return {
     platform: Platform.OS === "ios" ? "ios" : "android",
-    serverUrl: wsUrl(API_URL, "/ws"),
-    // The WS upgrade requires a short-lived JWT (not the stored session
-    // token): getWsJwt fetches one from /api/auth/token with caching.
-    getAuthToken: () => getWsJwt(),
+    apiBaseUrl: API_URL,
+    wsUrl: deriveWsUrl(API_URL),
+    // REST bearer session token; the WS upgrade JWT comes from getWsJwt
+    // (replaced by the shared auth service in P12-C).
+    getSessionToken: () => tokenStore.get(),
     storage: secureStorage,
-    onAppStateChange(cb: (s: AppLifecycle) => void) {
+    openLocalDatabase,
+    onAppStateChange(cb) {
       const handler = AppState.addEventListener("change", (state) => {
         cb(state === "active" ? "active" : "background");
       });
       return () => handler.remove();
     },
-  };
+  } satisfies PlatformAdapter;
 }

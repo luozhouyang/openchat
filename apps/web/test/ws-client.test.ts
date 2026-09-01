@@ -11,10 +11,11 @@ test("connection store transitions", () => {
   expect(useConnectionStore.getState().state).toBe("open");
 });
 
-test("platform instance resolves serverUrl and auth", async () => {
-  const { platform } = await import("../src/lib/platform");
+test("platform instance resolves urls and session token surface", async () => {
+  const { platform, getWsToken } = await import("../src/lib/platform");
   expect(platform.platform).toBe("web");
-  expect(typeof platform.getAuthToken).toBe("function");
+  expect(platform.wsUrl).toMatch(/^wss?:\/\/.*\/ws$/);
+  expect(typeof getWsToken).toBe("function");
 });
 
 test("sidebar bump and markRead", () => {
