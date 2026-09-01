@@ -1,10 +1,60 @@
-import { createRootRoute, Outlet, redirect } from "@tanstack/react-router";
+import { useEffect } from "react";
+import { createRootRoute, Outlet, redirect, useRouterState } from "@tanstack/react-router";
 import { authClient } from "../lib/auth-client";
+import { desktopFileMode, hasDesktopSession } from "../lib/desktop-mode";
+import { wsClient } from "../ws/client";
+
+const PUBLIC_PATHS = ["/login", "/signup"];
+
+/**
+ * App-level realtime connection (p10 §4.1): one socket per tab for the whole
+ * authenticated session, independent of team/channel navigation. Also feeds
+ * the server's presence/push-suppression state with throttled activity
+ * frames on real user interaction (system design §5.5).
+ */
+function ConnectionManager() {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const authed = !PUBLIC_PATHS.some((p) => pathname.startsWith(p));
+
+  useEffect(() => {
+    if (!authed) return;
+    void wsClient.ensureConnected();
+    let lastSent = 0;
+    const activity = () => {
+      const now = Date.now();
+      if (now - lastSent < 30_000) return;
+      lastSent = now;
+      wsClient.sendActivity();
+    };
+    activity();
+    window.addEventListener("pointerdown", activity, { passive: true });
+    window.addEventListener("keydown", activity, { passive: true });
+    return () => {
+      window.removeEventListener("pointerdown", activity);
+      window.removeEventListener("keydown", activity);
+    };
+  }, [authed]);
+
+  return null;
+}
 
 export const Route = createRootRoute({
-  component: () => <Outlet />,
+  component: () => (
+    <>
+      <ConnectionManager />
+      <Outlet />
+    </>
+  ),
   beforeLoad: async ({ location }) => {
-    if (location.pathname === "/login" || location.pathname === "/signup") return;
+    if (PUBLIC_PATHS.some((p) => location.pathname.startsWith(p))) return;
+    if (desktopFileMode) {
+      // Electron file:// shell: bearer session probe instead of the cookie
+      // session lookup.
+      if (!(await hasDesktopSession())) {
+        throw redirect({ to: "/login" });
+      }
+      return;
+    }
     const session = await authClient.getSession();
     if (!session.data) {
       throw redirect({ to: "/login" });

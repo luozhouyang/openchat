@@ -30,26 +30,42 @@ async function handle(call: SqliteWorkerCall): Promise<{ rows?: Record<string, u
       db!.exec(call.sql);
       return {};
     case "run":
-      db!
-        .prepare(call.sql)
-        .bind(call.params as BindingSpec)
-        .stepFinalize();
+      run(db!, call.sql, call.params);
       return {};
-    case "all": {
-      const stmt = db!.prepare(call.sql);
-      try {
-        stmt.bind(call.params as BindingSpec);
-        const rows: Record<string, unknown>[] = [];
-        while (stmt.step()) rows.push(stmt.get({}) as Record<string, unknown>);
-        return { rows };
-      } finally {
-        stmt.finalize();
-      }
-    }
+    case "all":
+      return { rows: all(db!, call.sql, call.params) };
     case "close":
       db?.close();
       db = null;
       return {};
+  }
+}
+
+// bind([]) on a statement with zero placeholders throws ("no bindable
+// parameters"), e.g. SELECT DISTINCT channel_id — skip binding instead.
+function bindParams(stmt: { bind(spec: BindingSpec): void }, params: unknown[]) {
+  if (params.length > 0) stmt.bind(params as BindingSpec);
+}
+
+function run(db: Database, sql: string, params: unknown[]) {
+  const stmt = db.prepare(sql);
+  try {
+    bindParams(stmt, params);
+    stmt.stepFinalize();
+  } finally {
+    stmt.finalize();
+  }
+}
+
+function all(db: Database, sql: string, params: unknown[]): Record<string, unknown>[] {
+  const stmt = db.prepare(sql);
+  try {
+    bindParams(stmt, params);
+    const rows: Record<string, unknown>[] = [];
+    while (stmt.step()) rows.push(stmt.get({}) as Record<string, unknown>);
+    return rows;
+  } finally {
+    stmt.finalize();
   }
 }
 

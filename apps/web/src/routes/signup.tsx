@@ -24,7 +24,7 @@ function SignupPage() {
       setError(res.error.message ?? null);
       return;
     }
-    router.navigate({ to: "/" });
+    void router.navigate({ to: "/" });
   }
 
   return (

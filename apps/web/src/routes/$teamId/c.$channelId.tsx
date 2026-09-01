@@ -39,18 +39,6 @@ function ChannelView() {
     }
   }, [channelId, maxSeq]);
 
-  useEffect(() => {
-    const off = wsClient.onLocal((ev) => {
-      if (ev.type === "sync.result" && ev.channelId === channelId) {
-        useMessageStore.getState().applySync(ev.channelId, ev.messages);
-        void persistMessages(ev.channelId, ev.messages);
-      }
-    });
-    return () => {
-      off();
-    };
-  }, [channelId]);
-
   return (
     <div className="flex h-full">
       <div className="flex min-w-0 flex-1 flex-col">

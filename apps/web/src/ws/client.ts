@@ -1,125 +1,94 @@
 import { RealtimeClient } from "realtime";
+import { createDispatcher, createSyncGapHandler, buildSyncChannels } from "state";
+import type { ClientFrame } from "protocol";
+import { api } from "../lib/api";
 import { platform } from "../lib/platform";
-import { persistEdit, persistMessage, persistRemove } from "../lib/message-db";
+import { desktopBridge } from "../lib/desktop-bridge";
+import { getMessageDB } from "../lib/message-db";
 import { useConnectionStore } from "../stores/connection";
-import { useMessageStore } from "../stores/messages";
-import { useSidebarStore } from "../stores/sidebar";
-import { usePresenceStore } from "../stores/presence";
-import { useTypingStore } from "../stores/typing";
-import type { ClientFrame, ServerEvent, ChannelEvent, Message } from "protocol";
 
 class WsClient {
   private realtime: RealtimeClient;
+  private deviceId: string | null = null;
+  private selfUserId: string | null = null;
+  private handleSyncGap = createSyncGapHandler({
+    getDb: getMessageDB,
+    fetchHistory: async (channelId, beforeSeq) => {
+      const res = await api.posts.list(channelId, { limit: 100, beforeSeq });
+      // The REST list output omits attachments; normalize to the protocol shape.
+      return res.messages.map((m) => ({
+        ...m,
+        attachments: (m as { attachments?: unknown[] | null }).attachments ?? null,
+      }));
+    },
+  });
+  private dispatch = createDispatcher({
+    getDb: getMessageDB,
+    onMessageNew: (channelId, message) => this.notifyDesktop(channelId, message),
+    onSyncGap: (channelId) => void this.handleSyncGap(channelId),
+  });
 
   constructor() {
     this.realtime = new RealtimeClient({
       getToken: () => platform.getAuthToken(),
       buildUrl: (deviceId, token) => `${platform.serverUrl}?deviceId=${deviceId}&token=${token}`,
       onAuthMissing: () => {
-        window.location.href = "/login";
+        // file:// (hash router) must not navigate to a filesystem path.
+        if (window.location.protocol === "file:") window.location.hash = "#/login";
+        else window.location.href = "/login";
       },
       handlers: {
-        onOpen: () => this.sendSync(),
+        onOpen: () => void this.sendSync(),
         onMessage: (raw) => this.dispatch(raw),
         onStateChange: (state) => useConnectionStore.getState().set(state),
       },
     });
   }
 
-  async connect(deviceId: string) {
-    await this.realtime.connect(deviceId);
+  /**
+   * App-level connection entry (root layout): idempotent, one socket per
+   * browser tab regardless of team/channel navigation.
+   */
+  async ensureConnected() {
+    this.deviceId ??= localStorage.getItem("deviceId") ?? crypto.randomUUID();
+    localStorage.setItem("deviceId", this.deviceId);
+    if (this.selfUserId === null) {
+      try {
+        const me = await api.me();
+        this.selfUserId = me.user.id;
+      } catch {
+        this.selfUserId = null; // notifications just lose self-filtering
+      }
+    }
+    await this.realtime.connect(this.deviceId);
   }
 
   send(frame: ClientFrame) {
     this.realtime.send(JSON.stringify(frame));
   }
 
+  /** User-interaction liveness signal (presence + push suppression, §5.5). */
+  sendActivity() {
+    this.send({ type: "activity" });
+  }
+
   close() {
     this.realtime.close();
   }
 
-  private sendSync() {
-    const channels = Object.keys(useMessageStore.getState().channels);
+  private async sendSync() {
+    const db = await getMessageDB();
+    const channels = await buildSyncChannels(db);
     if (channels.length > 0) {
-      this.send({
-        type: "sync",
-        channels: channels.map((channelId) => ({
-          channelId,
-          lastSeq: useMessageStore.getState().maxSeq(channelId),
-        })),
-      });
+      this.send({ type: "sync", channels });
     }
   }
 
-  private dispatch(raw: string) {
-    const ev = JSON.parse(raw) as ServerEvent;
-    switch (ev.type) {
-      case "channel.event": {
-        const inner = ev.event as ChannelEvent;
-        if (inner.type === "message.new") {
-          const message = inner.message as Message;
-          useMessageStore.getState().ingest(ev.channelId, message);
-          if (message.parentId) useMessageStore.getState().ingestThread(ev.channelId, message);
-          useSidebarStore.getState().bump(ev.channelId);
-          void persistMessage(ev.channelId, message);
-        } else if (inner.type === "message.edit") {
-          useMessageStore.getState().edit(ev.channelId, inner.messageId, inner.content);
-          void persistEdit(ev.channelId, inner.messageId, inner.content, inner.editedAt);
-        } else if (inner.type === "message.delete") {
-          useMessageStore.getState().remove(ev.channelId, inner.messageId);
-          void persistRemove(ev.channelId, inner.messageId);
-        } else if (inner.type === "reaction.update") {
-          const e = inner as { messageSeq: number; reactions: Record<string, string[]> };
-          useMessageStore.getState().setReactions(ev.channelId, e.messageSeq, e.reactions);
-        } else if (inner.type === "thread.reply") {
-          const e = inner as { message: Message };
-          useMessageStore.getState().ingestThread(ev.channelId, e.message);
-          void persistMessage(ev.channelId, e.message);
-        } else if (inner.type === "typing.start") {
-          useTypingStore.getState().mark(ev.channelId, inner.userId, inner.expiresAt);
-        }
-        break;
-      }
-      case "sidebar.update":
-        useSidebarStore.getState().apply(ev);
-        break;
-      case "presence.update":
-        usePresenceStore.getState().set(ev.userId, ev.status);
-        break;
-      case "presence.snapshot":
-        usePresenceStore.getState().applySnapshot(ev.states);
-        break;
-      case "ack":
-        useMessageStore
-          .getState()
-          .ack(ev.channelId, ev.clientToken, { id: ev.messageId, seq: ev.seq });
-        break;
-      case "error": {
-        const channelId = (ev as { channelId?: string }).channelId;
-        if (ev.clientToken && channelId) {
-          useMessageStore.getState().fail(channelId, ev.clientToken);
-        }
-        this.emitLocal(ev);
-        break;
-      }
-      case "sync.result":
-        this.emitLocal(ev);
-        break;
-      case "sync.gap":
-      case "channel.read":
-      case "hello":
-        this.emitLocal(ev);
-        break;
-    }
-  }
-
-  private localHandlers = new Set<(ev: ServerEvent) => void>();
-  onLocal(cb: (ev: ServerEvent) => void) {
-    this.localHandlers.add(cb);
-    return () => this.localHandlers.delete(cb);
-  }
-  private emitLocal(ev: ServerEvent) {
-    for (const cb of this.localHandlers) cb(ev);
+  private notifyDesktop(channelId: string, message: { userId: string; content: string }) {
+    if (!desktopBridge) return;
+    if (!document.hidden) return;
+    if (this.selfUserId && message.userId === this.selfUserId) return;
+    desktopBridge.notify("openchat", message.content.slice(0, 100), `openchat://c/${channelId}`);
   }
 }
 

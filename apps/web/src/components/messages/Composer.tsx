@@ -13,10 +13,9 @@ export function Composer({ channelId }: { channelId: string }) {
     const content = text.trim();
     if (!content) return;
     const clientToken = crypto.randomUUID();
-    const maxSeq = useMessageStore.getState().maxSeq(channelId);
-    useMessageStore.getState().ingest(channelId, {
+    useMessageStore.getState().appendPending(channelId, clientToken, {
       id: `pending-${clientToken}`,
-      seq: maxSeq + 1,
+      seq: 0,
       userId: "me",
       parentId: null,
       type: "text",

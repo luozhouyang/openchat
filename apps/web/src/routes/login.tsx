@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { authClient } from "../lib/auth-client";
+import { desktopFileMode, signInDesktop } from "../lib/desktop-mode";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 
@@ -19,13 +20,22 @@ function LoginPage() {
     e.preventDefault();
     setBusy(true);
     setError(null);
-    const res = await authClient.signIn.email({ email, password });
-    setBusy(false);
-    if (res.error) {
-      setError(res.error.message ?? null);
-      return;
+    try {
+      if (desktopFileMode) {
+        await signInDesktop(email, password);
+      } else {
+        const res = await authClient.signIn.email({ email, password });
+        if (res.error) {
+          setError(res.error.message ?? null);
+          return;
+        }
+      }
+      void router.navigate({ to: "/" });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "登录失败");
+    } finally {
+      setBusy(false);
     }
-    router.navigate({ to: "/" });
   }
 
   return (
