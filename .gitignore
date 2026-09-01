@@ -44,3 +44,7 @@ dist-ssr
 # playwright artifacts
 test-results/
 playwright-report/
+release/
+
+# electron build output
+.vite/

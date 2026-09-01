@@ -1,0 +1,38 @@
+# electron-builder packaging (spec §6.2): macOS dmg/zip (notarization via env),
+# Windows nsis, Linux AppImage + deb. Updates: electron-updater generic feed
+# (R2 / GitHub Releases) provided at runtime via OPENCHAT_DESKTOP_UPDATE_URL.
+appId: dev.openchat.desktop
+productName: openchat
+directories:
+  output: release
+  buildResources: assets
+files:
+  - ".vite/build/**"
+  - "assets/**"
+  - "package.json"
+mac:
+  category: public.app-category.social-networking
+  target:
+    - target: dmg
+      arch: [universal]
+    - target: zip
+      arch: [universal]
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: entitlements.mac.plist
+  entitlementsInherit: entitlements.mac.plist
+  identity: null
+  notarize: false
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+linux:
+  target:
+    - target: AppImage
+      arch: [x64]
+    - target: deb
+      arch: [x64]
+  category: Network;InstantMessaging
+  icon: assets
+publish: null

@@ -1,0 +1,29 @@
+{
+  "name": "desktop",
+  "version": "0.0.0",
+  "private": true,
+  "description": "openchat desktop client (Electron shell over the web renderer)",
+  "type": "commonjs",
+  "main": ".vite/build/main.js",
+  "scripts": {
+    "start": "pnpm run build && electron .",
+    "build": "vp build --config vite.main.config.ts && vp build --config vite.preload.config.ts",
+    "package": "pnpm run build && electron-builder --config electron-builder.yml",
+    "package:dir": "pnpm run build && electron-builder --dir --config electron-builder.yml",
+    "test": "vp test",
+    "e2e": "playwright test",
+    "check": "vp check"
+  },
+  "dependencies": {
+    "electron-updater": "^6.6.4"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.62.1",
+    "@types/node": "catalog:",
+    "electron": "44.1.0",
+    "electron-builder": "^26.0.12",
+    "typescript": "catalog:",
+    "vite": "catalog:"
+  },
+  "productName": "openchat"
+}
