@@ -7,7 +7,7 @@ import { describe, expect, it, vi } from "vite-plus/test";
 import { render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider, createRouter } from "@tanstack/react-router";
-import { MemoryMessageDB } from "state";
+import { createMemoryDatabase } from "state";
 import { routeTree } from "../src/routeTree.gen";
 import { hydrateChannel } from "../src/lib/message-db";
 import { useMessageStore } from "../src/stores/messages";
@@ -36,9 +36,9 @@ describe("app", () => {
 
 describe("channel view hydration", () => {
   it("seeds the message store from the local db before sync", async () => {
-    const db = new MemoryMessageDB();
-    await db.init("c1");
-    await db.append("c1", {
+    const db = createMemoryDatabase();
+    await db.migrate();
+    await db.messages.append("c1", {
       id: "m1",
       seq: 1,
       userId: "u1",

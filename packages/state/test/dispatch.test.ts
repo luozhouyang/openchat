@@ -1,6 +1,6 @@
 import { expect, test, vi } from "vite-plus/test";
 import type { Message, ServerEvent } from "protocol";
-import { MemoryMessageDB } from "../src/db/memory.ts";
+import { createMemoryDatabase } from "../src/db/database.ts";
 import { createDispatcher } from "../src/realtime/dispatch.ts";
 import { buildSyncChannels, createSyncGapHandler } from "../src/realtime/sync.ts";
 import { useMessageStore } from "../src/stores/messages.ts";
@@ -21,7 +21,7 @@ const msg = (seq: number, id = `m${seq}`): Message => ({
 
 function setup() {
   useMessageStore.setState({ channels: {}, threads: {} });
-  const db = new MemoryMessageDB();
+  const db = createMemoryDatabase();
   const onMessageNew = vi.fn();
   const onSyncGap = vi.fn();
   const onLocal = vi.fn<(ev: ServerEvent) => void>();
@@ -53,7 +53,7 @@ test("dispatch message.new ingests, persists and fires onMessageNew", async () =
       event: { type: "message.new", message: msg(1) },
     }),
   );
-  await vi.waitFor(() => expect(db.maxSeq("c1")).resolves.toBe(1));
+  await vi.waitFor(() => expect(db.messages.maxSeq("c1")).resolves.toBe(1));
   expect(useMessageStore.getState().list("c1")).toHaveLength(1);
   expect(onMessageNew).toHaveBeenCalledWith("c1", msg(1));
 });
@@ -61,7 +61,7 @@ test("dispatch message.new ingests, persists and fires onMessageNew", async () =
 test("dispatch sync.result applies, persists and passes through", async () => {
   const { db, dispatch, onLocal } = setup();
   dispatch(JSON.stringify({ type: "sync.result", channelId: "c1", messages: [msg(1), msg(2)] }));
-  await vi.waitFor(() => expect(db.maxSeq("c1")).resolves.toBe(2));
+  await vi.waitFor(() => expect(db.messages.maxSeq("c1")).resolves.toBe(2));
   expect(useMessageStore.getState().maxSeq("c1")).toBe(2);
   expect(onLocal).toHaveBeenCalledTimes(1);
 });
@@ -107,9 +107,9 @@ test("dispatch ack confirms pending, channel.read syncs sidebar", async () => {
 
 test("buildSyncChannels takes lastSeq from db and store, capped at maxChannels", async () => {
   useMessageStore.setState({ channels: {}, threads: {} });
-  const db = new MemoryMessageDB();
-  await db.init("c1");
-  await db.append("c1", msg(5)); // db ahead of store
+  const db = createMemoryDatabase();
+
+  await db.messages.append("c1", msg(5)); // db ahead of store
   useMessageStore.getState().applySync("c1", [msg(3)]);
   useMessageStore.getState().applySync("c2", [msg(9)]); // store-only channel
   const channels = await buildSyncChannels(db, 1);
@@ -122,7 +122,7 @@ test("buildSyncChannels takes lastSeq from db and store, capped at maxChannels",
 
 test("createSyncGapHandler pages history backwards until overlap", async () => {
   useMessageStore.setState({ channels: {}, threads: {} });
-  const db = new MemoryMessageDB();
+  const db = createMemoryDatabase();
   const fetchHistory = vi.fn(async (channelId: string, beforeSeq?: number) => {
     // Server has seq 1..250; latest page first, then older pages.
     const top = beforeSeq === undefined ? 250 : beforeSeq - 1;
@@ -139,12 +139,12 @@ test("createSyncGapHandler pages history backwards until overlap", async () => {
   // Fills from local head + 1 up to the latest page
   const list = useMessageStore.getState().list("c1");
   expect(list[list.length - 1].seq).toBe(250);
-  expect(await db.maxSeq("c1")).toBe(250);
+  expect(await db.messages.maxSeq("c1")).toBe(250);
 });
 
 test("createSyncGapHandler stops quietly when offline", async () => {
   useMessageStore.setState({ channels: {}, threads: {} });
-  const db = new MemoryMessageDB();
+  const db = createMemoryDatabase();
   const handle = createSyncGapHandler({
     getDb: async () => db,
     fetchHistory: vi.fn(async () => {

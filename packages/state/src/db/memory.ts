@@ -1,5 +1,5 @@
 import type { Message } from "protocol";
-import type { ChannelQuery, MessageDB, MessagePage } from "./types.ts";
+import type { ChannelQuery, MessagePage, MessageRepository } from "./types.ts";
 
 interface ChannelState {
   byId: Map<string, Message>;
@@ -22,10 +22,13 @@ function applyUpsert(ch: ChannelState, message: Message) {
   ch.bySeq.set(message.seq, message.id);
 }
 
-export class MemoryMessageDB implements MessageDB {
+/**
+ * Session-scoped implementation for environments without SQLite (no
+ * Worker/OPFS). Same semantics as the SQLite repository — pinned by the
+ * shared contract tests.
+ */
+export class MemoryMessageRepository implements MessageRepository {
   private channels = new Map<string, ChannelState>();
-
-  async init(_channelId: string) {}
 
   async append(channelId: string, message: Message) {
     const ch = ensure(this.channels, channelId);
@@ -77,7 +80,7 @@ export class MemoryMessageDB implements MessageDB {
     if (m) m.deletedAt = Date.now();
   }
 
-  async close() {
+  clear() {
     this.channels.clear();
   }
 }

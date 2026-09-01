@@ -1,5 +1,5 @@
 import type { Message } from "protocol";
-import type { MessageDB } from "../db/types.ts";
+import type { LocalDatabase } from "../db/database.ts";
 import { useMessageStore } from "../stores/messages.ts";
 
 /**
@@ -8,16 +8,16 @@ import { useMessageStore } from "../stores/messages.ts";
  * channels hydrated this session but not yet persisted.
  */
 export async function buildSyncChannels(
-  db: MessageDB,
+  db: LocalDatabase,
   maxChannels = 500,
 ): Promise<{ channelId: string; lastSeq: number }[]> {
-  const ids = new Set(await db.listChannels());
+  const ids = new Set(await db.messages.listChannels());
   for (const id of Object.keys(useMessageStore.getState().channels)) ids.add(id);
   const out: { channelId: string; lastSeq: number }[] = [];
   for (const channelId of ids) {
     const lastSeq = Math.max(
       useMessageStore.getState().maxSeq(channelId),
-      await db.maxSeq(channelId),
+      await db.messages.maxSeq(channelId),
     );
     out.push({ channelId, lastSeq });
   }
@@ -30,7 +30,7 @@ export async function buildSyncChannels(
  * we already have locally.
  */
 export function createSyncGapHandler(deps: {
-  getDb(): Promise<MessageDB>;
+  getDb(): Promise<LocalDatabase>;
   /** Returns one page of history (newest first backwards); page size is the caller's choice. */
   fetchHistory(channelId: string, beforeSeq?: number): Promise<Message[]>;
   maxPages?: number;
@@ -40,7 +40,7 @@ export function createSyncGapHandler(deps: {
     const db = await deps.getDb();
     const localMax = Math.max(
       useMessageStore.getState().maxSeq(channelId),
-      await db.maxSeq(channelId),
+      await db.messages.maxSeq(channelId),
     );
     let beforeSeq: number | undefined;
     for (let page = 0; page < maxPages; page++) {
@@ -52,7 +52,7 @@ export function createSyncGapHandler(deps: {
       }
       if (messages.length === 0) return;
       useMessageStore.getState().applySync(channelId, messages);
-      await db.applyGap(
+      await db.messages.applyGap(
         channelId,
         messages.map((m) => ({ ...m, attachments: m.attachments ?? null })),
       );

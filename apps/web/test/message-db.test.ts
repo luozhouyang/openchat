@@ -1,5 +1,5 @@
 import { expect, test } from "vite-plus/test";
-import { MemoryMessageDB } from "state";
+import { createMemoryDatabase } from "state";
 import { getMessageDB, hydrateChannel, persistMessage } from "../src/lib/message-db";
 import { useMessageStore } from "../src/stores/messages";
 
@@ -18,16 +18,16 @@ const msg = {
 };
 
 test("persistMessage appends to injected db", async () => {
-  const db = new MemoryMessageDB();
-  await db.init("c1");
+  const db = createMemoryDatabase();
+  await db.migrate();
   await persistMessage("c1", msg, db);
-  expect(await db.maxSeq("c1")).toBe(1);
+  expect(await db.messages.maxSeq("c1")).toBe(1);
 });
 
 test("hydrateChannel seeds store from db and returns count", async () => {
-  const db = new MemoryMessageDB();
-  await db.init("c1");
-  await db.append("c1", msg);
+  const db = createMemoryDatabase();
+  await db.migrate();
+  await db.messages.append("c1", msg);
   useMessageStore.getState().reset("c1");
   const n = await hydrateChannel("c1", db);
   expect(n).toBe(1);
@@ -37,10 +37,10 @@ test("hydrateChannel seeds store from db and returns count", async () => {
 
 test("getMessageDB degrades to a working db without worker/OPFS (jsdom)", async () => {
   const db = await getMessageDB();
-  await db.init("c1");
-  await db.append("c1", msg);
-  expect(await db.maxSeq("c1")).toBe(1);
-  const { rows } = await db.query("c1", { limit: 10 });
+  await db.migrate();
+  await db.messages.append("c1", msg);
+  expect(await db.messages.maxSeq("c1")).toBe(1);
+  const { rows } = await db.messages.query("c1", { limit: 10 });
   expect(rows).toHaveLength(1);
   expect(rows[0].id).toBe("m1");
 });

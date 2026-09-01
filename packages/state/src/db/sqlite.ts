@@ -1,7 +1,7 @@
 import type { Message } from "protocol";
-import { MIGRATIONS } from "./schema.ts";
 import type { SqliteDriver } from "./driver.ts";
-import type { ChannelQuery, MessageDB, MessagePage } from "./types.ts";
+import type { SqliteTxRunner } from "./tx.ts";
+import type { ChannelQuery, MessagePage, MessageRepository } from "./types.ts";
 
 function json(v: unknown): string | null {
   return v === null || v === undefined ? null : JSON.stringify(v);
@@ -53,15 +53,13 @@ ON CONFLICT (channel_id, message_id) DO UPDATE SET
   deleted_at = excluded.deleted_at
 `;
 
-export class SqliteMessageDB implements MessageDB {
+export class SqliteMessageRepository implements MessageRepository {
   private d: SqliteDriver;
+  private tx: SqliteTxRunner;
 
-  constructor(d: SqliteDriver) {
+  constructor(d: SqliteDriver, tx: SqliteTxRunner) {
     this.d = d;
-  }
-
-  async init(_channelId: string) {
-    for (const m of MIGRATIONS) await this.d.exec(m);
+    this.tx = tx;
   }
 
   async append(channelId: string, message: Message) {
@@ -70,16 +68,11 @@ export class SqliteMessageDB implements MessageDB {
 
   async applyGap(channelId: string, messages: Message[]) {
     if (messages.length === 0) return;
-    // One transaction per gap: without it a 500-message refill costs one
-    // implicit transaction (and driver round-trip) per row.
-    await this.d.exec("BEGIN");
-    try {
+    // One transaction per gap (joins an outer transaction when the caller
+    // wrapped it): a 500-message refill is a single commit, not 500.
+    await this.tx.run(async () => {
       for (const m of messages) await this.d.run(UPSERT, this.params(channelId, m));
-      await this.d.exec("COMMIT");
-    } catch (err) {
-      await this.d.exec("ROLLBACK").catch(() => {});
-      throw err;
-    }
+    });
   }
 
   async query(channelId: string, opts: ChannelQuery): Promise<MessagePage> {
@@ -125,10 +118,6 @@ export class SqliteMessageDB implements MessageDB {
       channelId,
       messageId,
     ]);
-  }
-
-  async close() {
-    await this.d.close();
   }
 
   private params(channelId: string, m: Message): unknown[] {

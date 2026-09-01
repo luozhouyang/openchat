@@ -1,5 +1,5 @@
 import type { ChannelEvent, Message, ServerEvent } from "protocol";
-import type { MessageDB } from "../db/types.ts";
+import type { LocalDatabase } from "../db/database.ts";
 import { useMessageStore } from "../stores/messages.ts";
 import { useSidebarStore } from "../stores/sidebar.ts";
 import { usePresenceStore } from "../stores/presence.ts";
@@ -11,7 +11,7 @@ function normalize(m: Message): Message {
 }
 
 export interface DispatcherDeps {
-  getDb(): Promise<MessageDB>;
+  getDb(): Promise<LocalDatabase>;
   /** Fired for every confirmed incoming message (notifications, sidebar extras). */
   onMessageNew?(channelId: string, message: Message): void;
   /** sync.gap: the app refetches history — see createSyncGapHandler. */
@@ -43,12 +43,12 @@ export function createDispatcher(deps: DispatcherDeps) {
           if (message.parentId) useMessageStore.getState().ingestThread(ev.channelId, message);
           // Instant badge; the authoritative sidebar.update follows right after.
           useSidebarStore.getState().bump(ev.channelId);
-          void deps.getDb().then((db) => db.append(ev.channelId, normalize(message)));
+          void deps.getDb().then((db) => db.messages.append(ev.channelId, normalize(message)));
           deps.onMessageNew?.(ev.channelId, message);
         } else if (inner.type === "thread.reply") {
           const message = (inner as unknown as { message: Message }).message;
           useMessageStore.getState().ingestThread(ev.channelId, message);
-          void deps.getDb().then((db) => db.append(ev.channelId, normalize(message)));
+          void deps.getDb().then((db) => db.messages.append(ev.channelId, normalize(message)));
           deps.onMessageNew?.(ev.channelId, message);
         } else if (inner.type === "message.edit") {
           useMessageStore
@@ -56,10 +56,12 @@ export function createDispatcher(deps: DispatcherDeps) {
             .edit(ev.channelId, inner.messageId, inner.content, inner.editedAt);
           void deps
             .getDb()
-            .then((db) => db.edit(ev.channelId, inner.messageId, inner.content, inner.editedAt));
+            .then((db) =>
+              db.messages.edit(ev.channelId, inner.messageId, inner.content, inner.editedAt),
+            );
         } else if (inner.type === "message.delete") {
           useMessageStore.getState().remove(ev.channelId, inner.messageId);
-          void deps.getDb().then((db) => db.remove(ev.channelId, inner.messageId));
+          void deps.getDb().then((db) => db.messages.remove(ev.channelId, inner.messageId));
         } else if (inner.type === "reaction.update") {
           const e = inner as unknown as { messageSeq: number; reactions: Record<string, string[]> };
           useMessageStore.getState().setReactions(ev.channelId, e.messageSeq, e.reactions);
@@ -98,7 +100,9 @@ export function createDispatcher(deps: DispatcherDeps) {
         break;
       case "sync.result":
         useMessageStore.getState().applySync(ev.channelId, ev.messages);
-        void deps.getDb().then((db) => db.applyGap(ev.channelId, ev.messages.map(normalize)));
+        void deps
+          .getDb()
+          .then((db) => db.messages.applyGap(ev.channelId, ev.messages.map(normalize)));
         deps.onLocal?.(ev);
         break;
       case "sync.gap":

@@ -10,8 +10,11 @@ export interface MessagePage {
   hasMore: boolean;
 }
 
-export interface MessageDB {
-  init(channelId: string): Promise<void>;
+/**
+ * Message entity repository. Lifecycle (migrations, transactions, close)
+ * belongs to LocalDatabase — this is data access only.
+ */
+export interface MessageRepository {
   append(channelId: string, message: Message): Promise<void>;
   applyGap(channelId: string, messages: Message[]): Promise<void>;
   query(channelId: string, opts: ChannelQuery): Promise<MessagePage>;
@@ -20,5 +23,4 @@ export interface MessageDB {
   listChannels(): Promise<string[]>;
   edit(channelId: string, messageId: string, content: string, editedAt: number): Promise<void>;
   remove(channelId: string, messageId: string): Promise<void>;
-  close(): Promise<void>;
 }

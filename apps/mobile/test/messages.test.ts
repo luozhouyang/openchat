@@ -1,6 +1,6 @@
 import { beforeEach, expect, jest, test } from "@jest/globals";
 import type { Message } from "protocol";
-import { MemoryMessageDB } from "state";
+import { createMemoryDatabase, type LocalDatabase } from "state";
 import { useMessages } from "../src/stores/messages";
 import { dispatch } from "../src/ws/client";
 import * as messageDb from "../src/lib/message-db";
@@ -30,12 +30,12 @@ function makeMessage(seq: number, id = `m${seq}`): Message {
   };
 }
 
-let db: MemoryMessageDB;
+let db: LocalDatabase;
 
 beforeEach(() => {
   useMessages.getState().reset("c1");
   useMessages.setState({ channels: {}, threads: {} });
-  db = new MemoryMessageDB();
+  db = createMemoryDatabase();
   jest.spyOn(messageDb, "getMessageDB").mockImplementation(async () => db);
 });
 
@@ -84,8 +84,8 @@ test("shared dispatch message.new ingests and persists to the on-device db", asy
     }),
   );
   expect(useMessages.getState().list("c1")).toHaveLength(1);
-  await until(async () => (await db.maxSeq("c1")) === 1);
-  expect(await db.maxSeq("c1")).toBe(1);
+  await until(async () => (await db.messages.maxSeq("c1")) === 1);
+  expect(await db.messages.maxSeq("c1")).toBe(1);
 });
 
 test("shared dispatch sync.result applies history and persists", async () => {
@@ -97,8 +97,8 @@ test("shared dispatch sync.result applies history and persists", async () => {
     }),
   );
   expect(useMessages.getState().maxSeq("c1")).toBe(2);
-  await until(async () => (await db.maxSeq("c1")) === 2);
-  expect(await db.maxSeq("c1")).toBe(2);
+  await until(async () => (await db.messages.maxSeq("c1")) === 2);
+  expect(await db.messages.maxSeq("c1")).toBe(2);
 });
 
 test("shared dispatch ignores keepalive and malformed frames", () => {
@@ -109,9 +109,8 @@ test("shared dispatch ignores keepalive and malformed frames", () => {
 });
 
 test("in-memory driver (used by unit tests) keeps basic semantics", async () => {
-  await db.init("c1");
-  await db.append("c1", makeMessage(1));
-  await db.append("c1", makeMessage(1)); // idempotent upsert
-  expect(await db.maxSeq("c1")).toBe(1);
-  expect((await db.query("c1", { limit: 10 })).rows).toHaveLength(1);
+  await db.messages.append("c1", makeMessage(1));
+  await db.messages.append("c1", makeMessage(1)); // idempotent upsert
+  expect(await db.messages.maxSeq("c1")).toBe(1);
+  expect((await db.messages.query("c1", { limit: 10 })).rows).toHaveLength(1);
 });

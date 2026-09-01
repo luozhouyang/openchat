@@ -1,10 +1,14 @@
-export { MemoryMessageDB } from "./db/memory.ts";
-export { SqliteMessageDB } from "./db/sqlite.ts";
-// NOTE: runMessageDBContract lives behind the "state/contract" entry (it
+export { createMemoryDatabase, createSqliteDatabase, type LocalDatabase } from "./db/database.ts";
+export { runMigrations, wipeDatabase, type Migration } from "./db/migrations.ts";
+export { MIGRATIONS, SCHEMA_V1 } from "./db/schema.ts";
+// NOTE: runMessageRepoContract lives behind the "state/contract" entry (it
 // depends on the vitest harness and must stay out of app runtime bundles).
 // The node:sqlite NodeSqliteDriver likewise lives behind "state/node".
 export type { SqliteDriver } from "./db/driver.ts";
-export type { ChannelQuery, MessageDB, MessagePage } from "./db/types.ts";
+export type { ChannelQuery, MessagePage, MessageRepository } from "./db/types.ts";
+export { MemoryMessageRepository } from "./db/memory.ts";
+export { SqliteMessageRepository } from "./db/sqlite.ts";
+export { SqliteTxRunner } from "./db/tx.ts";
 
 export { useMessageStore, type StoreMessage } from "./stores/messages.ts";
 export { useSidebarStore } from "./stores/sidebar.ts";
