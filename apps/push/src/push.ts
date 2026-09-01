@@ -51,10 +51,37 @@ export async function handlePushTask(task: PushTask, env: PushEnv): Promise<void
           throw err;
         }
       }
-    } else if (sub.kind === "fcm") {
-      await sendFcm(env, sub, payload);
+    } else if (sub.kind === "expo") {
+      // Mobile: the Expo push service fans out to FCM/APNs on our behalf (no
+      // per-provider credentials to manage in the worker).
+      await sendExpo(sub, payload);
     }
+    // "fcm" / "apns": direct provider delivery needs an OAuth2 service
+    // account / APNs credentials design decision — not implemented yet;
+    // mobile registers as kind=expo instead.
   }
+}
+
+async function sendExpo(sub: Subscription, payload: string): Promise<void> {
+  const token = new URL(sub.endpoint).searchParams.get("device");
+  if (!token) {
+    console.error("expo push: endpoint carries no device token");
+    return;
+  }
+  const data = JSON.parse(payload) as { title: string; body: string; channelId: string };
+  const res = await fetch("https://exp.host/--/api/v2/push/send", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify([
+      {
+        to: token,
+        title: data.title,
+        body: data.body,
+        data: { url: `openchat://c/${data.channelId}` },
+      },
+    ]),
+  });
+  if (!res.ok) console.error("expo push failed", res.status);
 }
 
 async function fetchSubscriptions(env: PushEnv, userId: string): Promise<Subscription[]> {
@@ -72,15 +99,4 @@ async function unregister(env: PushEnv, userId: string, deviceId: string): Promi
     headers: { "x-internal-token": env.INTERNAL_TOKEN_KEY, "content-type": "application/json" },
     body: JSON.stringify({ deviceId }),
   });
-}
-
-async function sendFcm(_env: PushEnv, sub: Subscription, payload: string): Promise<void> {
-  const res = await fetch("https://fcm.googleapis.com/v1/projects/openchat/messages:send", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      message: { token: sub.endpoint, data: { payload } },
-    }),
-  });
-  if (!res.ok) console.error("fcm push failed", res.status);
 }
