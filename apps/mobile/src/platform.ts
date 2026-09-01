@@ -2,7 +2,7 @@ import * as SecureStore from "expo-secure-store";
 import { AppState, Platform } from "react-native";
 import type { AppLifecycle, PlatformAdapter, StorageAdapter } from "platform";
 import { API_URL, wsUrl } from "./lib/config";
-import { tokenStore } from "./lib/secure";
+import { getWsJwt } from "./lib/auth";
 
 const secureStorage: StorageAdapter = {
   get: (key) => {
@@ -25,7 +25,9 @@ export function createMobilePlatform(): PlatformAdapter {
   return {
     platform: Platform.OS === "ios" ? "ios" : "android",
     serverUrl: wsUrl(API_URL, "/ws"),
-    getAuthToken: () => tokenStore.get(),
+    // The WS upgrade requires a short-lived JWT (not the stored session
+    // token): getWsJwt fetches one from /api/auth/token with caching.
+    getAuthToken: () => getWsJwt(),
     storage: secureStorage,
     onAppStateChange(cb: (s: AppLifecycle) => void) {
       const handler = AppState.addEventListener("change", (state) => {

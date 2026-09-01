@@ -1,5 +1,5 @@
 import { beforeEach, expect, jest, test } from "@jest/globals";
-import { api, signIn, signOut, signUp } from "../src/lib/auth";
+import { api, getWsJwt, signIn, signOut, signUp } from "../src/lib/auth";
 import { tokenStore } from "../src/lib/secure";
 
 const mockFetch = jest.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>();
@@ -45,8 +45,12 @@ test("api attaches Authorization header and clears token on 401", async () => {
 
   const res = await api<{ teams: unknown[] }>("/api/v1/users/me/workspaces");
   expect(res).toEqual({ teams: [] });
-  const sentHeaders = (mockFetch.mock.calls[0]?.[1]?.headers ?? {}) as Record<string, string>;
-  expect(sentHeaders.authorization).toBe("Bearer tok-1");
+  const sentHeaders = mockFetch.mock.calls[0]?.[1]?.headers;
+  const authHeader =
+    sentHeaders instanceof Headers
+      ? sentHeaders.get("authorization")
+      : (sentHeaders as Record<string, string> | undefined)?.authorization;
+  expect(authHeader).toBe("Bearer tok-1");
 
   await expect(api("/api/v1/users/me/workspaces")).rejects.toThrow("unauthorized");
   expect(await tokenStore.get()).toBeNull();
@@ -64,4 +68,28 @@ test("signOut clears the stored token", async () => {
   await tokenStore.set("tok-1");
   await signOut();
   expect(await tokenStore.get()).toBeNull();
+});
+
+test("getWsJwt exchanges the session token for a WS JWT and caches it", async () => {
+  await tokenStore.set("session-1");
+  mockFetch.mockResolvedValueOnce(
+    new Response(JSON.stringify({ token: "jwt-1" }), { status: 200 }),
+  );
+  await expect(getWsJwt()).resolves.toBe("jwt-1");
+  const call = mockFetch.mock.calls[0];
+  expect(String(call[0])).toContain("/api/auth/token");
+  const headers = call[1]?.headers as Record<string, string>;
+  const auth = headers instanceof Headers ? headers.get("authorization") : headers?.authorization;
+  expect(auth).toBe("Bearer session-1");
+  // Cached: no extra fetch within the TTL window.
+  await expect(getWsJwt()).resolves.toBe("jwt-1");
+  expect(mockFetch).toHaveBeenCalledTimes(1);
+});
+
+test("getWsJwt returns null without a session or on failure", async () => {
+  await tokenStore.clear();
+  await expect(getWsJwt()).resolves.toBeNull();
+  await tokenStore.set("session-2");
+  mockFetch.mockResolvedValueOnce(new Response("nope", { status: 401 }));
+  await expect(getWsJwt()).resolves.toBeNull();
 });

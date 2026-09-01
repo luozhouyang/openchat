@@ -13,9 +13,10 @@ export function consumeDeepLink(): string | null {
 }
 
 /**
- * Push registration (spec §4.3): expo-notifications token → the existing
- * push_subscriptions pipeline. Requires a development build (EAS) with push
- * credentials; in Expo Go or on unsupported targets this degrades to a no-op.
+ * Push registration (spec §4.3): an Expo push token registered as kind=expo;
+ * the push worker delivers through the Expo push service, which fans out to
+ * FCM/APNs. Requires a development build (EAS) — in Expo Go or on unsupported
+ * targets this degrades to a no-op.
  */
 export async function registerPush(): Promise<void> {
   try {
@@ -26,17 +27,17 @@ export async function registerPush(): Promise<void> {
     }
     if (!granted) return;
 
-    const token = await Notifications.getDevicePushTokenAsync();
-    const nativeToken = "data" in token && typeof token.data === "string" ? token.data : "";
-    // The current push pipeline (P7) stores webpush endpoints; native tokens
-    // are carried via the Expo push service endpoint until the API grows
-    // fcm/apns token columns (P10c backend follow-up).
+    const { data: expoToken } = await Notifications.getExpoPushTokenAsync();
+    if (typeof expoToken !== "string" || expoToken.length === 0) return;
+    // endpoint must be a URL (protocol PushSubscribeInput); the Expo push
+    // service send endpoint carries the token in the device query param.
+    const endpoint = `https://exp.host/--/api/v2/push/send?device=${encodeURIComponent(expoToken)}`;
     await api("/api/v1/users/me/push_subscriptions", {
       method: "POST",
       body: JSON.stringify({
         deviceId: await getDeviceId(),
-        kind: Platform.OS === "ios" ? "apns" : "fcm",
-        endpoint: `https://exp.host/--/api/v2/push/send?device=${encodeURIComponent(nativeToken)}`,
+        kind: "expo",
+        endpoint,
       }),
     });
 

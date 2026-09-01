@@ -1,25 +1,20 @@
 import { RealtimeClient } from "realtime";
-import type { ChannelEvent, ClientFrame, Message, ServerEvent } from "protocol";
-import { persistEdit, persistMessage, persistMessages, persistRemove } from "../lib/message-db";
+import { buildSyncChannels, createDispatcher, createSyncGapHandler } from "state";
+import type { ClientFrame, Message } from "protocol";
+import { api } from "../lib/auth";
+import { getMessageDB } from "../lib/message-db";
 import { getDeviceId } from "../lib/secure";
 import { createMobilePlatform } from "../platform";
-import { useMessages } from "../stores/messages";
 
 export type ConnectionState = "idle" | "connecting" | "open" | "reconnecting" | "closed";
 
 let connectionState: ConnectionState = "idle";
 const stateListeners = new Set<(s: ConnectionState) => void>();
-const localHandlers = new Set<(ev: ServerEvent) => void>();
 
 export function onConnectionState(cb: (s: ConnectionState) => void): () => void {
   stateListeners.add(cb);
   cb(connectionState);
   return () => stateListeners.delete(cb);
-}
-
-export function onLocalEvent(cb: (ev: ServerEvent) => void): () => void {
-  localHandlers.add(cb);
-  return () => localHandlers.delete(cb);
 }
 
 function setConnectionState(s: ConnectionState) {
@@ -29,16 +24,30 @@ function setConnectionState(s: ConnectionState) {
 
 const platform = createMobilePlatform();
 
+const handleSyncGap = createSyncGapHandler({
+  getDb: () => getMessageDB(),
+  fetchHistory: async (channelId, beforeSeq) => {
+    const res = await api<{ messages: Message[] }>(
+      `/api/v1/channels/${channelId}/posts?limit=100${beforeSeq !== undefined ? `&beforeSeq=${beforeSeq}` : ""}`,
+    );
+    return res.messages;
+  },
+});
+
+/** Shared server-event pipeline (store + on-device DB), same code as web. */
+export const dispatch = createDispatcher({
+  getDb: () => getMessageDB(),
+  onSyncGap: (channelId) => void handleSyncGap(channelId),
+});
+
 const realtime = new RealtimeClient({
   getToken: () => platform.getAuthToken(),
   buildUrl: (deviceId, token) => `${platform.serverUrl}?deviceId=${deviceId}&token=${token}`,
-  onAuthMissing: () => {
-    for (const cb of localHandlers) {
-      cb({ type: "error", code: "auth_missing", message: "authentication required" });
-    }
-  },
+  // Token gone (signed out): RealtimeClient parks itself in "closed"; the
+  // login flow reconnects via connectRealtime() after a fresh sign-in.
+  onAuthMissing: () => {},
   handlers: {
-    onOpen: () => sendSync(),
+    onOpen: () => void sendSync(),
     onMessage: (raw) => dispatch(raw),
     onStateChange: setConnectionState,
   },
@@ -58,50 +67,14 @@ export function sendFrame(frame: ClientFrame): boolean {
   return realtime.send(JSON.stringify(frame));
 }
 
-function sendSync() {
-  const channels = Object.keys(useMessages.getState().channels);
-  if (channels.length === 0) return;
-  sendFrame({
-    type: "sync",
-    channels: channels.map((channelId) => ({
-      channelId,
-      lastSeq: useMessages.getState().maxSeq(channelId),
-    })),
-  });
+/** Liveness signal for presence + push suppression (system design §5.5). */
+export function sendActivity(): void {
+  sendFrame({ type: "activity" });
 }
 
-export function dispatch(raw: string) {
-  const ev = JSON.parse(raw) as ServerEvent;
-  switch (ev.type) {
-    case "channel.event": {
-      const inner = ev.event as ChannelEvent;
-      if (inner.type === "message.new" || inner.type === "thread.reply") {
-        const message = (inner as { message: Message }).message;
-        useMessages.getState().ingest(ev.channelId, message);
-        void persistMessage(ev.channelId, message);
-      } else if (inner.type === "message.edit") {
-        useMessages.getState().edit(ev.channelId, inner.messageId, inner.content, inner.editedAt);
-        void persistEdit(ev.channelId, inner.messageId, inner.content, inner.editedAt);
-      } else if (inner.type === "message.delete") {
-        useMessages.getState().remove(ev.channelId, inner.messageId);
-        void persistRemove(ev.channelId, inner.messageId);
-      }
-      break;
-    }
-    case "sync.result":
-      useMessages.getState().applySync(ev.channelId, ev.messages);
-      void persistMessages(ev.channelId, ev.messages);
-      for (const cb of localHandlers) cb(ev);
-      break;
-    case "ack":
-      useMessages.getState().ack(ev.channelId, ev.clientToken, { id: ev.messageId, seq: ev.seq });
-      break;
-    case "error":
-    case "sync.gap":
-    case "hello":
-      for (const cb of localHandlers) cb(ev);
-      break;
-    default:
-      break;
-  }
+async function sendSync() {
+  const db = await getMessageDB();
+  const channels = await buildSyncChannels(db);
+  if (channels.length === 0) return;
+  sendFrame({ type: "sync", channels });
 }

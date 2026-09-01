@@ -10,13 +10,14 @@ import {
   TextInput,
   View,
 } from "react-native";
-import type { Message } from "protocol";
+import type { StoreMessage } from "state";
+import { useSidebarStore, useStructureStore } from "state";
 import { api, signIn } from "./src/lib/auth";
 import { consumeDeepLink, registerPush } from "./src/lib/push";
 import { hydrateChannel, persistMessage, persistMessages } from "./src/lib/message-db";
 import { createMobilePlatform } from "./src/platform";
 import { useMessages } from "./src/stores/messages";
-import { closeRealtime, connectRealtime, onConnectionState, sendFrame } from "./src/ws/client";
+import { closeRealtime, connectRealtime, sendActivity, sendFrame } from "./src/ws/client";
 
 type TeamSummary = { id: string; displayName: string; channels: ChannelSummary[] };
 type ChannelSummary = { id: string; displayName: string; type: string; member?: unknown };
@@ -51,15 +52,17 @@ export default function App() {
     if (!hasSession) return;
     void connectRealtime();
     void registerPush();
-    const offState = onConnectionState(() => {});
+    sendActivity(); // foregrounding is an interaction signal
     const mobilePlatform = createMobilePlatform();
     // Background closes the socket; foreground reconnects + re-syncs (spec §4.1).
     const offApp = mobilePlatform.onAppStateChange((state) => {
       if (state === "background") closeRealtime();
-      else void connectRealtime();
+      else {
+        void connectRealtime();
+        sendActivity();
+      }
     });
     return () => {
-      offState();
       offApp();
       closeRealtime();
     };
@@ -152,18 +155,41 @@ function WorkspaceScreen({
 }) {
   const [teams, setTeams] = useState<TeamSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const structureVersion = useStructureStore((s) => s.version);
 
   useEffect(() => {
     (async () => {
       try {
         const res = await api<{ teams: TeamSummary[] }>("/api/v1/users/me/workspaces");
         setTeams(res.teams);
+        setError(null);
       } catch (e) {
         setError(e instanceof Error ? e.message : "加载失败");
-        setTeams([]);
+        setTeams((t) => t ?? []);
       }
     })();
-  }, []);
+  }, [structureVersion]);
+
+  // Sidebar counts (unread/mentions) come from the shared store: seeded via
+  // REST here, then kept live by sidebar.update / channel.read WS events.
+  useEffect(() => {
+    void (async () => {
+      try {
+        const res = await api<{
+          channels: Array<{
+            channelId: string;
+            unread: number;
+            mentions: number;
+            preview: string | null;
+            lastMessageAt: number | null;
+          }>;
+        }>("/api/v1/users/me/sidebar");
+        useSidebarStore.getState().loadAll(res.channels);
+      } catch {
+        // offline: badges resume from live events
+      }
+    })();
+  }, [structureVersion]);
 
   if (teams === null) {
     return (
@@ -187,17 +213,47 @@ function WorkspaceScreen({
         data={rows}
         keyExtractor={(item) => item.channel.id}
         renderItem={({ item }) => (
-          <View style={styles.row}>
-            <Button
-              title={`# ${item.channel.displayName} (${item.teamName})`}
-              onPress={() =>
-                onOpenChannel(item.teamId, item.channel.id, `# ${item.channel.displayName}`)
-              }
-            />
-          </View>
+          <SidebarRow
+            label={`# ${item.channel.displayName}`}
+            teamName={item.teamName}
+            channelId={item.channel.id}
+            onOpen={() =>
+              onOpenChannel(item.teamId, item.channel.id, `# ${item.channel.displayName}`)
+            }
+          />
         )}
         ListEmptyComponent={<Text style={styles.empty}>尚未加入任何频道</Text>}
       />
+    </View>
+  );
+}
+
+function SidebarRow({
+  label,
+  teamName,
+  channelId,
+  onOpen,
+}: {
+  label: string;
+  teamName: string;
+  channelId: string;
+  onOpen: () => void;
+}) {
+  const entry = useSidebarStore((s) => s.entries[channelId]);
+  const unread = entry?.unread ?? 0;
+  const mentions = entry?.mentions ?? 0;
+  return (
+    <View style={styles.row}>
+      <Button title={`${label} (${teamName})`} onPress={onOpen} />
+      {mentions > 0 ? (
+        <View style={styles.mentionBadge}>
+          <Text style={styles.mentionBadgeText}>@{mentions}</Text>
+        </View>
+      ) : unread > 0 ? (
+        <View style={styles.unreadBadge}>
+          <Text style={styles.unreadBadgeText}>{unread > 99 ? "99+" : unread}</Text>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -213,8 +269,10 @@ function ChannelScreen({
   title: string;
   onBack: () => void;
 }) {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<StoreMessage[]>([]);
   const [draft, setDraft] = useState("");
+  const [hasOlder, setHasOlder] = useState(true);
+  const [loadingOlder, setLoadingOlder] = useState(false);
   const maxSeq = useMessages((s) => s.maxSeq(channelId));
 
   const refresh = useCallback(() => {
@@ -229,6 +287,7 @@ function ChannelScreen({
   // 1) hydrate from the on-device DB (instant, offline-capable)…
   useEffect(() => {
     useMessages.getState().reset(channelId);
+    setHasOlder(true);
     void hydrateChannel(channelId, (rows) => {
       useMessages.getState().applySync(channelId, rows);
       refresh();
@@ -236,7 +295,7 @@ function ChannelScreen({
     // 2) …then REST history fills anything the cache missed.
     void (async () => {
       try {
-        const res = await api<{ messages: Message[] }>(
+        const res = await api<{ messages: StoreMessage[] }>(
           `/api/v1/channels/${channelId}/posts?limit=30`,
         );
         useMessages.getState().applySync(channelId, res.messages);
@@ -252,9 +311,36 @@ function ChannelScreen({
     });
   }, [channelId, refresh]);
 
+  const loadOlder = useCallback(async () => {
+    if (loadingOlder || !hasOlder) return;
+    const oldest = useMessages
+      .getState()
+      .list(channelId)
+      .find((m) => m.seq > 0)?.seq;
+    if (oldest === undefined || oldest <= 1) {
+      setHasOlder(false);
+      return;
+    }
+    setLoadingOlder(true);
+    try {
+      const res = await api<{ messages: StoreMessage[] }>(
+        `/api/v1/channels/${channelId}/posts?limit=30&beforeSeq=${oldest}`,
+      );
+      useMessages.getState().applySync(channelId, res.messages);
+      void persistMessages(channelId, res.messages);
+      refresh();
+      if (res.messages.length < 30) setHasOlder(false);
+    } catch {
+      // offline: keep what we have
+    } finally {
+      setLoadingOlder(false);
+    }
+  }, [channelId, hasOlder, loadingOlder, refresh]);
+
   // Mark read whenever the channel head advances.
   useEffect(() => {
     if (maxSeq > 0) {
+      useSidebarStore.getState().markRead(channelId);
       sendFrame({ type: "mark_read", channelId, seq: maxSeq });
     }
   }, [channelId, maxSeq]);
@@ -263,10 +349,9 @@ function ChannelScreen({
     const content = draft.trim();
     if (!content) return;
     const clientToken = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    const max = useMessages.getState().maxSeq(channelId);
-    useMessages.getState().ingest(channelId, {
+    useMessages.getState().appendPending(channelId, clientToken, {
       id: `pending-${clientToken}`,
-      seq: max + 1,
+      seq: 0,
       userId: "me",
       parentId: null,
       type: "text",
@@ -279,8 +364,9 @@ function ChannelScreen({
     });
     setDraft("");
     refresh();
+    sendActivity(); // sending is an interaction signal
     try {
-      const posted = await api<Message>(`/api/v1/channels/${channelId}/posts`, {
+      const posted = await api<StoreMessage>(`/api/v1/channels/${channelId}/posts`, {
         method: "POST",
         body: JSON.stringify({ message: content, clientToken }),
       });
@@ -307,6 +393,15 @@ function ChannelScreen({
         style={styles.flex}
         data={messages}
         keyExtractor={(m) => m.id}
+        ListHeaderComponent={
+          hasOlder ? (
+            <Button
+              title={loadingOlder ? "加载中…" : "加载更早的消息"}
+              onPress={() => void loadOlder()}
+              testID="load-older"
+            />
+          ) : null
+        }
         renderItem={({ item }) => (
           <View style={styles.message} testID={`message-${item.id}`}>
             <Text style={styles.messageUser}>{item.userId || "me"}</Text>
@@ -345,7 +440,30 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 8,
   },
-  row: { paddingHorizontal: 8, paddingVertical: 2 },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  unreadBadge: {
+    minWidth: 22,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 11,
+    backgroundColor: "#6b7280",
+    alignItems: "center",
+  },
+  unreadBadgeText: { color: "#fff", fontSize: 12 },
+  mentionBadge: {
+    minWidth: 22,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 11,
+    backgroundColor: "#c0392b",
+    alignItems: "center",
+  },
+  mentionBadgeText: { color: "#fff", fontSize: 12, fontWeight: "700" },
   error: { color: "#c0392b", paddingHorizontal: 12 },
   empty: { color: "#888", padding: 12 },
   message: { paddingHorizontal: 12, paddingVertical: 6 },

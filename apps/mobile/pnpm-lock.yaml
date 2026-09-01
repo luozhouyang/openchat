@@ -24,6 +24,9 @@ catalogs:
     zod:
       specifier: ^4.5.4
       version: 4.5.4
+    zustand:
+      specifier: ^5.0.15
+      version: 5.0.15
 
 importers:
 
@@ -155,6 +158,12 @@ importers:
       protocol:
         specifier: workspace:*
         version: link:../protocol
+      realtime:
+        specifier: workspace:*
+        version: link:../realtime
+      zustand:
+        specifier: 'catalog:'
+        version: 5.0.15(@types/react@19.2.18)(react@19.2.3)
     devDependencies:
       '@types/node':
         specifier: 'catalog:'

@@ -1,5 +1,5 @@
 import type { Message } from "protocol";
-import { SqliteMessageDB, type MessageDB } from "state";
+import { SqliteMessageDB, type MessageDB, type StoreMessage } from "state";
 import { ExpoSqliteDriver } from "../db/expo-driver";
 
 let cached: Promise<MessageDB> | null = null;
@@ -26,17 +26,17 @@ export async function hydrateChannel(
   return rows.length;
 }
 
-export async function persistMessage(channelId: string, message: Message) {
+export async function persistMessage(channelId: string, message: Message | StoreMessage) {
   const db = await getMessageDB();
-  await db.append(channelId, { ...message, attachments: message.attachments ?? null });
+  await db.append(channelId, { ...message, attachments: message.attachments ?? null } as Message);
 }
 
-export async function persistMessages(channelId: string, messages: Message[]) {
+export async function persistMessages(channelId: string, messages: Array<Message | StoreMessage>) {
   if (messages.length === 0) return;
   const db = await getMessageDB();
   await db.applyGap(
     channelId,
-    messages.map((m) => ({ ...m, attachments: m.attachments ?? null })),
+    messages.map((m) => ({ ...m, attachments: m.attachments ?? null }) as Message),
   );
 }
 
