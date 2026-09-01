@@ -312,7 +312,7 @@ export type SchemesOutput = z.infer<typeof SchemesOutput>;
 // ---- push ----
 export const PushSubscribeInput = z.object({
   deviceId: idSchema,
-  kind: z.enum(["webpush", "fcm", "apns"]),
+  kind: z.enum(["webpush", "fcm", "apns", "expo"]),
   endpoint: z.string().url(),
   p256dh: z.string().optional(),
   auth: z.string().optional(),

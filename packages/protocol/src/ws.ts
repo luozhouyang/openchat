@@ -58,6 +58,12 @@ export type ServerEvent =
       lastMessage: { preview: string; userId: string; at: number };
     }
   | { type: "channel.read"; channelId: string; lastReadSeq: number }
+  | {
+      /** Structure changed (channel/team created or archived, membership changed):
+       * clients refetch workspaces + sidebar instead of polling on navigation. */
+      type: "structure.update";
+      scope: "channels" | "teams";
+    }
   | { type: "presence.snapshot"; states: Record<string, PresenceStatus> }
   | { type: "presence.update"; userId: string; status: PresenceStatus };
 
