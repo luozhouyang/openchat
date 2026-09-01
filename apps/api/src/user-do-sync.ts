@@ -8,6 +8,9 @@ export async function syncUserChannels(env: Env, userId: string) {
   const channelIds = rows.map((r) => r.channel.id);
   const id = env.USER_DO.idFromName(userDoName(userId));
   await env.USER_DO.get(id).channelsSubscribe(channelIds);
+  // Tell the user's connected devices the structure moved (live refresh
+  // instead of polling on navigation).
+  await env.USER_DO.get(id).structureNotify({ scope: "channels" });
 }
 
 export async function syncChannelMember(

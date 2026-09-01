@@ -298,6 +298,20 @@ export class UserDO extends DurableObject<Env> {
     await this.ensureDefaultCategories(this.userId);
   }
 
+  /**
+   * Push a structure.update event to every connected device of this user, so
+   * clients refetch workspaces/sidebar live instead of on the next navigation
+   * (closes the structure-blindness gap flagged in the Mattermost alignment
+   * review: no channel_created/member_added polling).
+   */
+  async structureNotify(body: { scope: "channels" | "teams" }): Promise<{ ok: boolean }> {
+    const payload = JSON.stringify({ type: "structure.update", scope: body.scope });
+    for (const ws of this.ctx.getWebSockets()) {
+      if (ws.readyState === WebSocket.OPEN) ws.send(payload);
+    }
+    return { ok: true };
+  }
+
   private async ensureDefaultCategories(userId: string): Promise<void> {
     const existing = await this.db
       .select()
@@ -538,7 +552,7 @@ export class UserDO extends DurableObject<Env> {
 
   async pushSubscribe(body: {
     deviceId: string;
-    kind: "webpush" | "fcm" | "apns";
+    kind: "webpush" | "fcm" | "apns" | "expo";
     endpoint: string;
     p256dh?: string;
     auth?: string;
@@ -622,9 +636,12 @@ export class UserDO extends DurableObject<Env> {
         platform: url.searchParams.get("platform") ?? "web",
         connectedAt: Date.now(),
         userId: url.searchParams.get("sub") ?? null,
+        // A fresh connection is itself activity: push suppression sees the
+        // device as foreground for the first 30s without waiting for a frame.
+        lastActivity: Date.now(),
       });
       this.ctx.acceptWebSocket(server, [`device:${deviceId}`]);
-      server.send(JSON.stringify(helloEvent(this.ctx.id.toString())));
+      server.send(JSON.stringify(helloEvent(this.userId)));
       this.lastActiveAt = Date.now();
       this.awayNotified = false;
       await this.ctx.storage.setAlarm(this.lastActiveAt + 5 * 60_000);
@@ -640,6 +657,11 @@ export class UserDO extends DurableObject<Env> {
     const data = typeof message === "string" ? message : new TextDecoder().decode(message);
     const frame = parseClientFrame(data);
     if (!frame) return;
+    // Any valid client frame proves the device is alive: refresh the
+    // activity clock that drives presence (away) and push suppression
+    // (hasActiveForeground). Without this, a client that never sends the
+    // explicit activity frame looks idle and gets spammed with pushes.
+    this.touchActivity(ws);
     if (frame.type === "echo") {
       ws.send(JSON.stringify({ type: "echo", data: frame.data }));
     }
@@ -651,20 +673,26 @@ export class UserDO extends DurableObject<Env> {
       void this.env.CHANNEL_DO.get(id).readMark({ userId, seq: frame.seq });
     }
     if (frame.type === "sync") {
-      for (const ch of frame.channels.slice(0, 8)) {
-        const stub = this.env.CHANNEL_DO.get(
-          this.env.CHANNEL_DO.idFromName(channelDoName(ch.channelId)),
-        );
-        const body = await stub.history({ afterSeq: ch.lastSeq, limit: 500 });
-        if (body.messages.length >= 500) {
-          ws.send(JSON.stringify({ type: "sync.gap", channelId: ch.channelId }));
-          continue;
-        }
-        ws.send(
-          JSON.stringify({
-            type: "sync.result",
-            channelId: ch.channelId,
-            messages: body.messages.reverse(),
+      // All channels (protocol cap 500), 8 DO fan-outs at a time — never a
+      // silent truncation (system design §4.5).
+      for (let i = 0; i < frame.channels.length; i += 8) {
+        await Promise.all(
+          frame.channels.slice(i, i + 8).map(async (ch) => {
+            const stub = this.env.CHANNEL_DO.get(
+              this.env.CHANNEL_DO.idFromName(channelDoName(ch.channelId)),
+            );
+            const body = await stub.history({ afterSeq: ch.lastSeq, limit: 500 });
+            if (body.messages.length >= 500) {
+              ws.send(JSON.stringify({ type: "sync.gap", channelId: ch.channelId }));
+              return;
+            }
+            ws.send(
+              JSON.stringify({
+                type: "sync.result",
+                channelId: ch.channelId,
+                messages: body.messages.reverse(),
+              }),
+            );
           }),
         );
       }
@@ -708,13 +736,7 @@ export class UserDO extends DurableObject<Env> {
       }
     }
     if (frame.type === "activity") {
-      this.lastActiveAt = Date.now();
-      this.awayNotified = false;
-      await this.ctx.storage.setAlarm(this.lastActiveAt + 5 * 60_000);
-      await this.persistStatus("online");
-      await this.notifySubscribers("online");
-      const attachment = ws.deserializeAttachment() as { lastActivity?: number } | null;
-      ws.serializeAttachment({ ...attachment, lastActivity: Date.now() });
+      this.touchActivity(ws);
     }
     if (frame.type === "presence_subscribe" || frame.type === "presence_unsubscribe") {
       const attachment = ws.deserializeAttachment() as { userId?: string } | null;
@@ -758,6 +780,22 @@ export class UserDO extends DurableObject<Env> {
     if (this.ctx.getWebSockets().length === 0) {
       void this.persistStatus("offline");
       void this.notifySubscribers("offline");
+    }
+  }
+
+  /**
+   * Refresh per-socket + per-DO activity state. Self-heals presence: if the
+   * user was flagged away, any traffic brings them back online.
+   */
+  private touchActivity(ws: WebSocket) {
+    const att = ws.deserializeAttachment() as { lastActivity?: number } | null;
+    ws.serializeAttachment({ ...att, lastActivity: Date.now() });
+    this.lastActiveAt = Date.now();
+    void this.ctx.storage.setAlarm(this.lastActiveAt + 5 * 60_000);
+    if (this.awayNotified) {
+      this.awayNotified = false;
+      void this.persistStatus("online");
+      void this.notifySubscribers("online");
     }
   }
 

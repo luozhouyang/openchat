@@ -22,13 +22,17 @@ export const teamsV1 = new Hono<{ Bindings: Env }>();
 teamsV1.post("/teams", requireSession, zodValidator("json", CreateTeamInput), async (c) => {
   const body = c.req.valid("json");
   const db = getDb(c.env.DB);
+  const creatorId = c.get("session")!.user.id;
   const { id: teamId, inviteCode } = await createTeam(db, {
     name: body.name,
     displayName: body.displayName,
     type: body.type,
     description: body.description,
-    creatorId: c.get("session")!.user.id,
+    creatorId,
   });
+  // Refresh the creator's User DO channel list (they just gained a team) and
+  // notify their devices.
+  await syncUserChannels(c.env, creatorId);
   const out: CreateTeamOutput = inviteCode ? { id: teamId, inviteCode } : { id: teamId };
   return c.json(out, 201);
 });
@@ -98,6 +102,10 @@ teamsV1.post(
       userId: c.get("session")!.user.id,
       inviteCode: body.inviteCode,
     });
+    // Joining a team changes the user's channel set: refresh the User DO
+    // subscriptions and notify devices (previously missed — the new team's
+    // channels never reached the User DO until the next workspaces call).
+    await syncUserChannels(c.env, c.get("session")!.user.id);
     return c.json({ ok: true });
   },
 );
