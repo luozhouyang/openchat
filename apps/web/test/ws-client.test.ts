@@ -1,3 +1,7 @@
+// @vitest-environment jsdom
+// The "platform instance" case imports lib/platform, which reads
+// window.location at module init; jsdom keeps that working under the root
+// aggregate runner too (the web package config already sets jsdom).
 import { expect, test } from "vite-plus/test";
 import { useConnectionStore } from "../src/stores/connection";
 import { useSidebarStore } from "../src/stores/sidebar";

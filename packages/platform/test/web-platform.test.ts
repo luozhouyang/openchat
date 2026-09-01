@@ -1,3 +1,6 @@
+// @vitest-environment jsdom
+// Declares its environment so the suite passes under any runner (per-package
+// `vp test` and the root aggregate both honor this docblock).
 import { expect, test, vi } from "vite-plus/test";
 import { createWebPlatform } from "../src/web.ts";
 import { LocalStorageAdapter } from "../src/storage.ts";

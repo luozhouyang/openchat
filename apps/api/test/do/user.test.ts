@@ -85,11 +85,7 @@ beforeAll(async () => {
 test("default sidebar categories are initialized", async () => {
   const { categories } = await sidebarCategories(userId);
   expect(categories).toHaveLength(3);
-  expect(categories.map((c) => c.type).toSorted()).toEqual([
-    "channels",
-    "direct_messages",
-    "favorite",
-  ]);
+  expect(categories.map((c) => c.type).sort()).toEqual(["channels", "direct_messages", "favorite"]);
   const channelsCat = categories.find((c) => c.type === "channels")!;
   const dmCat = categories.find((c) => c.type === "direct_messages")!;
   const favoritesCat = categories.find((c) => c.type === "favorite")!;

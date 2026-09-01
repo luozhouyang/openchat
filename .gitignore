@@ -45,6 +45,7 @@ dist-ssr
 test-results/
 playwright-report/
 release/
+apps/desktop/web-dist/
 
 # electron build output
 .vite/

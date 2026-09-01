@@ -1,3 +1,8 @@
+// @vitest-environment jsdom
+// Component test (DOM rendering via @testing-library/react); declares jsdom
+// and pulls in the jest-dom matchers itself so it also works under the root
+// aggregate runner (which does not load the web package's setup file).
+import "@testing-library/jest-dom/vitest";
 import { describe, expect, it, vi } from "vite-plus/test";
 import { render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";

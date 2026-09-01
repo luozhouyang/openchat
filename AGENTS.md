@@ -57,8 +57,18 @@ Notes:
 - `vp <name>` runs a built-in; `vp run <name>` runs a `package.json` script/task.
 - Don't call `node -v`, `pnpm -v`, or `npm -v` directly — Vite+ binaries may not
   answer them cleanly; use `vp toolchain`.
-- Web (apps/web) tests run under plain Vitest (jsdom); the api package uses the
-  Cloudflare vitest plugin — `vp run api#test` (never `vp test` for the api package).
+- Root `vp test` runs the plain-Vitest suites only (shared `packages/*` +
+  web/desktop/push unit tests); the root `vite.config.ts` `test.exclude` keeps
+  the special runners out:
+  - `apps/api` — Cloudflare vitest plugin + D1 migrations → `vp run api#test`
+    (never `vp test` for the api package).
+  - `apps/mobile` — jest-expo standalone workspace → `cd apps/mobile &&
+corepack pnpm test`.
+  - `apps/web/e2e` + `apps/desktop/e2e` — Playwright → `vp run web#e2e` /
+    `vp run desktop#e2e`.
+- jsdom-dependent test files declare `// @vitest-environment jsdom` themselves
+  (docblock) so they pass under both the per-package and root runners — keep
+  that convention for new DOM-touching tests.
 - New dependencies belong in `pnpm-workspace.yaml` `catalog:` (project convention)
   unless the package is used only once (then a direct pinned version is acceptable,
   matching how `better-auth` is handled).
