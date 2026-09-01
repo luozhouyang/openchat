@@ -54,7 +54,7 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
     headers: {
       "content-type": "application/json",
       ...(token ? { authorization: `Bearer ${token}` } : {}),
-      ...init?.headers,
+      ...(init?.headers as Record<string, string> | undefined),
     },
   });
   if (res.status === 401) {
