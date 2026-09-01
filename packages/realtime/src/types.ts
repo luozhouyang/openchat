@@ -25,4 +25,6 @@ export interface RealtimeClientOptions {
   reconnectBaseMs?: number;
   reconnectMaxMs?: number;
   tokenTtlMs?: number;
+  /** Interval between "ping" keepalives while open. 0 disables. */
+  heartbeatIntervalMs?: number;
 }

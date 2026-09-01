@@ -114,6 +114,7 @@ test("token refresh closes socket with 4100 after tokenTtlMs", async () => {
   const { client, sockets } = make({ tokenTtlMs: 60_000 });
   await client.connect("dev-1");
   sockets[0].readyState = 1;
+  sockets[0].onopen?.();
   const closeSpy = vi.spyOn(sockets[0], "close");
   await vi.advanceTimersByTimeAsync(60_000);
   expect(closeSpy).toHaveBeenCalledWith(4100, "token-refresh");
@@ -185,5 +186,67 @@ test("reconnect after unexpected close refetches token", async () => {
   await vi.advanceTimersByTimeAsync(1501);
   expect(getToken).toHaveBeenCalledTimes(2);
   expect(sockets).toHaveLength(2);
+  vi.useRealTimers();
+});
+
+test("close() during the reconnect backoff window cancels the pending reconnect", async () => {
+  vi.useFakeTimers();
+  const { client, sockets } = make();
+  await client.connect("dev-1");
+  sockets[0].readyState = 1;
+  sockets[0].onclose?.(); // unexpected drop → reconnect scheduled in ~1-1.5s
+  client.close(); // user backgrounds the app while still waiting
+  await vi.advanceTimersByTimeAsync(60_000);
+  expect(sockets).toHaveLength(1); // no socket ever re-opened
+  vi.useRealTimers();
+});
+
+test("events from a superseded socket are ignored after close()", async () => {
+  const { client, handlers, sockets } = make();
+  await client.connect("dev-1");
+  client.close();
+  sockets[0].readyState = 1;
+  sockets[0].onopen?.(); // stale socket completes its handshake late
+  sockets[0].onmessage?.({ data: '{"type":"hello"}' });
+  expect(handlers.onOpen).not.toHaveBeenCalled();
+  expect(handlers.onMessage).not.toHaveBeenCalled();
+  expect(handlers.onStateChange).toHaveBeenLastCalledWith("idle");
+});
+
+test("connect() while open is a no-op (single socket)", async () => {
+  const { client, sockets } = make();
+  await client.connect("dev-1");
+  sockets[0].readyState = 1;
+  sockets[0].onopen?.();
+  await client.connect("dev-1");
+  expect(sockets).toHaveLength(1);
+});
+
+test("heartbeat sends ping periodically while open and stops after close", async () => {
+  vi.useFakeTimers();
+  const { client, sockets } = make({ heartbeatIntervalMs: 10_000 });
+  await client.connect("dev-1");
+  sockets[0].readyState = 1;
+  sockets[0].onopen?.();
+  await vi.advanceTimersByTimeAsync(35_000);
+  expect(sockets[0].sent.filter((s) => s === "ping")).toHaveLength(3);
+  client.close();
+  const sentAtClose = sockets[0].sent.length;
+  await vi.advanceTimersByTimeAsync(60_000);
+  expect(sockets[0].sent).toHaveLength(sentAtClose);
+  vi.useRealTimers();
+});
+
+test("connect() racing close() before the token resolves does not open a socket", async () => {
+  vi.useFakeTimers();
+  let release!: (t: string) => void;
+  const getToken = () => new Promise<string | null>((r) => (release = r));
+  const { client, sockets } = make({ getToken });
+  const pending = client.connect("dev-1");
+  client.close(); // user closes while the token fetch is in flight
+  release("tok-1");
+  await pending;
+  await vi.advanceTimersByTimeAsync(60_000);
+  expect(sockets).toHaveLength(0);
   vi.useRealTimers();
 });
