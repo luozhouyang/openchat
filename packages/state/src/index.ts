@@ -19,3 +19,26 @@ export { useStructureStore } from "./stores/structure.ts";
 
 export { createDispatcher, type DispatcherDeps } from "./realtime/dispatch.ts";
 export { buildSyncChannels, createSyncGapHandler } from "./realtime/sync.ts";
+export {
+  createRealtimeConnection,
+  type RealtimeConnection,
+  type RealtimeConnectionDeps,
+} from "./realtime/connection.ts";
+
+export { createAuthService, type AuthService, type AuthServiceDeps } from "./services/auth.ts";
+export {
+  createChannelsService,
+  type ChannelsService,
+  type ChannelsServiceDeps,
+} from "./services/channels.ts";
+export {
+  createMessagesService,
+  type MessagesService,
+  type MessagesServiceDeps,
+} from "./services/messages.ts";
+export {
+  createAppClient,
+  type AppClient,
+  type AppClientPlatform,
+  type CreateAppClientOptions,
+} from "./app.ts";
