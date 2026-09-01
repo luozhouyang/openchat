@@ -9,22 +9,23 @@ export interface DesktopFilePlatformOptions {
 }
 
 /**
- * Electron file:// mode: no cookies, no usable window.location — bearer
- * sessions persist through the safeStorage-backed bridge, REST/WS target
- * the injected origin, notifications are the shell's native ones and the
- * router runs on hash history.
+ * Electron bundled-renderer mode (served over the privileged app:// scheme):
+ * no cookies (cross-origin API), so bearer sessions persist through the
+ * safeStorage-backed bridge; REST/WS target the injected origin and
+ * notifications are the shell's native ones.
  */
 export function createDesktopFilePlatform(opts: DesktopFilePlatformOptions): PlatformAdapter {
   return {
     platform: "desktop",
-    apiBaseUrl: opts.serverUrl,
+    // Same-origin through the shell's app:// /api proxy — zero CORS. The
+    // serverUrl still drives the WebSocket target (WS is not CORS-bound).
+    apiBaseUrl: "app://-",
     wsUrl: deriveWsUrl(opts.serverUrl),
     getSessionToken: () => opts.bridge.getToken(),
     setSessionToken: (token) =>
       token === null ? opts.bridge.clearToken() : opts.bridge.setToken(token),
     storage: new LocalStorageAdapter(),
     openLocalDatabase,
-    usesHashRouting: true,
     notify: ({ title, body, link }) => {
       opts.bridge.notify(title, body, link);
       return true;

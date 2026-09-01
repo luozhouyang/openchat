@@ -50,8 +50,6 @@ export interface PlatformAdapter {
   storage: StorageAdapter;
   /** Opens (and memoizes) the local database; degradation chain lives here. */
   openLocalDatabase(): Promise<LocalDatabase>;
-  /** True when the router must run on hash history (file:// shells). */
-  usesHashRouting: boolean;
   /**
    * Best-effort background notification (desktop native notifications,
    * no-op where the platform has no channel). Returns false when dropped.

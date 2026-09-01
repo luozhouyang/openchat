@@ -15,7 +15,6 @@ test("platform instance resolves urls and the adapter surface", async () => {
   const { platform } = await import("../src/lib/platform");
   expect(platform.platform).toBe("web");
   expect(platform.wsUrl).toMatch(/^wss?:\/\/.*\/ws$/);
-  expect(platform.usesHashRouting).toBe(false);
   expect(typeof platform.openLocalDatabase).toBe("function");
 });
 

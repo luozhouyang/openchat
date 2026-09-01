@@ -19,15 +19,16 @@ export interface WebPlatformOptions {
 
 /** Browser / Electron-remote-URL mode: cookie sessions, same-origin REST. */
 export function createWebPlatform(opts: WebPlatformOptions = {}): PlatformAdapter {
-  const apiBaseUrl = opts.apiBaseUrl ?? window.location.origin;
+  // "" is the same-origin marker the shared client core keys its cookie/bearer
+  // mode on — REST stays relative; the WS endpoint derives from location.
+  const apiBaseUrl = opts.apiBaseUrl ?? "";
   return {
     platform: "web",
     apiBaseUrl,
-    wsUrl: deriveWsUrl(apiBaseUrl),
+    wsUrl: deriveWsUrl(opts.apiBaseUrl ?? window.location.origin),
     getSessionToken: async () => null, // cookie mode
     storage: new LocalStorageAdapter(),
     openLocalDatabase,
-    usesHashRouting: false,
     notify: () => false, // web notifications go through the PWA service worker
     onAppStateChange: visibilityAppState,
   } satisfies PlatformAdapter;

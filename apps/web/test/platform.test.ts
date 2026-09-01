@@ -29,11 +29,10 @@ test("web platform derives urls from location and runs cookie mode", () => {
   });
   const p = createWebPlatform();
   expect(p.platform).toBe("web");
-  expect(p.apiBaseUrl).toBe("https://example.com");
+  expect(p.apiBaseUrl).toBe(""); // same-origin marker (cookie mode)
   expect(p.wsUrl).toBe("wss://example.com/ws");
   expect(p.getSessionToken()).resolves.toBeNull();
   expect(p.setSessionToken).toBeUndefined();
-  expect(p.usesHashRouting).toBe(false);
   expect(p.notify({ title: "t", body: "b" })).toBe(false);
   expect(p.desktopBridge).toBeUndefined();
 });
@@ -47,11 +46,10 @@ test("desktop-file platform routes auth and notifications through the bridge", a
   const bridge = mockBridge();
   const p = createDesktopFilePlatform({ serverUrl: bridge.serverUrl, bridge });
   expect(p.platform).toBe("desktop");
-  expect(p.apiBaseUrl).toBe("http://localhost:8787");
+  expect(p.apiBaseUrl).toBe("app://-"); // same-origin /api proxy (bearer mode)
   expect(p.wsUrl).toBe("ws://localhost:8787/ws");
   expect(await p.getSessionToken()).toBe("session-token");
   expect(p.setSessionToken).toBeDefined();
-  expect(p.usesHashRouting).toBe(true);
   expect(p.notify({ title: "t", body: "b", link: "openchat://c/x" })).toBe(true);
   expect(bridge.notify).toHaveBeenCalledWith("t", "b", "openchat://c/x");
   expect(p.desktopBridge).toBe(bridge);

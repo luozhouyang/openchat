@@ -8,6 +8,10 @@ import { desktopFileMode, desktopServerUrl } from "./desktop-mode";
 // baseURL at the injected origin at least keeps the client functional for
 // token fetches.
 export const authClient = createAuthClient({
-  baseURL: desktopFileMode ? desktopServerUrl : window.location.origin,
+  baseURL: desktopFileMode
+    ? desktopServerUrl
+    : /^https?:$/.test(window.location.protocol)
+      ? window.location.origin
+      : undefined,
   plugins: [jwtClient(), adminClient()],
 });

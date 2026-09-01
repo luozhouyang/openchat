@@ -28,7 +28,6 @@ export function createMobilePlatform(): PlatformAdapter {
     setSessionToken: (token) => (token === null ? tokenStore.clear() : tokenStore.set(token)),
     storage: secureStorage,
     openLocalDatabase,
-    usesHashRouting: false,
     notify: () => false, // in-app notification taps are handled by expo-notifications
     onAppStateChange(cb) {
       const handler = AppState.addEventListener("change", (state) => {

@@ -1,18 +1,12 @@
 import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { RouterProvider, createHashHistory, createRouter } from "@tanstack/react-router";
+import { RouterProvider, createRouter } from "@tanstack/react-router";
 import { routeTree } from "./routeTree.gen";
-import { platform } from "./lib/platform";
 import { listenForOpenchatLinks } from "./lib/deep-link";
 import "./app.css";
 
 const queryClient = new QueryClient();
-// file:// shells (Electron packaged renderer) have no URL rewriting server:
-// deep routes cannot resolve, so the router runs on hash history there.
-const router = createRouter({
-  routeTree,
-  history: platform.usesHashRouting ? createHashHistory() : undefined,
-});
+const router = createRouter({ routeTree });
 
 declare module "@tanstack/react-router" {
   interface Register {
@@ -20,7 +14,9 @@ declare module "@tanstack/react-router" {
   }
 }
 
-if (!platform.usesHashRouting && "serviceWorker" in navigator) {
+// The service worker only exists on http(s) deployments (the Electron
+// app:// renderer has no push SW).
+if (/^https?:$/.test(window.location.protocol) && "serviceWorker" in navigator) {
   void navigator.serviceWorker.register("/sw.js").catch(() => {});
 }
 

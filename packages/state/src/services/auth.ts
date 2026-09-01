@@ -33,17 +33,33 @@ export function createAuthService(deps: AuthServiceDeps): AuthService {
   const cookieMode = deps.apiBaseUrl === "";
   let wsJwt: { session: string; token: string; fetchedAt: number } | null = null;
 
+  // Same-origin modes ("" in the browser, "app://-" behind the shell's /api
+  // proxy): better-auth validates its baseURL as http(s) and falls back to
+  // window.location.origin (which is NOT http on app://), so we pass a
+  // placeholder base and rewrite every request to a same-origin relative
+  // URL inside our custom fetch.
+  const sameOrigin = !/^https?:\/\//.test(deps.apiBaseUrl);
   const authClient = createAuthClient({
-    baseURL: deps.apiBaseUrl || undefined,
+    baseURL: sameOrigin ? "http://openchat.invalid" : deps.apiBaseUrl,
     plugins: [jwtClient()],
     fetchOptions: {
-      customFetchImpl: async (url, init) => {
+      customFetchImpl: async (request, init) => {
         const headers = new Headers(init?.headers);
         if (!cookieMode) {
           const session = await deps.getSessionToken();
           if (session) headers.set("authorization", `Bearer ${session}`);
         }
-        return fetch(url, { ...init, headers, credentials: cookieMode ? "include" : "omit" });
+        // Same-origin mode rewrites the absolute placeholder URL to a
+        // relative path (served by the app:// /api proxy or the browser's
+        // own origin); otherwise fetch the absolute URL unchanged.
+        const href =
+          typeof request === "string"
+            ? request
+            : request instanceof URL
+              ? request.href
+              : request.url;
+        const target = sameOrigin ? `${new URL(href).pathname}${new URL(href).search}` : href;
+        return fetch(target, { ...init, headers, credentials: cookieMode ? "include" : "omit" });
       },
     },
   });

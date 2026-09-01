@@ -1,5 +1,6 @@
-import { existsSync } from "node:fs";
-import { pathToFileURL } from "node:url";
+import { mkdtempSync, cpSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { expect, test } from "@playwright/test";
 import { _electron as electron, type ElectronApplication, type Page } from "@playwright/test";
 import { createChannel, createTeam, signupUser } from "../../web/e2e/fixtures";
@@ -144,21 +145,27 @@ test.describe("openchat desktop shell", () => {
   });
 });
 
-test.describe("openchat desktop file:// renderer mode (packaged web-dist)", () => {
+test.describe("openchat desktop app:// bundled renderer mode", () => {
   let app: ElectronApplication;
   let page: Page;
-  // Requires the desktop web build (pnpm run build:web in apps/desktop)
-  // and a running API on :8787 (the shared webServer above provides it).
-  const dist = `${__dirname.replace(/\/e2e$/, "")}/web-dist/index.html`;
-
+  // Requires the desktop web build (pnpm run build:web in apps/desktop) and
+  // a running API on :8787 (the shared webServer above provides it).
+  // OPENCHAT_DESKTOP_APP selects the bundled renderer over app://-; the
+  // bundle is copied to a tmp dir and injected via OPENCHAT_DESKTOP_APP_DIR
+  // so the test never depends on the dev checkout's fs layout.
   test.beforeAll(async () => {
-    test.skip(!existsSync(dist), "web-dist missing — run `pnpm run build:web` first");
+    // Copy the bundle the playwright webServer itself built (apps/web/dist,
+    // via web#build) — same process view, unlike dev-checkout artifacts.
+    const src = join(__dirname.replace(/\/e2e$/, ""), "../web/dist");
+    const appDir = mkdtempSync(join(tmpdir(), "openchat-web-dist-"));
+    cpSync(src, appDir, { recursive: true });
     app = await electron.launch({
       args: [".vite/build/main.js"],
       cwd: __dirname.replace(/\/e2e$/, ""),
       env: {
         ...process.env,
-        OPENCHAT_DESKTOP_FILE: dist,
+        OPENCHAT_DESKTOP_APP: "1",
+        OPENCHAT_DESKTOP_APP_DIR: appDir,
         OPENCHAT_API_URL: "http://localhost:8787",
         DISPLAY: process.env.DISPLAY ?? ":0",
       } as Record<string, string>,
@@ -171,8 +178,14 @@ test.describe("openchat desktop file:// renderer mode (packaged web-dist)", () =
     await app?.close();
   });
 
-  test("loads the renderer from file:// with the injected API origin", async () => {
-    await expect(page).toHaveURL(/^file:\/\//);
+  test("loads the renderer from app:// with the injected API origin", async () => {
+    await expect(page).toHaveURL(/^app:\/\//);
+    const probe = await page.evaluate(() => ({
+      protocol: window.location.protocol,
+      origin: window.location.origin,
+      hasBridge: !!(window as unknown as Record<string, unknown>).openchatDesktop,
+    }));
+    console.log("[probe]", JSON.stringify(probe));
     const serverUrl = await page.evaluate(
       () =>
         (window as unknown as { openchatDesktop: { serverUrl: string } }).openchatDesktop.serverUrl,
@@ -180,19 +193,19 @@ test.describe("openchat desktop file:// renderer mode (packaged web-dist)", () =
     expect(serverUrl).toBe("http://localhost:8787");
   });
 
-  test("bearer sign-in lands in a channel (hash routes, no cookies)", async ({ request }) => {
+  test("bearer sign-in lands in a channel (history routes, no cookies)", async ({ request }) => {
     const seq = Date.now();
-    const email = `desktop-file-${seq}@test.dev`;
+    const email = `desktop-app-${seq}@test.dev`;
     const password = "Password123!";
     const user = await signupUser(request, email, password);
-    const team = await createTeam(request, user.token, `file-team-${seq}`);
+    const team = await createTeam(request, user.token, `app-team-${seq}`);
     const channel = await createChannel(request, user.token, team.id, `general-${seq}`);
 
-    await page.goto(`${pathToFileURL(dist).href}#/login`);
+    // Fresh instance without a session: the root guard redirects to /login.
     await page.getByPlaceholder("邮箱").fill(email);
     await page.getByPlaceholder("密码").fill(password);
     await page.getByRole("button", { name: "登录" }).click();
     await expect(page.getByPlaceholder("输入消息…")).toBeVisible({ timeout: 20_000 });
-    await expect(page).toHaveURL(new RegExp(`#/.*${channel.id}`));
+    await expect(page).toHaveURL(new RegExp(`app://-/.*/${channel.id}`));
   });
 });
