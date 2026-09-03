@@ -128,8 +128,26 @@ describe("signup page", () => {
         password: "alice-password",
       }),
     );
-    // The /check-email route is added in Task 8; assert navigation away from
-    // /signup occurred rather than the landing page content.
-    await vi.waitFor(() => expect(window.location.pathname).not.toBe("/signup"));
+    expect(await screen.findByText("验证你的邮箱")).toBeInTheDocument();
+  });
+});
+
+describe("check-email page", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    auth.sendVerificationEmail.mockResolvedValue({ data: null, error: null });
+  });
+
+  it("renders the target email and resends via authClient", async () => {
+    await renderRoute("/check-email", { email: "alice@test.dev" });
+    expect(await screen.findByText("验证你的邮箱")).toBeInTheDocument();
+    expect(screen.getByText(/alice@test\.dev/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "重新发送验证邮件" }));
+    await vi.waitFor(() =>
+      expect(auth.sendVerificationEmail).toHaveBeenCalledWith({
+        email: "alice@test.dev",
+        callbackURL: "/verify-email",
+      }),
+    );
   });
 });
