@@ -1,5 +1,5 @@
 import { expect, test } from "vite-plus/test";
-import { sanitizeFilename } from "../../src/worker/r2.ts";
+import { sanitizeFilename } from "../../../src/worker/r2.ts";
 
 test("sanitizeFilename strips unsafe chars", () => {
   expect(sanitizeFilename("../../evil.sh")).toBe("evil.sh");

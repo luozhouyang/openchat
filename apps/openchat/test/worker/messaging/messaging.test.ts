@@ -2,8 +2,8 @@ import { expect, test } from "vite-plus/test";
 import { env, runInDurableObject } from "cloudflare:test";
 import { eq } from "drizzle-orm";
 import { channelDoName, issueInternalToken, userDoName } from "protocol";
-import * as schema from "../../src/worker/db/schema-channel-do.ts";
-import * as userSchema from "../../src/worker/db/schema-user-do.ts";
+import * as schema from "../../../src/worker/db/schema-channel-do.ts";
+import * as userSchema from "../../../src/worker/db/schema-user-do.ts";
 
 function channelStub(channelId: string) {
   return env.CHANNEL_DO.get(env.CHANNEL_DO.idFromName(channelDoName(channelId)));
@@ -148,4 +148,34 @@ test("postMessage updates meta last_message keys", async () => {
   expect(metaMap.get("last_message_user_id")).toBe("alice");
   expect(metaMap.get("last_message_preview")).toBe("hello meta");
   expect(Number(metaMap.get("last_message_at"))).toBeGreaterThan(0);
+});
+
+function idemStub() {
+  return env.CHANNEL_DO.get(env.CHANNEL_DO.idFromName(channelDoName("c-idem")));
+}
+
+test("message gets seq and duplicate token returns same seq with deduplicated", async () => {
+  const stub = idemStub();
+  await stub.membersAdd({ userId: "u1", role: "member" });
+  const first = await stub.postMessage("u1", { content: "hello", clientToken: "tok-1" });
+  expect(first).not.toHaveProperty("error");
+  const r1 = first as { messageId: string; seq: number };
+  const second = await stub.postMessage("u1", { content: "hello", clientToken: "tok-1" });
+  const r2 = second as { messageId: string; seq: number; deduplicated?: boolean };
+  expect(r2.seq).toBe(r1.seq);
+  expect(r2.messageId).toBe(r1.messageId);
+  expect(r2.deduplicated).toBe(true);
+});
+
+test("non-member rejected with 403 semantics", async () => {
+  const stub = idemStub();
+  const res = await stub.postMessage("stranger", { content: "hi", clientToken: "tok-x" });
+  expect(res).toEqual({ error: "not a member", status: 403 });
+});
+
+test("oversized content rejected with 422 semantics", async () => {
+  const stub = idemStub();
+  await stub.membersAdd({ userId: "u1", role: "member" });
+  const res = await stub.postMessage("u1", { content: "x".repeat(17000), clientToken: "tok-big" });
+  expect(res).toEqual({ error: "invalid", status: 422 });
 });

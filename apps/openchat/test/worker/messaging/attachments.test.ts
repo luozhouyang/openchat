@@ -2,8 +2,8 @@ import { expect, test } from "vite-plus/test";
 import { env } from "cloudflare:test";
 import { exports } from "cloudflare:workers";
 import { channelDoName } from "protocol";
-import { getDb } from "../../src/worker/db/client.ts";
-import { uploadsessions } from "../../src/worker/db/schema-d1.ts";
+import { getDb } from "../../../src/worker/db/client.ts";
+import { uploadsessions } from "../../../src/worker/db/schema-d1.ts";
 
 function channelStub(channelId: string) {
   return env.CHANNEL_DO.get(env.CHANNEL_DO.idFromName(channelDoName(channelId)));

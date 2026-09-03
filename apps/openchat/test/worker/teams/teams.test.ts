@@ -2,17 +2,14 @@ import { expect, test, beforeAll } from "vite-plus/test";
 import { env } from "cloudflare:test";
 import { exports } from "cloudflare:workers";
 import { userDoName } from "protocol";
-import { getDb } from "../../src/worker/db/client.ts";
-import { createChannel } from "../../src/worker/db/repos/channels.ts";
+import { getDb } from "../../../src/worker/db/client.ts";
+import { createChannel } from "../../../src/worker/db/repos/channels.ts";
 
-let ownerCookie = "";
-let acmeId = "";
-
-async function signup(email: string): Promise<string> {
+async function signup(email: string, password: string): Promise<string> {
   const res = await exports.default.fetch("http://localhost/api/auth/sign-up/email", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ email, password: "team-test-password", name: email.split("@")[0] }),
+    body: JSON.stringify({ email, password, name: email.split("@")[0] }),
   });
   return res.headers.get("set-cookie") ?? "";
 }
@@ -34,8 +31,11 @@ async function createTeam(
   };
 }
 
+let ownerCookie = "";
+let acmeId = "";
+
 beforeAll(async () => {
-  ownerCookie = await signup("owner@test.dev");
+  ownerCookie = await signup("owner@test.dev", "team-test-password");
 });
 
 test("create and list team", async () => {
@@ -53,7 +53,7 @@ test("create and list team", async () => {
 });
 
 test("open team joinable, invite team needs code", async () => {
-  const joiner = await signup("joiner@test.dev");
+  const joiner = await signup("joiner@test.dev", "team-test-password");
 
   const openJoin = await exports.default.fetch(`http://localhost/api/v1/teams/${acmeId}/members`, {
     method: "POST",
@@ -96,7 +96,7 @@ test("admin detail exposes team and join with invite code works", async () => {
   expect(team.name).toBe("vault");
   expect(team.type).toBe("invite");
 
-  const member = await signup("member@test.dev");
+  const member = await signup("member@test.dev", "team-test-password");
   const withCode = await exports.default.fetch(`http://localhost/api/v1/teams/${invId}/members`, {
     method: "POST",
     headers: { cookie: member, "content-type": "application/json" },
@@ -106,7 +106,7 @@ test("admin detail exposes team and join with invite code works", async () => {
 });
 
 test("non-member list returns empty", async () => {
-  const outsider = await signup("outsider@test.dev");
+  const outsider = await signup("outsider@test.dev", "team-test-password");
   const list = await exports.default.fetch("http://localhost/api/v1/users/me/teams", {
     headers: { cookie: outsider },
   });
@@ -127,7 +127,7 @@ test("sole admin cannot leave team", async () => {
 });
 
 test("leave syncs user channels via UserDO rpc", async () => {
-  const member = await signup("leaver@test.dev");
+  const member = await signup("leaver@test.dev", "team-test-password");
   const me = await exports.default.fetch("http://localhost/api/v1/users/me", {
     headers: { cookie: member },
   });
@@ -166,4 +166,96 @@ test("leave syncs user channels via UserDO rpc", async () => {
   });
   const body = (await list.json()) as { teams: unknown[] };
   expect(body.teams).toHaveLength(0);
+});
+
+let wsCookie = "";
+let wsTeamId = "";
+
+beforeAll(async () => {
+  wsCookie = await signup("ws-guide@test.dev", "ws-guide-password");
+  const res = await exports.default.fetch("http://localhost/api/v1/teams", {
+    method: "POST",
+    headers: { cookie: wsCookie, "content-type": "application/json" },
+    body: JSON.stringify({ name: "guideteam", displayName: "Guide Team", type: "open" }),
+  });
+  const body = (await res.json()) as { id?: string };
+  wsTeamId = body.id!;
+});
+
+test("workspaces returns team with empty channels", async () => {
+  const res = await exports.default.fetch("http://localhost/api/v1/users/me/workspaces", {
+    headers: { cookie: wsCookie },
+  });
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as {
+    teams: {
+      id: string;
+      name: string;
+      displayName: string;
+      type: string;
+      roles: string;
+      archivedAt: number | null;
+      channels: {
+        id: string;
+        teamId: string | null;
+        name: string | null;
+        displayName: string;
+        type: string;
+        member: boolean;
+        archivedAt: number | null;
+      }[];
+    }[];
+  };
+  expect(body.teams).toHaveLength(1);
+  expect(body.teams[0].name).toBe("guideteam");
+  expect(body.teams[0].displayName).toBe("Guide Team");
+  expect(body.teams[0].type).toBe("open");
+  expect(body.teams[0].roles).toBe("team_admin");
+  expect(body.teams[0].channels).toHaveLength(0);
+});
+
+test("workspaces lists channels and membership", async () => {
+  const db = getDb(env.DB);
+  await createChannel(db, {
+    id: "channel-ws-1",
+    teamId: wsTeamId,
+    name: "general",
+    displayName: "General",
+    type: "public",
+    dedupKey: "dedup-ws-1",
+    creatorId: "user-ws-1",
+  });
+
+  const res = await exports.default.fetch("http://localhost/api/v1/users/me/workspaces", {
+    headers: { cookie: wsCookie },
+  });
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as {
+    teams: { id: string; channels: { id: string; name: string | null; member: boolean }[] }[];
+  };
+  expect(body.teams[0].channels).toHaveLength(1);
+  expect(body.teams[0].channels[0].name).toBe("general");
+  expect(body.teams[0].channels[0].member).toBe(false);
+
+  await createChannel(db, {
+    id: "channel-ws-2",
+    teamId: wsTeamId,
+    name: "announce",
+    displayName: "Announce",
+    type: "public",
+    dedupKey: "dedup-ws-2",
+    creatorId: "user-ws-1",
+  });
+  const res2 = await exports.default.fetch("http://localhost/api/v1/users/me/workspaces", {
+    headers: { cookie: wsCookie },
+  });
+  const body2 = (await res2.json()) as {
+    teams: { channels: { id: string; member: boolean }[] }[];
+  };
+  expect(body2.teams[0].channels).toHaveLength(2);
+});
+
+test("workspaces requires session", async () => {
+  const res = await exports.default.fetch("http://localhost/api/v1/users/me/workspaces");
+  expect(res.status).toBe(401);
 });

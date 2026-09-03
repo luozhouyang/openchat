@@ -4,8 +4,8 @@ import { exports } from "cloudflare:workers";
 import { userDoName } from "protocol";
 import type { PresenceStatus } from "protocol";
 import { eq } from "drizzle-orm";
-import { getDb } from "../../src/worker/db/client.ts";
-import * as schemaD1 from "../../src/worker/db/schema-d1.ts";
+import { getDb } from "../../../src/worker/db/client.ts";
+import * as schemaD1 from "../../../src/worker/db/schema-d1.ts";
 
 let aliceCookie = "";
 let aliceId = "";

@@ -1,7 +1,7 @@
 import { expect, test, beforeAll } from "vite-plus/test";
 import { env, runInDurableObject } from "cloudflare:test";
 import { channelDoName, issueInternalToken, userDoName } from "protocol";
-import * as schema from "../../src/worker/db/schema-channel-do.ts";
+import * as schema from "../../../src/worker/db/schema-channel-do.ts";
 
 const channelId = "c-ws-actions";
 const channel = env.CHANNEL_DO.get(env.CHANNEL_DO.idFromName(channelDoName(channelId)));
