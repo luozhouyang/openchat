@@ -20,11 +20,13 @@ export interface AuthServiceDeps {
 
 export interface AuthService {
   signIn(email: string, password: string): Promise<void>;
-  signUp(email: string, password: string): Promise<void>;
+  signUp(email: string, password: string, name: string): Promise<void>;
   signOut(): Promise<void>;
   hasSession(): Promise<boolean>;
   /** Short-lived better-auth JWT for the WebSocket upgrade. */
   getWsJwt(): Promise<string | null>;
+  sendVerificationEmail(email: string, callbackURL: string): Promise<void>;
+  verifyEmail(input: { token: string; callbackURL?: string }): Promise<void>;
 }
 
 const WS_JWT_TTL_MS = 10 * 60_000; // JWT lives 15min; rotate a bit early
@@ -80,14 +82,22 @@ export function createAuthService(deps: AuthServiceDeps): AuthService {
       if (!cookieMode) await persistBearerToken(res.data);
     },
 
-    async signUp(email, password) {
-      const res = await authClient.signUp.email({
-        email,
-        password,
-        name: email.split("@")[0],
-      });
+    async signUp(email, password, name) {
+      const res = await authClient.signUp.email({ email, password, name });
       if (res.error) throw new Error(res.error.message ?? "sign-up failed");
       if (!cookieMode) await persistBearerToken(res.data);
+    },
+
+    async sendVerificationEmail(email, callbackURL) {
+      const res = await authClient.sendVerificationEmail({ email, callbackURL });
+      if (res.error) throw new Error(res.error.message ?? "send verification email failed");
+    },
+
+    async verifyEmail(input) {
+      const res = await authClient.verifyEmail({
+        query: { token: input.token, callbackURL: input.callbackURL },
+      });
+      if (res.error) throw new Error(res.error.message ?? "email verification failed");
     },
 
     async signOut() {
