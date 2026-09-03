@@ -47,7 +47,7 @@ function SignupPage() {
             onSubmit={(e) => {
               e.preventDefault();
               e.stopPropagation();
-              form.handleSubmit();
+              void form.handleSubmit();
             }}
             className="space-y-4"
           >
