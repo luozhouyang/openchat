@@ -18,16 +18,6 @@ export const pushSubscriptions = sqliteTable("push_subscriptions", {
   updatedAt: integer("updated_at").notNull(),
 });
 
-export const presenceSubscribers = sqliteTable("presence_subscribers", {
-  userId: text("user_id").primaryKey(),
-  expiresAt: integer("expires_at").notNull(),
-});
-
-export const presenceSubscriptions = sqliteTable("presence_subscriptions", {
-  userId: text("user_id").primaryKey(),
-  expiresAt: integer("expires_at").notNull(),
-});
-
 export const sidebarCache = sqliteTable("sidebar_cache", {
   channelId: text("channel_id").primaryKey(),
   maxSeq: integer("max_seq").notNull().default(0),
@@ -64,12 +54,3 @@ export const sidebarchannels = sqliteTable(
     index("idx_sbc_user").on(t.userId),
   ],
 );
-
-export const status = sqliteTable("status", {
-  userId: text("user_id").primaryKey(),
-  status: text("status").notNull().default("offline"),
-  manual: integer("manual", { mode: "boolean" }).notNull().default(false),
-  lastActivityAt: integer("last_activity_at"),
-  dndEndTime: integer("dnd_end_time"),
-  prevStatus: text("prev_status"),
-});

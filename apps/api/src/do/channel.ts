@@ -1,10 +1,11 @@
 import { DurableObject } from "cloudflare:workers";
 import { drizzle } from "drizzle-orm/durable-sqlite";
 import { migrate } from "drizzle-orm/durable-sqlite/migrator";
-import { and, asc, count, desc, eq, gt, isNull, lt, ne, or } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, inArray, isNull, lt } from "drizzle-orm";
 import { id, userDoName, isAllowedEmoji, type MessageType, type NotifPref } from "protocol";
 import migrations from "../../migrations/channel-do/migrations";
 import * as schema from "../db/schema-channel-do.ts";
+import * as schemaD1 from "../db/schema-d1.ts";
 import { getDb } from "../db/client.ts";
 import { setThumbnail } from "../db/repos/uploads.ts";
 import { createBroadcaster } from "./broadcast.ts";
@@ -34,6 +35,13 @@ interface ThreadInfo {
   participants: string[];
   channelId: string | null;
 }
+
+/**
+ * Channels at or below this member count broadcast to every member (relying on
+ * UserDO.push's cheap short-circuit); larger channels filter targets via D1
+ * `user_status.online`. Tuned so one D1 read ≈ one offline-UserDO wake-up.
+ */
+const SMALL_CHANNEL_THRESHOLD = 16;
 
 export class ChannelDO extends DurableObject<Env> {
   db: ReturnType<typeof drizzle>;
@@ -87,13 +95,6 @@ export class ChannelDO extends DurableObject<Env> {
     });
   }
 
-  async setPresence(body: { userId: string; online: boolean }): Promise<void> {
-    await this.db
-      .update(schema.memberState)
-      .set({ online: body.online })
-      .where(eq(schema.memberState.userId, body.userId));
-  }
-
   async setPushSubscribed(body: { userId: string; subscribed: boolean }): Promise<void> {
     await this.db
       .update(schema.memberState)
@@ -103,11 +104,15 @@ export class ChannelDO extends DurableObject<Env> {
 
   async health(): Promise<{ ok: boolean; members: number; online: number }> {
     const members = (await this.db.select().from(schema.memberState)).length;
-    const onlineRows = await this.db
-      .select({ n: count() })
-      .from(schema.memberState)
-      .where(eq(schema.memberState.online, true));
-    return { ok: true, members, online: Number(onlineRows[0]?.n ?? 0) };
+    const online =
+      (
+        await this.fetchOnlineMemberIds(
+          (
+            await this.db.select({ userId: schema.memberState.userId }).from(schema.memberState)
+          ).map((r) => r.userId),
+        )
+      )?.length ?? 0;
+    return { ok: true, members, online };
   }
 
   async count(): Promise<{ count: number }> {
@@ -760,46 +765,64 @@ export class ChannelDO extends DurableObject<Env> {
   }
 
   private async broadcast(event: { type: string; [k: string]: unknown }) {
-    // Target list is derived from the persisted member_state, which survives
-    // hibernation (the old in-memory subscriber cache was discarded on sleep
-    // and real-time delivery silently stopped). Only members that can actually
-    // receive something are woken:
-    //   - online members (live WS) always get real-time frames;
-    //   - offline members are only woken for message.new when they have a push
-    //     subscription and have not opted out of notifications.
-    // typing/reaction/edit/delete/pin events carry no notification and only
-    // matter to online members.
+    // Presence lives centrally in D1 `user_status` (single source of truth).
+    // The target filter is an *optimization* to avoid waking hibernated offline
+    // User DOs, not a correctness requirement: UserDO.push cheaply short-circuits
+    // (foreground / pref / mention / push-subscription checks).
+    //   - small channels: target all members (0 network hops before the fan-out);
+    //   - large channels: one D1 IN-list query for online members, then merge the
+    //     offline-but-push-subscribed members locally.
+    // D1 failure degrades to target-all so delivery never blocks on it.
     const wantsPush = event.type === "message.new";
-    const rows = wantsPush
-      ? await this.db
-          .select({
-            userId: schema.memberState.userId,
-            notifPref: schema.memberState.notifPref,
-          })
-          .from(schema.memberState)
-          .where(
-            or(
-              eq(schema.memberState.online, true),
-              and(
-                eq(schema.memberState.pushSubscribed, true),
-                ne(schema.memberState.notifPref, "none"),
-              ),
-            ),
-          )
-      : await this.db
-          .select({
-            userId: schema.memberState.userId,
-            notifPref: schema.memberState.notifPref,
-          })
-          .from(schema.memberState)
-          .where(eq(schema.memberState.online, true));
+    const rows = await this.db
+      .select({
+        userId: schema.memberState.userId,
+        notifPref: schema.memberState.notifPref,
+        pushSubscribed: schema.memberState.pushSubscribed,
+      })
+      .from(schema.memberState);
     const prefs = new Map<string, NotifPref>();
-    const userIds: string[] = [];
-    for (const row of rows) {
-      prefs.set(row.userId, row.notifPref as NotifPref);
-      userIds.push(row.userId);
+    for (const row of rows) prefs.set(row.userId, row.notifPref as NotifPref);
+
+    let targets: string[];
+    if (rows.length <= SMALL_CHANNEL_THRESHOLD) {
+      targets = rows.map((r) => r.userId);
+    } else {
+      const online = await this.fetchOnlineMemberIds(rows.map((r) => r.userId));
+      if (online === null) {
+        targets = rows.map((r) => r.userId);
+      } else {
+        const onlineSet = new Set(online);
+        targets = rows
+          .filter((r) =>
+            wantsPush
+              ? onlineSet.has(r.userId) || (r.pushSubscribed && r.notifPref !== "none")
+              : onlineSet.has(r.userId),
+          )
+          .map((r) => r.userId);
+      }
     }
-    await this.broadcaster.broadcast(event, prefs, userIds);
+    await this.broadcaster.broadcast(event, prefs, targets);
+  }
+
+  /** Online member ids from D1 `user_status`; `null` signals a D1 failure. */
+  private async fetchOnlineMemberIds(ids: string[]): Promise<string[] | null> {
+    try {
+      const out: string[] = [];
+      for (let i = 0; i < ids.length; i += 900) {
+        const chunk = ids.slice(i, i + 900);
+        const rows = await getDb(this.env.DB)
+          .select({ userId: schemaD1.userStatus.userId })
+          .from(schemaD1.userStatus)
+          .where(
+            and(eq(schemaD1.userStatus.online, true), inArray(schemaD1.userStatus.userId, chunk)),
+          );
+        for (const r of rows) out.push(r.userId);
+      }
+      return out;
+    } catch {
+      return null;
+    }
   }
 
   private async notifyThreadSubscribers(parentId: string, senderId: string, message: unknown) {

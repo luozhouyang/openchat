@@ -2,18 +2,13 @@ import { DurableObject } from "cloudflare:workers";
 import { drizzle } from "drizzle-orm/durable-sqlite";
 import { migrate } from "drizzle-orm/durable-sqlite/migrator";
 import { asc, count, eq } from "drizzle-orm";
-import {
-  channelDoName,
-  helloEvent,
-  parseClientFrame,
-  userDoName,
-  verifyInternalToken,
-} from "protocol";
+import { channelDoName, helloEvent, parseClientFrame, verifyInternalToken } from "protocol";
 import type { PresenceStatus } from "protocol";
 import migrations from "../../migrations/user-do/migrations";
 import { getDb } from "../db/client.ts";
 import { listChannelsByIds } from "../db/repos/channels.ts";
 import * as schema from "../db/schema-user-do.ts";
+import * as schemaD1 from "../db/schema-d1.ts";
 
 interface SidebarEntry {
   channelId: string;
@@ -92,37 +87,52 @@ export class UserDO extends DurableObject<Env> {
   }
 
   private async persistStatus(status: PresenceStatus): Promise<void> {
-    const rows = await this.db
+    // Single source of truth: D1 `user_status` (Mattermost-style global status
+    // row). The `online` boolean reflects *connectivity* (derived status, not
+    // the effective/manual one) so a manual "dnd/offline" user still receives
+    // real-time frames; `status` stores the effective status for display.
+    const db = getDb(this.env.DB);
+    const rows = await db
       .select()
-      .from(schema.status)
-      .where(eq(schema.status.userId, this.userId))
+      .from(schemaD1.userStatus)
+      .where(eq(schemaD1.userStatus.userId, this.userId))
       .limit(1);
     const existing = rows[0];
     const lastActivityAt = this.lastActivity() || existing?.lastActivityAt || null;
+    const online = status !== "offline";
     if (!existing) {
-      await this.db
-        .insert(schema.status)
+      await db
+        .insert(schemaD1.userStatus)
         .values({
           userId: this.userId,
+          online,
           status,
           manual: false,
           lastActivityAt,
           dndEndTime: null,
           prevStatus: null,
+          updatedAt: Date.now(),
         })
         .onConflictDoNothing();
       return;
     }
     const effective = existing.manual ? existing.status : status;
-    if (existing.status === effective && existing.lastActivityAt === lastActivityAt) return;
-    await this.db
-      .update(schema.status)
+    if (
+      existing.status === effective &&
+      existing.online === online &&
+      existing.lastActivityAt === lastActivityAt
+    )
+      return;
+    await db
+      .update(schemaD1.userStatus)
       .set({
         status: effective,
+        online,
         lastActivityAt,
         ...(existing.status !== effective ? { prevStatus: existing.status } : {}),
+        updatedAt: Date.now(),
       })
-      .where(eq(schema.status.userId, this.userId));
+      .where(eq(schemaD1.userStatus.userId, this.userId));
   }
 
   constructor(ctx: DurableObjectState, env: Env) {
@@ -273,20 +283,6 @@ export class UserDO extends DurableObject<Env> {
 
   private isBroadcastMention(message: { content?: string }): boolean {
     return /@\[(channel|all)\]/.test(message.content ?? "");
-  }
-
-  private async syncPresenceToChannels(online: boolean): Promise<void> {
-    const rows = await this.db.select().from(schema.channelsCache);
-    await Promise.all(
-      rows.map(async (row) => {
-        try {
-          const stub = this.env.CHANNEL_DO.get(
-            this.env.CHANNEL_DO.idFromName(channelDoName(row.channelId)),
-          );
-          await stub.setPresence({ userId: this.userId, online });
-        } catch {}
-      }),
-    );
   }
 
   private async syncPushSubscribedToChannels(subscribed: boolean): Promise<void> {
@@ -500,39 +496,11 @@ export class UserDO extends DurableObject<Env> {
     return { ok: true, devices, channels, disconnectUntil: this.disconnectUntil };
   }
 
-  async presenceSubscribe(body: { subscriberId: string; expiresAt: number }): Promise<void> {
-    await this.db
-      .insert(schema.presenceSubscribers)
-      .values({ userId: body.subscriberId, expiresAt: body.expiresAt })
-      .onConflictDoUpdate({
-        target: schema.presenceSubscribers.userId,
-        set: { expiresAt: body.expiresAt },
-      });
-  }
-
-  async presenceUnsubscribe(body: { subscriberId: string }): Promise<void> {
-    await this.db
-      .delete(schema.presenceSubscribers)
-      .where(eq(schema.presenceSubscribers.userId, body.subscriberId));
-  }
-
-  async presenceNotify(body: { userId: string; status: PresenceStatus }): Promise<void> {
-    const payload = JSON.stringify({
-      type: "presence.update",
-      userId: body.userId,
-      status: body.status,
-    });
-    for (const conn of this.ctx.getWebSockets()) {
-      if (conn.readyState === WebSocket.OPEN) conn.send(payload);
-    }
-  }
-
   async presenceStatus(): Promise<{ status: PresenceStatus }> {
     const status = this.status();
     if (status === "away" && !this.awayNotified) {
       this.awayNotified = true;
       await this.persistStatus("away");
-      await this.notifySubscribers("away");
     }
     return { status };
   }
@@ -541,44 +509,45 @@ export class UserDO extends DurableObject<Env> {
     userId: string,
     body: { status: string; manual?: boolean; dndEndTime?: number | null },
   ): Promise<{ ok: true }> {
-    const rows = await this.db
+    const db = getDb(this.env.DB);
+    const rows = await db
       .select()
-      .from(schema.status)
-      .where(eq(schema.status.userId, userId))
+      .from(schemaD1.userStatus)
+      .where(eq(schemaD1.userStatus.userId, userId))
       .limit(1);
     const existing = rows[0];
     const manual = body.manual ?? false;
     if (existing) {
-      await this.db
-        .update(schema.status)
+      await db
+        .update(schemaD1.userStatus)
         .set({
           status: body.status,
           manual,
           dndEndTime: body.dndEndTime !== undefined ? body.dndEndTime : existing.dndEndTime,
           prevStatus: manual ? existing.status : existing.prevStatus,
+          updatedAt: Date.now(),
         })
-        .where(eq(schema.status.userId, userId));
+        .where(eq(schemaD1.userStatus.userId, userId));
     } else {
-      await this.db.insert(schema.status).values({
+      await db.insert(schemaD1.userStatus).values({
         userId,
+        online: false,
         status: body.status,
         manual,
         lastActivityAt: Date.now(),
         dndEndTime: body.dndEndTime ?? null,
         prevStatus: null,
+        updatedAt: Date.now(),
       });
-    }
-    if (body.status === "online" || body.status === "away" || body.status === "offline") {
-      await this.notifySubscribers(body.status);
     }
     return { ok: true };
   }
 
   async getStatus(userId: string): Promise<UserStatus> {
-    const rows = await this.db
+    const rows = await getDb(this.env.DB)
       .select()
-      .from(schema.status)
-      .where(eq(schema.status.userId, userId))
+      .from(schemaD1.userStatus)
+      .where(eq(schemaD1.userStatus.userId, userId))
       .limit(1);
     const row = rows[0];
     if (!row) {
@@ -659,19 +628,6 @@ export class UserDO extends DurableObject<Env> {
     if (this.awayNotified) return;
     this.awayNotified = true;
     await this.persistStatus("away");
-    await this.notifySubscribers("away");
-  }
-
-  private async notifySubscribers(status: PresenceStatus) {
-    const subs = await this.db.select().from(schema.presenceSubscribers);
-    const now = Date.now();
-    for (const sub of subs) {
-      if (sub.expiresAt < now) continue;
-      try {
-        const id = this.env.USER_DO.idFromName(userDoName(sub.userId));
-        await this.env.USER_DO.get(id).presenceNotify({ userId: this.userId, status });
-      } catch {}
-    }
   }
 
   async fetch(request: Request): Promise<Response> {
@@ -705,8 +661,8 @@ export class UserDO extends DurableObject<Env> {
       this.lastActiveAt = Date.now();
       this.awayNotified = false;
       await this.armAwayAlarm();
-      void this.notifySubscribers("online");
-      void this.syncPresenceToChannels(true);
+      // Connectivity is the freshness-critical presence fact: write it before
+      // accepting so the next broadcast (D1 read) sees this user online.
       await this.persistStatus("online");
       return new Response(null, { status: 101, webSocket: client });
     }
@@ -799,49 +755,12 @@ export class UserDO extends DurableObject<Env> {
     if (frame.type === "activity") {
       this.touchActivity(ws);
     }
-    if (frame.type === "presence_subscribe" || frame.type === "presence_unsubscribe") {
-      const attachment = ws.deserializeAttachment() as { userId?: string } | null;
-      const subscriberId = attachment?.userId;
-      if (!subscriberId) return;
-      const expiresAt = Date.now() + 24 * 3600_000;
-      for (const targetId of frame.userIds) {
-        const targetStub = this.env.USER_DO.get(this.env.USER_DO.idFromName(userDoName(targetId)));
-        if (frame.type === "presence_subscribe") {
-          await this.db
-            .insert(schema.presenceSubscriptions)
-            .values({ userId: targetId, expiresAt })
-            .onConflictDoUpdate({
-              target: schema.presenceSubscriptions.userId,
-              set: { expiresAt },
-            });
-          await targetStub.presenceSubscribe({ subscriberId, expiresAt });
-        } else {
-          await this.db
-            .delete(schema.presenceSubscriptions)
-            .where(eq(schema.presenceSubscriptions.userId, targetId));
-          await targetStub.presenceUnsubscribe({ subscriberId });
-        }
-      }
-      const states: Record<string, PresenceStatus> = {};
-      for (const targetId of frame.userIds) {
-        try {
-          const targetStub = this.env.USER_DO.get(
-            this.env.USER_DO.idFromName(userDoName(targetId)),
-          );
-          const { status } = await targetStub.presenceStatus();
-          states[targetId] = status;
-        } catch {}
-      }
-      ws.send(JSON.stringify({ type: "presence.snapshot", states }));
-    }
   }
 
   async webSocketClose(ws: WebSocket, code: number, reason: string, _wasClean: boolean) {
     ws.close(code, reason);
     if (this.ctx.getWebSockets().length === 0) {
       void this.persistStatus("offline");
-      void this.notifySubscribers("offline");
-      void this.syncPresenceToChannels(false);
       void this.ctx.storage.deleteAlarm();
     }
   }
@@ -857,7 +776,6 @@ export class UserDO extends DurableObject<Env> {
     if (this.awayNotified) {
       this.awayNotified = false;
       void this.persistStatus("online");
-      void this.notifySubscribers("online");
     }
   }
 

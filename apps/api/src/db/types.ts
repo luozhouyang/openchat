@@ -32,7 +32,6 @@ export type ChannelDoMemberState = typeof channelDo.memberState.$inferSelect;
 export type ChannelDoThread = typeof channelDo.threads.$inferSelect;
 export type ChannelDoReaction = typeof channelDo.reactions.$inferSelect;
 
-export type UserDoStatus = typeof userDo.status.$inferSelect;
 export type UserDoPushSubscription = typeof userDo.pushSubscriptions.$inferSelect;
 export type UserDoSidebarCache = typeof userDo.sidebarCache.$inferSelect;
 export type UserDoSidebarCategory = typeof userDo.sidebarcategories.$inferSelect;

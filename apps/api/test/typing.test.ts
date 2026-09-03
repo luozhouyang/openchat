@@ -8,7 +8,6 @@ const channel = env.CHANNEL_DO.get(env.CHANNEL_DO.idFromName(channelDoName(chann
 beforeAll(async () => {
   await channel.membersAdd({ userId: "alice", role: "member" });
   await channel.membersAdd({ userId: "bob", role: "member" });
-  await channel.setPresence({ userId: "bob", online: true });
 });
 
 test("typing by member is silent, non-member rejected", async () => {

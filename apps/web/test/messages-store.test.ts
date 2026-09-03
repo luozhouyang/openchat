@@ -5,7 +5,6 @@ import { useMessageStore } from "../src/stores/messages";
 import { useConnectionStore } from "../src/stores/connection";
 import { useSidebarStore } from "../src/stores/sidebar";
 import { useTypingStore } from "../src/stores/typing";
-import { usePresenceStore } from "../src/stores/presence";
 
 const msg = (seq: number) => ({
   id: `m${seq}`,
@@ -44,8 +43,4 @@ test("web stores re-export the shared state package", () => {
   useTypingStore.setState({ active: {} });
   useTypingStore.getState().mark("c1", "u1", Date.now() + 1000);
   expect(useTypingStore.getState().list("c1")).toEqual(["u1"]);
-
-  usePresenceStore.setState({ states: {} });
-  usePresenceStore.getState().set("u1", "online");
-  expect(usePresenceStore.getState().states["u1"]).toBe("online");
 });

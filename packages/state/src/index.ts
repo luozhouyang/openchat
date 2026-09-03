@@ -13,7 +13,6 @@ export { SqliteTxRunner } from "./db/tx.ts";
 export { useMessageStore, type StoreMessage } from "./stores/messages.ts";
 export { useSidebarStore } from "./stores/sidebar.ts";
 export { useTypingStore } from "./stores/typing.ts";
-export { usePresenceStore } from "./stores/presence.ts";
 export { useConnectionStore } from "./stores/connection.ts";
 export { useStructureStore } from "./stores/structure.ts";
 

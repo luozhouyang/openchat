@@ -218,3 +218,18 @@ export const schemes = sqliteTable("schemes", {
   updatedAt: integer("updated_at"),
   deletedAt: integer("deleted_at"),
 });
+
+export const userStatus = sqliteTable(
+  "user_status",
+  {
+    userId: text("user_id").primaryKey(),
+    online: integer("online", { mode: "boolean" }).notNull().default(false),
+    status: text("status").notNull().default("offline"),
+    manual: integer("manual", { mode: "boolean" }).notNull().default(false),
+    lastActivityAt: integer("last_activity_at"),
+    dndEndTime: integer("dnd_end_time"),
+    prevStatus: text("prev_status"),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (t) => [index("idx_user_status_online").on(t.online)],
+);

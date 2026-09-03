@@ -2,7 +2,6 @@ import type { ChannelEvent, Message, ServerEvent } from "protocol";
 import type { LocalDatabase } from "../db/database.ts";
 import { useMessageStore } from "../stores/messages.ts";
 import { useSidebarStore } from "../stores/sidebar.ts";
-import { usePresenceStore } from "../stores/presence.ts";
 import { useStructureStore } from "../stores/structure.ts";
 import { useTypingStore } from "../stores/typing.ts";
 
@@ -90,12 +89,6 @@ export function createDispatcher(deps: DispatcherDeps) {
       case "structure.update":
         useStructureStore.getState().bump(ev.scope);
         deps.onLocal?.(ev);
-        break;
-      case "presence.update":
-        usePresenceStore.getState().set(ev.userId, ev.status);
-        break;
-      case "presence.snapshot":
-        usePresenceStore.getState().applySnapshot(ev.states);
         break;
       case "ack":
         useMessageStore

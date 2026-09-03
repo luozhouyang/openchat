@@ -1,10 +1,13 @@
 import { Hono, type Context } from "hono";
+import { eq, inArray } from "drizzle-orm";
 import { userDoName, type UserStatus } from "protocol";
 import { PutStatusInput, StatusIdsInput, StatusOutput, StatusesOutput } from "protocol";
 import type { SessionContext } from "../../auth/session.ts";
 import { requireSession } from "../../auth/session.ts";
 import { zodValidator } from "../../lib/validation.ts";
 import { apiError } from "../../lib/errors.ts";
+import { getDb } from "../../db/client.ts";
+import * as schemaD1 from "../../db/schema-d1.ts";
 
 type StatusCtx = Context<{ Bindings: Env; Variables: { session: SessionContext } }>;
 
@@ -20,13 +23,20 @@ function userDoStub(env: Env, userId: string) {
 
 statusV1.get("/users/:userId/status", requireSession, async (c) => {
   const userId = targetUserId(c, c.req.param("userId"));
-  const s = await userDoStub(c.env, userId).getStatus(userId);
+  // Reads hit the shared D1 `user_status` directly (no DO wake-up): the row
+  // holds the effective status computed by the owning User DO.
+  const rows = await getDb(c.env.DB)
+    .select()
+    .from(schemaD1.userStatus)
+    .where(eq(schemaD1.userStatus.userId, userId))
+    .limit(1);
+  const row = rows[0];
   const out: StatusOutput = {
-    userId: s.userId,
-    status: s.status as UserStatus,
-    manual: s.manual,
-    lastActivityAt: s.lastActivityAt,
-    dndEndTime: s.dndEndTime,
+    userId,
+    status: (row?.status as UserStatus) ?? "offline",
+    manual: row?.manual ?? false,
+    lastActivityAt: row?.lastActivityAt ?? null,
+    dndEndTime: row?.dndEndTime ?? null,
   };
   return c.json(out);
 });
@@ -55,15 +65,20 @@ statusV1.post(
   zodValidator("json", StatusIdsInput),
   async (c) => {
     const body = c.req.valid("json");
-    const statuses: Record<string, "online" | "away" | "offline"> = {};
+    const rows = await getDb(c.env.DB)
+      .select()
+      .from(schemaD1.userStatus)
+      .where(inArray(schemaD1.userStatus.userId, body.userIds));
+    const byId = new Map(rows.map((r) => [r.userId, r]));
+    const statuses: Record<string, string> = {};
     for (const uid of body.userIds) {
-      const stub = userDoStub(c.env, uid);
-      try {
-        const { status } = await stub.presenceStatus();
-        statuses[uid] = status;
-      } catch {
-        const s = await stub.getStatus(uid);
-        statuses[uid] = s.status === "dnd" ? "online" : (s.status as "online" | "away" | "offline");
+      const row = byId.get(uid);
+      if (!row) {
+        statuses[uid] = "offline";
+      } else {
+        // Presence indicators only know online/away/offline: a manual dnd user
+        // is still connected, so surface them as online (matches the old path).
+        statuses[uid] = row.status === "dnd" ? "online" : (row.status as string);
       }
     }
     const out: StatusesOutput = { statuses };

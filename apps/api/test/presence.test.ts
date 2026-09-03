@@ -3,9 +3,11 @@ import { env } from "cloudflare:test";
 import { exports } from "cloudflare:workers";
 import { userDoName } from "protocol";
 import type { PresenceStatus } from "protocol";
+import { eq } from "drizzle-orm";
+import { getDb } from "../src/db/client.ts";
+import * as schemaD1 from "../src/db/schema-d1.ts";
 
 let aliceCookie = "";
-let watcherCookie = "";
 let aliceId = "";
 
 beforeAll(async () => {
@@ -23,17 +25,6 @@ beforeAll(async () => {
     headers: { cookie: aliceCookie },
   });
   aliceId = jwtSubject(((await tokenAlice.json()) as { token: string }).token);
-
-  const signupWatcher = await exports.default.fetch("http://localhost/api/auth/sign-up/email", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      email: "watcher@presence.dev",
-      password: "presence-test-password",
-      name: "Watcher",
-    }),
-  });
-  watcherCookie = signupWatcher.headers.get("set-cookie") ?? "";
 });
 
 function jwtSubject(token: string): string {
@@ -82,23 +73,27 @@ async function waitForStatus(userId: string, expected: PresenceStatus, timeoutMs
   expect(status).toBe(expected);
 }
 
+async function waitFor(predicate: () => Promise<boolean>, timeoutMs = 5000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (await predicate()) return;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  throw new Error("timed out");
+}
+
+async function d1Status(userId: string) {
+  const rows = await getDb(env.DB)
+    .select()
+    .from(schemaD1.userStatus)
+    .where(eq(schemaD1.userStatus.userId, userId))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
 test("no connections means offline", async () => {
   const { status } = await userStub("presence-nobody").presenceStatus();
   expect(status).toBe("offline");
-});
-
-test("presenceSubscribe and presenceUnsubscribe lifecycle", async () => {
-  const target = userStub("presence-target");
-  await target.presenceSubscribe({
-    subscriberId: "lifecycle-watcher",
-    expiresAt: Date.now() + 86_400_000,
-  });
-  await target.presenceSubscribe({
-    subscriberId: "lifecycle-watcher",
-    expiresAt: Date.now() + 2 * 86_400_000,
-  });
-  await target.presenceUnsubscribe({ subscriberId: "lifecycle-watcher" });
-  await target.presenceUnsubscribe({ subscriberId: "lifecycle-watcher" });
 });
 
 test("presence is online while connected and offline after close", async () => {
@@ -110,55 +105,33 @@ test("presence is online while connected and offline after close", async () => {
   await waitForStatus(aliceId, "offline");
 });
 
-test("subscriber receives presence.update frames across online and offline", async () => {
-  const watcher = await upgrade(watcherCookie, "d1");
-  const hello = await nextMessage(watcher);
+test("connect and disconnect write online/offline into D1 user_status", async () => {
+  const alice = await upgrade(aliceCookie, "d1");
+  const hello = await nextMessage(alice);
   expect(JSON.parse(String(hello.data))).toMatchObject({ type: "hello" });
 
-  watcher.send(JSON.stringify({ type: "presence_subscribe", userIds: [aliceId] }));
-  const snapshot = await nextMessage(watcher);
-  expect(JSON.parse(String(snapshot.data))).toEqual({
-    type: "presence.snapshot",
-    states: { [aliceId]: "offline" },
-  });
+  await waitFor(async () => (await d1Status(aliceId))?.online === true);
+  const online = await d1Status(aliceId);
+  expect(online).toMatchObject({ userId: aliceId, status: "online" });
 
-  const onlineFrame = nextMessage(watcher);
-  const alice = await upgrade(aliceCookie, "d1");
-  const aliceHello = await nextMessage(alice);
-  expect(JSON.parse(String(aliceHello.data))).toMatchObject({ type: "hello" });
-  const online = await onlineFrame;
-  expect(JSON.parse(String(online.data))).toEqual({
-    type: "presence.update",
-    userId: aliceId,
-    status: "online",
-  });
-
-  const offlineFrame = nextMessage(watcher);
   alice.close(1000, "done");
-  const offline = await offlineFrame;
-  expect(JSON.parse(String(offline.data))).toEqual({
-    type: "presence.update",
-    userId: aliceId,
-    status: "offline",
-  });
+  await waitFor(async () => (await d1Status(aliceId))?.online === false);
+  const offline = await d1Status(aliceId);
+  expect(offline?.status).toBe("offline");
+});
 
-  watcher.send(JSON.stringify({ type: "presence_unsubscribe", userIds: [aliceId] }));
-  const snapshot2 = await nextMessage(watcher);
-  expect(JSON.parse(String(snapshot2.data))).toEqual({
-    type: "presence.snapshot",
-    states: { [aliceId]: "offline" },
-  });
+test("manual status persists to D1 and survives connect/disconnect", async () => {
+  const stub = userStub(aliceId);
+  const dndEndTime = Date.now() + 3600_000;
+  await stub.setStatus(aliceId, { status: "dnd", manual: true, dndEndTime });
 
-  const silent = nextMessage(watcher);
-  const alice2 = await upgrade(aliceCookie, "d2");
-  const alice2Hello = await nextMessage(alice2);
-  expect(JSON.parse(String(alice2Hello.data))).toMatchObject({ type: "hello" });
-  const race = await Promise.race([
-    silent.then(() => "frame"),
-    new Promise<string>((r) => setTimeout(() => r("timeout"), 400)),
-  ]);
-  expect(race).toBe("timeout");
+  const alice = await upgrade(aliceCookie, "d1");
+  await waitFor(async () => (await d1Status(aliceId))?.online === true);
+  const row = await d1Status(aliceId);
+  // manual status overrides the auto transition: display stays dnd, but the
+  // online boolean reflects connectivity so the user still gets real-time.
+  expect(row).toMatchObject({ userId: aliceId, status: "dnd", manual: true, dndEndTime });
+  expect(row?.online).toBe(true);
 
-  alice2.close(1000, "done");
-  watcher.close(1000, "done");
+  alice.close(1000, "done");
 });
