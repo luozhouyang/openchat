@@ -37,8 +37,10 @@
     "react": "catalog:",
     "react-dom": "catalog:",
     "realtime": "workspace:*",
+    "shadcn": "catalog:",
     "state": "workspace:*",
     "tailwind-merge": "catalog:",
+    "tw-animate-css": "catalog:",
     "zod": "catalog:",
     "zustand": "catalog:"
   },
