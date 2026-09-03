@@ -16,6 +16,7 @@ import { Route as CheckEmailRouteImport } from './routes/check-email'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SignupRouteImport } from './routes/signup'
+import { Route as VerifyEmailRouteImport } from './routes/verify-email'
 import { Route as TeamIdIndexRouteImport } from './routes/$teamId/index'
 import { Route as TeamIdCChannelIdRouteImport } from './routes/$teamId/c.$channelId'
 import { Route as TeamIdDmChannelIdRouteImport } from './routes/$teamId/dm.$channelId'
@@ -56,6 +57,11 @@ const SignupRoute = SignupRouteImport.update({
   path: '/signup',
   getParentRoute: () => rootRouteImport,
 } as any)
+const VerifyEmailRoute = VerifyEmailRouteImport.update({
+  id: '/verify-email',
+  path: '/verify-email',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TeamIdIndexRoute = TeamIdIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -86,6 +92,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/settings': typeof SettingsRoute
   '/signup': typeof SignupRoute
+  '/verify-email': typeof VerifyEmailRoute
   '/$teamId/': typeof TeamIdIndexRoute
   '/$teamId/c/$channelId': typeof TeamIdCChannelIdRouteWithChildren
   '/$teamId/dm/$channelId': typeof TeamIdDmChannelIdRoute
@@ -98,6 +105,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/settings': typeof SettingsRoute
   '/signup': typeof SignupRoute
+  '/verify-email': typeof VerifyEmailRoute
   '/$teamId': typeof TeamIdIndexRoute
   '/$teamId/c/$channelId': typeof TeamIdCChannelIdRouteWithChildren
   '/$teamId/dm/$channelId': typeof TeamIdDmChannelIdRoute
@@ -112,6 +120,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/settings': typeof SettingsRoute
   '/signup': typeof SignupRoute
+  '/verify-email': typeof VerifyEmailRoute
   '/$teamId/': typeof TeamIdIndexRoute
   '/$teamId/c/$channelId': typeof TeamIdCChannelIdRouteWithChildren
   '/$teamId/dm/$channelId': typeof TeamIdDmChannelIdRoute
@@ -127,6 +136,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/settings'
     | '/signup'
+    | '/verify-email'
     | '/$teamId/'
     | '/$teamId/c/$channelId'
     | '/$teamId/dm/$channelId'
@@ -139,6 +149,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/settings'
     | '/signup'
+    | '/verify-email'
     | '/$teamId'
     | '/$teamId/c/$channelId'
     | '/$teamId/dm/$channelId'
@@ -152,6 +163,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/settings'
     | '/signup'
+    | '/verify-email'
     | '/$teamId/'
     | '/$teamId/c/$channelId'
     | '/$teamId/dm/$channelId'
@@ -166,6 +178,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   SettingsRoute: typeof SettingsRoute
   SignupRoute: typeof SignupRoute
+  VerifyEmailRoute: typeof VerifyEmailRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -217,6 +230,13 @@ declare module '@tanstack/react-router' {
       path: '/signup'
       fullPath: '/signup'
       preLoaderRoute: typeof SignupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/verify-email': {
+      id: '/verify-email'
+      path: '/verify-email'
+      fullPath: '/verify-email'
+      preLoaderRoute: typeof VerifyEmailRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/$teamId/': {
@@ -284,6 +304,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   SettingsRoute: SettingsRoute,
   SignupRoute: SignupRoute,
+  VerifyEmailRoute: VerifyEmailRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

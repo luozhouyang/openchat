@@ -3,7 +3,7 @@ import { createRootRoute, Outlet, redirect, useRouterState } from "@tanstack/rea
 import { appClient } from "../app-client";
 import { wsClient } from "../ws/client";
 
-const PUBLIC_PATHS = ["/login", "/signup", "/check-email"];
+const PUBLIC_PATHS = ["/login", "/signup", "/check-email", "/verify-email"];
 
 // beforeLoad runs on every navigation; probe cheaply with a short-lived
 // positive cache (the cookie-mode equivalent of better-auth's cookieCache).

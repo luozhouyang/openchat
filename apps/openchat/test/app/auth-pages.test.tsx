@@ -151,3 +151,39 @@ describe("check-email page", () => {
     );
   });
 });
+
+describe("verify-email page", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    auth.verifyEmail.mockResolvedValue({ data: null, error: null });
+    auth.sendVerificationEmail.mockResolvedValue({ data: null, error: null });
+  });
+
+  it("shows the success state with workspace/login actions", async () => {
+    await renderRoute("/verify-email");
+    expect(await screen.findByText("邮箱验证成功")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "进入工作区" })).toBeInTheDocument();
+  });
+
+  it("shows the failure state when error is present", async () => {
+    await renderRoute("/verify-email", { error: "invalid_token", email: "alice@test.dev" });
+    expect(await screen.findByText("验证失败")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "重新发送验证邮件" }));
+    await vi.waitFor(() =>
+      expect(auth.sendVerificationEmail).toHaveBeenCalledWith({
+        email: "alice@test.dev",
+        callbackURL: "/verify-email",
+      }),
+    );
+  });
+
+  it("verifies via the token query when present", async () => {
+    await renderRoute("/verify-email", { token: "tok-1" });
+    await vi.waitFor(() =>
+      expect(auth.verifyEmail).toHaveBeenCalledWith({
+        query: { token: "tok-1", callbackURL: "/verify-email" },
+      }),
+    );
+    expect(await screen.findByText("邮箱验证成功")).toBeInTheDocument();
+  });
+});
