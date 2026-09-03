@@ -90,3 +90,46 @@ describe("login page", () => {
     expect(await screen.findByText("密码错误")).toBeInTheDocument();
   });
 });
+
+describe("signup page", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    auth.signUp.email.mockResolvedValue({ data: null, error: null });
+  });
+
+  it("shows a short-password error", async () => {
+    await renderRoute("/signup");
+    fireEvent.change(screen.getByPlaceholderText("昵称"), { target: { value: "Alice" } });
+    fireEvent.change(screen.getByPlaceholderText("you@example.com"), {
+      target: { value: "alice@test.dev" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("至少 8 位密码"), {
+      target: { value: "short" },
+    });
+    fireEvent.submit(screen.getByRole("button", { name: "注册" }));
+    expect(await screen.findByTestId("password-field-error")).toHaveTextContent("密码至少 8 位");
+    expect(auth.signUp.email).not.toHaveBeenCalled();
+  });
+
+  it("submits and navigates to /check-email with the email", async () => {
+    await renderRoute("/signup");
+    fireEvent.change(screen.getByPlaceholderText("昵称"), { target: { value: "Alice" } });
+    fireEvent.change(screen.getByPlaceholderText("you@example.com"), {
+      target: { value: "alice@test.dev" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("至少 8 位密码"), {
+      target: { value: "alice-password" },
+    });
+    fireEvent.submit(screen.getByRole("button", { name: "注册" }));
+    await vi.waitFor(() =>
+      expect(auth.signUp.email).toHaveBeenCalledWith({
+        name: "Alice",
+        email: "alice@test.dev",
+        password: "alice-password",
+      }),
+    );
+    // The /check-email route is added in Task 8; assert navigation away from
+    // /signup occurred rather than the landing page content.
+    await vi.waitFor(() => expect(window.location.pathname).not.toBe("/signup"));
+  });
+});
