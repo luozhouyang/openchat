@@ -130,8 +130,8 @@ test("message broadcast delivers notifPref to subscriber user DO without leaking
   const stub = env.CHANNEL_DO.get(id);
   await stub.membersAdd({ userId: "alice", role: "member" });
   await stub.membersAdd({ userId: "bob", role: "member" });
-  await stub.subscribe({ userId: "alice" });
-  await stub.subscribe({ userId: "bob" });
+  await stub.setPresence({ userId: "alice", online: true });
+  await stub.setPresence({ userId: "bob", online: true });
 
   await stub.setNotifPref({ userId: "alice", pref: "mention" });
 

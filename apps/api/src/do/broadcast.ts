@@ -3,7 +3,6 @@ import { UserDO } from "./user.ts";
 
 export interface BroadcastDeps {
   env: { USER_DO: DurableObjectNamespace<UserDO>; channelId: string };
-  subscribers: () => Iterable<string>;
   onPushFailed: (userId: string) => void;
 }
 
@@ -32,13 +31,17 @@ export function createBroadcaster(deps: BroadcastDeps) {
   }
 
   return {
-    async broadcast(event: unknown, prefs?: Map<string, "all" | "mention" | "none">) {
-      const targets = [...deps.subscribers()];
-      if (targets.length < 200) {
-        await Promise.all(targets.map((userId) => deliver(userId, [event], prefs?.get(userId))));
+    async broadcast(
+      event: unknown,
+      prefs?: Map<string, "all" | "mention" | "none">,
+      targets: Iterable<string> = [],
+    ) {
+      const list = [...targets];
+      if (list.length < 200) {
+        await Promise.all(list.map((userId) => deliver(userId, [event], prefs?.get(userId))));
         return;
       }
-      for (const userId of targets) {
+      for (const userId of list) {
         let entry = buffer.find((b) => b.userId === userId);
         if (!entry) {
           entry = { userId, events: [], pref: prefs?.get(userId) };

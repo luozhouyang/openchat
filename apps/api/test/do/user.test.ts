@@ -1,7 +1,7 @@
 import { expect, test, beforeAll } from "vite-plus/test";
-import { env } from "cloudflare:test";
+import { env, runInDurableObject } from "cloudflare:test";
 import { exports } from "cloudflare:workers";
-import { userDoName } from "protocol";
+import { issueInternalToken, userDoName } from "protocol";
 import { getDb } from "../../src/db/client.ts";
 import { channels } from "../../src/db/schema-d1.ts";
 
@@ -140,4 +140,34 @@ test("setStatus and getStatus round-trip", async () => {
   const after = await stub.getStatus(userId);
   expect(after.status).toBe("offline");
   expect(after.manual).toBe(false);
+});
+
+test("presence derives away from durable attachment after hibernation", async () => {
+  const stub = userStub("away-test");
+  const token = await issueInternalToken({
+    subject: "user:away-test",
+    secret: env.INTERNAL_TOKEN_KEY,
+  });
+  const up = await stub.fetch(
+    new Request("http://user-do/ws?deviceId=d1", {
+      headers: { Upgrade: "websocket", "x-internal-token": token },
+    }),
+  );
+  expect(up.status).toBe(101);
+  const ws = up.webSocket!;
+  ws.accept();
+
+  expect((await stub.presenceStatus()).status).toBe("online");
+
+  await runInDurableObject(stub, (instance) => {
+    const ctx = (instance as unknown as { ctx: DurableObjectState }).ctx;
+    const sock = ctx.getWebSockets()[0] as WebSocket;
+    const att = sock.deserializeAttachment() as { lastActivity?: number } | null;
+    sock.serializeAttachment({ ...att, lastActivity: Date.now() - 6 * 60_000 });
+    (instance as unknown as { lastActiveAt: number }).lastActiveAt = 0;
+  });
+
+  expect((await stub.presenceStatus()).status).toBe("away");
+
+  ws.close(1000, "done");
 });

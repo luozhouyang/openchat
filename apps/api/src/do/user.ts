@@ -61,6 +61,7 @@ export class UserDO extends DurableObject<Env> {
   disconnectUntil = 0;
   private lastTyping = new Map<string, number>();
   private lastActiveAt = 0;
+  private awayAlarmAt = 0;
   private awayNotified = false;
   private recentPush = new Map<string, number>();
 
@@ -70,8 +71,24 @@ export class UserDO extends DurableObject<Env> {
 
   private status(): PresenceStatus {
     if (this.ctx.getWebSockets().length === 0) return "offline";
-    if (Date.now() - this.lastActiveAt > 5 * 60_000) return "away";
+    if (Date.now() - this.lastActivity() > 5 * 60_000) return "away";
     return "online";
+  }
+
+  private lastActivity(): number {
+    let last = this.lastActiveAt;
+    for (const ws of this.ctx.getWebSockets()) {
+      const att = ws.deserializeAttachment() as { lastActivity?: number } | null;
+      if (att?.lastActivity) last = Math.max(last, att.lastActivity);
+    }
+    return last;
+  }
+
+  private armAwayAlarm(base = Date.now()): Promise<void> {
+    const awayAt = base + 5 * 60_000;
+    if (this.awayAlarmAt > awayAt) return Promise.resolve();
+    this.awayAlarmAt = awayAt;
+    return this.ctx.storage.setAlarm(awayAt);
   }
 
   private async persistStatus(status: PresenceStatus): Promise<void> {
@@ -81,7 +98,7 @@ export class UserDO extends DurableObject<Env> {
       .where(eq(schema.status.userId, this.userId))
       .limit(1);
     const existing = rows[0];
-    const lastActivityAt = this.lastActiveAt || existing?.lastActivityAt || null;
+    const lastActivityAt = this.lastActivity() || existing?.lastActivityAt || null;
     if (!existing) {
       await this.db
         .insert(schema.status)
@@ -256,6 +273,34 @@ export class UserDO extends DurableObject<Env> {
 
   private isBroadcastMention(message: { content?: string }): boolean {
     return /@\[(channel|all)\]/.test(message.content ?? "");
+  }
+
+  private async syncPresenceToChannels(online: boolean): Promise<void> {
+    const rows = await this.db.select().from(schema.channelsCache);
+    await Promise.all(
+      rows.map(async (row) => {
+        try {
+          const stub = this.env.CHANNEL_DO.get(
+            this.env.CHANNEL_DO.idFromName(channelDoName(row.channelId)),
+          );
+          await stub.setPresence({ userId: this.userId, online });
+        } catch {}
+      }),
+    );
+  }
+
+  private async syncPushSubscribedToChannels(subscribed: boolean): Promise<void> {
+    const rows = await this.db.select().from(schema.channelsCache);
+    await Promise.all(
+      rows.map(async (row) => {
+        try {
+          const stub = this.env.CHANNEL_DO.get(
+            this.env.CHANNEL_DO.idFromName(channelDoName(row.channelId)),
+          );
+          await stub.setPushSubscribed({ userId: this.userId, subscribed });
+        } catch {}
+      }),
+    );
   }
 
   async sidebar(): Promise<{ channels: SidebarEntry[] }> {
@@ -483,7 +528,13 @@ export class UserDO extends DurableObject<Env> {
   }
 
   async presenceStatus(): Promise<{ status: PresenceStatus }> {
-    return { status: this.status() };
+    const status = this.status();
+    if (status === "away" && !this.awayNotified) {
+      this.awayNotified = true;
+      await this.persistStatus("away");
+      await this.notifySubscribers("away");
+    }
+    return { status };
   }
 
   async setStatus(
@@ -535,7 +586,7 @@ export class UserDO extends DurableObject<Env> {
         userId,
         status: this.status(),
         manual: false,
-        lastActivityAt: this.lastActiveAt || null,
+        lastActivityAt: this.lastActivity() || null,
         dndEndTime: null,
         prevStatus: null,
       };
@@ -577,6 +628,7 @@ export class UserDO extends DurableObject<Env> {
           updatedAt: Date.now(),
         },
       });
+    void this.syncPushSubscribedToChannels(true);
     return { ok: true };
   }
 
@@ -584,6 +636,10 @@ export class UserDO extends DurableObject<Env> {
     await this.db
       .delete(schema.pushSubscriptions)
       .where(eq(schema.pushSubscriptions.deviceId, body.deviceId));
+    const remaining = await this.db.select({ n: count() }).from(schema.pushSubscriptions);
+    if (Number(remaining[0]?.n ?? 0) === 0) {
+      void this.syncPushSubscribedToChannels(false);
+    }
     return { ok: true };
   }
 
@@ -595,11 +651,15 @@ export class UserDO extends DurableObject<Env> {
   }
 
   async alarm(): Promise<void> {
-    if (this.ctx.getWebSockets().length > 0 && !this.awayNotified) {
-      this.awayNotified = true;
-      await this.persistStatus("away");
-      await this.notifySubscribers("away");
+    if (this.ctx.getWebSockets().length === 0) return;
+    if (this.status() === "online") {
+      await this.armAwayAlarm(this.lastActivity());
+      return;
     }
+    if (this.awayNotified) return;
+    this.awayNotified = true;
+    await this.persistStatus("away");
+    await this.notifySubscribers("away");
   }
 
   private async notifySubscribers(status: PresenceStatus) {
@@ -644,8 +704,9 @@ export class UserDO extends DurableObject<Env> {
       server.send(JSON.stringify(helloEvent(this.userId)));
       this.lastActiveAt = Date.now();
       this.awayNotified = false;
-      await this.ctx.storage.setAlarm(this.lastActiveAt + 5 * 60_000);
+      await this.armAwayAlarm();
       void this.notifySubscribers("online");
+      void this.syncPresenceToChannels(true);
       await this.persistStatus("online");
       return new Response(null, { status: 101, webSocket: client });
     }
@@ -780,6 +841,8 @@ export class UserDO extends DurableObject<Env> {
     if (this.ctx.getWebSockets().length === 0) {
       void this.persistStatus("offline");
       void this.notifySubscribers("offline");
+      void this.syncPresenceToChannels(false);
+      void this.ctx.storage.deleteAlarm();
     }
   }
 
@@ -791,7 +854,6 @@ export class UserDO extends DurableObject<Env> {
     const att = ws.deserializeAttachment() as { lastActivity?: number } | null;
     ws.serializeAttachment({ ...att, lastActivity: Date.now() });
     this.lastActiveAt = Date.now();
-    void this.ctx.storage.setAlarm(this.lastActiveAt + 5 * 60_000);
     if (this.awayNotified) {
       this.awayNotified = false;
       void this.persistStatus("online");

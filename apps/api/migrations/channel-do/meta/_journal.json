@@ -29,6 +29,13 @@
       "when": 1788172315401,
       "tag": "0003_mm-posts",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1788412010397,
+      "tag": "0004_spooky_guardsmen",
+      "breakpoints": true
     }
   ]
 }

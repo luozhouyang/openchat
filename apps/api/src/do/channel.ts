@@ -1,7 +1,7 @@
 import { DurableObject } from "cloudflare:workers";
 import { drizzle } from "drizzle-orm/durable-sqlite";
 import { migrate } from "drizzle-orm/durable-sqlite/migrator";
-import { and, asc, count, desc, eq, gt, isNull, lt } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, isNull, lt, ne, or } from "drizzle-orm";
 import { id, userDoName, isAllowedEmoji, type MessageType, type NotifPref } from "protocol";
 import migrations from "../../migrations/channel-do/migrations";
 import * as schema from "../db/schema-channel-do.ts";
@@ -38,12 +38,10 @@ interface ThreadInfo {
 export class ChannelDO extends DurableObject<Env> {
   db: ReturnType<typeof drizzle>;
   channelId = (this.ctx.id.name ?? "").slice("channel:".length);
-  subscribers = new Map<string, { userId: string }>();
   rates = new Map<string, number[]>();
   failedPush = new Map<string, number>();
   broadcaster = createBroadcaster({
     env: { ...this.env, channelId: this.channelId },
-    subscribers: () => this.subscribers.keys(),
     onPushFailed: (userId) => {
       this.failedPush.set(userId, (this.failedPush.get(userId) ?? 0) + 1);
     },
@@ -73,7 +71,6 @@ export class ChannelDO extends DurableObject<Env> {
 
   async membersRemove(body: { userId: string }): Promise<void> {
     await this.db.delete(schema.memberState).where(eq(schema.memberState.userId, body.userId));
-    this.subscribers.delete(body.userId);
   }
 
   async typing(callerUserId: string): Promise<{ error: string; status: 403 } | void> {
@@ -90,24 +87,27 @@ export class ChannelDO extends DurableObject<Env> {
     });
   }
 
-  async subscribe(body: { userId: string }): Promise<{ ok: boolean }> {
-    const member = await this.db
-      .select()
-      .from(schema.memberState)
-      .where(eq(schema.memberState.userId, body.userId))
-      .limit(1);
-    if (member.length === 0) return { ok: false };
-    this.subscribers.set(body.userId, { userId: body.userId });
-    return { ok: true };
+  async setPresence(body: { userId: string; online: boolean }): Promise<void> {
+    await this.db
+      .update(schema.memberState)
+      .set({ online: body.online })
+      .where(eq(schema.memberState.userId, body.userId));
   }
 
-  async unsubscribe(body: { userId: string }): Promise<void> {
-    this.subscribers.delete(body.userId);
+  async setPushSubscribed(body: { userId: string; subscribed: boolean }): Promise<void> {
+    await this.db
+      .update(schema.memberState)
+      .set({ pushSubscribed: body.subscribed })
+      .where(eq(schema.memberState.userId, body.userId));
   }
 
-  async health(): Promise<{ ok: boolean; members: number; subscribers: number }> {
+  async health(): Promise<{ ok: boolean; members: number; online: number }> {
     const members = (await this.db.select().from(schema.memberState)).length;
-    return { ok: true, members, subscribers: this.subscribers.size };
+    const onlineRows = await this.db
+      .select({ n: count() })
+      .from(schema.memberState)
+      .where(eq(schema.memberState.online, true));
+    return { ok: true, members, online: Number(onlineRows[0]?.n ?? 0) };
   }
 
   async count(): Promise<{ count: number }> {
@@ -760,19 +760,46 @@ export class ChannelDO extends DurableObject<Env> {
   }
 
   private async broadcast(event: { type: string; [k: string]: unknown }) {
-    if (event.type === "message.new") {
-      const rows = await this.db
-        .select({
-          userId: schema.memberState.userId,
-          notifPref: schema.memberState.notifPref,
-        })
-        .from(schema.memberState);
-      const prefs = new Map<string, NotifPref>();
-      for (const row of rows) prefs.set(row.userId, row.notifPref as NotifPref);
-      await this.broadcaster.broadcast(event, prefs);
-      return;
+    // Target list is derived from the persisted member_state, which survives
+    // hibernation (the old in-memory subscriber cache was discarded on sleep
+    // and real-time delivery silently stopped). Only members that can actually
+    // receive something are woken:
+    //   - online members (live WS) always get real-time frames;
+    //   - offline members are only woken for message.new when they have a push
+    //     subscription and have not opted out of notifications.
+    // typing/reaction/edit/delete/pin events carry no notification and only
+    // matter to online members.
+    const wantsPush = event.type === "message.new";
+    const rows = wantsPush
+      ? await this.db
+          .select({
+            userId: schema.memberState.userId,
+            notifPref: schema.memberState.notifPref,
+          })
+          .from(schema.memberState)
+          .where(
+            or(
+              eq(schema.memberState.online, true),
+              and(
+                eq(schema.memberState.pushSubscribed, true),
+                ne(schema.memberState.notifPref, "none"),
+              ),
+            ),
+          )
+      : await this.db
+          .select({
+            userId: schema.memberState.userId,
+            notifPref: schema.memberState.notifPref,
+          })
+          .from(schema.memberState)
+          .where(eq(schema.memberState.online, true));
+    const prefs = new Map<string, NotifPref>();
+    const userIds: string[] = [];
+    for (const row of rows) {
+      prefs.set(row.userId, row.notifPref as NotifPref);
+      userIds.push(row.userId);
     }
-    await this.broadcaster.broadcast(event);
+    await this.broadcaster.broadcast(event, prefs, userIds);
   }
 
   private async notifyThreadSubscribers(parentId: string, senderId: string, message: unknown) {

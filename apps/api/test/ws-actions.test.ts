@@ -12,8 +12,8 @@ let msgSeq = 0;
 beforeAll(async () => {
   await channel.membersAdd({ userId: "alice", role: "member" });
   await channel.membersAdd({ userId: "bob", role: "member" });
-  await channel.subscribe({ userId: "alice" });
-  await channel.subscribe({ userId: "bob" });
+  await channel.setPresence({ userId: "alice", online: true });
+  await channel.setPresence({ userId: "bob", online: true });
   const post = await channel.postMessage("alice", {
     content: "root",
     clientToken: "ws-actions-root",

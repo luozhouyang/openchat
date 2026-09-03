@@ -35,6 +35,8 @@ export const memberState = sqliteTable("member_state", {
   lastReadSeq: integer("last_read_seq").notNull().default(0),
   mentionCount: integer("mention_count").notNull().default(0),
   notifPref: text("notif_pref").notNull().default("all"),
+  online: integer("online", { mode: "boolean" }).notNull().default(false),
+  pushSubscribed: integer("push_subscribed", { mode: "boolean" }).notNull().default(false),
   joinedAt: integer("joined_at").notNull(),
 });
 

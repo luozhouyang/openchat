@@ -84,8 +84,7 @@ test("mark_read frame syncs read state back to sidebar", async () => {
   const hello = await nextMessage(ws);
   expect(JSON.parse(String(hello.data))).toMatchObject({ type: "hello" });
 
-  const sub = await channel.subscribe({ userId: "bob" });
-  expect(sub.ok).toBe(true);
+  await channel.setPresence({ userId: "bob", online: true });
 
   const eventFrame = collectUntil(ws, "channel.event");
   const updateFrame = collectUntil(ws, "sidebar.update");

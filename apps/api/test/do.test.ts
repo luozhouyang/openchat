@@ -16,7 +16,7 @@ test("ChannelDO health reports migrated member state", async () => {
   const body = await stub.health();
   expect(body.ok).toBe(true);
   expect(body.members).toBe(0);
-  expect(body.subscribers).toBe(0);
+  expect(body.online).toBe(0);
 });
 
 test("UserDO rejects upgrade without valid internal token", async () => {

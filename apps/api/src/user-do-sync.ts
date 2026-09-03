@@ -21,7 +21,6 @@ export async function syncChannelMember(
 ) {
   const id = env.CHANNEL_DO.idFromName(channelDoName(channelId));
   await env.CHANNEL_DO.get(id).membersAdd({ userId, role: roles });
-  await env.CHANNEL_DO.get(id).subscribe({ userId });
 }
 
 export async function removeChannelMemberFromDo(env: Env, channelId: string, userId: string) {
