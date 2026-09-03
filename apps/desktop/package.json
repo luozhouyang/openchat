@@ -8,7 +8,7 @@
   "scripts": {
     "start": "pnpm run build && electron .",
     "build": "vp build --config vite.main.config.ts && vp build --config vite.preload.config.ts",
-    "build:web": "cd .. && vp run web#build:desktop",
+    "build:web": "cd .. && vp run openchat#build:renderer",
     "package": "pnpm run build:web && pnpm run build && electron-builder --config electron-builder.yml",
     "package:dir": "pnpm run build:web && pnpm run build && electron-builder --dir --config electron-builder.yml",
     "test": "vp test",

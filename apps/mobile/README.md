@@ -37,7 +37,7 @@ EXPO_PUBLIC_API_URL=http://localhost:8787 corepack pnpm exec expo start
 
 ## E2E (Maestro)
 
-Requires: Maestro CLI, a running API (`vp run api#dev`), and a dev build on a
+Requires: Maestro CLI, a running API (`vp run openchat#dev`), and a dev build on a
 simulator (`corepack pnpm exec expo run:ios` / `run:android`).
 
 ```bash

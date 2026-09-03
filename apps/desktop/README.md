@@ -28,7 +28,7 @@ vp run desktop#package      # full distributables per electron-builder.yml
   `sandbox: true`, no `nodeIntegration`.
 - `src/lib/token-store.ts` — DI'd safeStorage-backed token store (unit tested).
 - `src/lib/deep-link.ts` — `openchat://c/<channelId>` parser (unit tested).
-- Web side: `apps/web/src/lib/deep-link.ts` listens for `openchat:navigate`
+- Web side: `apps/openchat/src/react-app/lib/deep-link.ts` listens for `openchat:navigate`
   DOM events and routes to the channel's team.
 
 ## Auto-update

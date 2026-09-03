@@ -1,5 +1,5 @@
 # Maestro E2E: login → workspace (频道 list) is visible.
-# Prereqs: a running API (vp run api#dev), a dev build installed on a
+# Prereqs: a running API (vp run openchat#dev), a dev build installed on a
 # simulator/device (npx expo run:ios | npx expo run:android), and Maestro CLI.
 appId: dev.openchat.mobile
 ---

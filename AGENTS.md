@@ -36,21 +36,21 @@ Environment facts verified on this machine:
 
 ## Command map (use these, never bare pnpm / npx / dlx)
 
-| Task                            | Command                                                                                                           |
-| ------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| Install deps                    | `vp install`                                                                                                      |
-| Add runtime dep                 | `vp add <pkg>`                                                                                                    |
-| Add dev dep                     | `vp add -D <pkg>`                                                                                                 |
-| Add to one workspace            | `vp add <pkg> --filter <name>`                                                                                    |
-| Remove dep                      | `vp remove <pkg>`                                                                                                 |
-| Run a package script/task       | `vp run <pkg>#<script>` (e.g. `vp run api#test`, `vp run api#types`, `vp run api#deploy:dry`, `vp run web#build`) |
-| Run across all packages         | `vp run -r test` / `vp run -r check`                                                                              |
-| Format / lint / typecheck       | `vp check` (all-in-one); `vp lint`, `vp fmt` alone                                                                |
-| Tests                           | `vp test` (repo root); package tests via `vp run <pkg>#test`                                                      |
-| One-off binary (not a dep)      | `vp dlx <pkg>` or `vpx <pkg>` (e.g. `vp dlx shadcn@latest` from `apps/web`)                                       |
-| Exec a project-local binary     | `vp exec <bin>` (e.g. `vp exec wrangler types`)                                                                   |
-| Raw package-manager passthrough | `vp pm <cmd>...` (e.g. `vp pm --filter api exec wrangler types`)                                                  |
-| Show toolchain versions         | `vp toolchain` (do NOT rely on `node -v` / `pnpm -v`)                                                             |
+| Task                            | Command                                                                                                                               |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Install deps                    | `vp install`                                                                                                                          |
+| Add runtime dep                 | `vp add <pkg>`                                                                                                                        |
+| Add dev dep                     | `vp add -D <pkg>`                                                                                                                     |
+| Add to one workspace            | `vp add <pkg> --filter <name>`                                                                                                        |
+| Remove dep                      | `vp remove <pkg>`                                                                                                                     |
+| Run a package script/task       | `vp run <pkg>#<script>` (e.g. `vp run openchat#test`, `vp run openchat#types`, `vp run openchat#deploy:dry`, `vp run openchat#build`) |
+| Run across all packages         | `vp run -r test` / `vp run -r check`                                                                                                  |
+| Format / lint / typecheck       | `vp check` (all-in-one); `vp lint`, `vp fmt` alone                                                                                    |
+| Tests                           | `vp test` (repo root); package tests via `vp run <pkg>#test`                                                                          |
+| One-off binary (not a dep)      | `vp dlx <pkg>` or `vpx <pkg>` (e.g. `vp dlx shadcn@latest` from `apps/openchat`)                                                      |
+| Exec a project-local binary     | `vp exec <bin>` (e.g. `vp exec wrangler types`)                                                                                       |
+| Raw package-manager passthrough | `vp pm <cmd>...` (e.g. `vp pm --filter openchat exec wrangler types`)                                                                 |
+| Show toolchain versions         | `vp toolchain` (do NOT rely on `node -v` / `pnpm -v`)                                                                                 |
 
 Notes:
 
@@ -58,14 +58,14 @@ Notes:
 - Don't call `node -v`, `pnpm -v`, or `npm -v` directly — Vite+ binaries may not
   answer them cleanly; use `vp toolchain`.
 - Root `vp test` runs the plain-Vitest suites only (shared `packages/*` +
-  web/desktop/push unit tests); the root `vite.config.ts` `test.exclude` keeps
-  the special runners out:
-  - `apps/api` — Cloudflare vitest plugin + D1 migrations → `vp run api#test`
-    (never `vp test` for the api package).
+  the openchat React app + desktop/push unit tests); the root `vite.config.ts`
+  `test.exclude` keeps the special runners out:
+  - `apps/openchat/test/worker` — Cloudflare vitest plugin + D1 migrations →
+    `vp run openchat#test` (never `vp test` for the worker suite).
   - `apps/mobile` — jest-expo standalone workspace → `cd apps/mobile &&
 corepack pnpm test`.
-  - `apps/web/e2e` + `apps/desktop/e2e` — Playwright → `vp run web#e2e` /
-    `vp run desktop#e2e`.
+  - `apps/openchat/e2e` + `apps/desktop/e2e` — Playwright → `vp run
+openchat#e2e` / `vp run desktop#e2e`.
 - jsdom-dependent test files declare `// @vitest-environment jsdom` themselves
   (docblock) so they pass under both the per-package and root runners — keep
   that convention for new DOM-touching tests.

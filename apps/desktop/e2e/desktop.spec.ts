@@ -3,7 +3,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "@playwright/test";
 import { _electron as electron, type ElectronApplication, type Page } from "@playwright/test";
-import { createChannel, createTeam, signupUser } from "../../web/e2e/fixtures";
+import { createChannel, createTeam, signupUser } from "../../openchat/e2e/fixtures";
+
+// Desktop e2e drives a dedicated wrangler dev on :8787; the shared fixtures
+// read E2E_API_URL to target that API.
+process.env.E2E_API_URL = "http://localhost:8787";
 
 const RENDERER = "http://localhost:4173";
 
@@ -154,9 +158,9 @@ test.describe("openchat desktop app:// bundled renderer mode", () => {
   // bundle is copied to a tmp dir and injected via OPENCHAT_DESKTOP_APP_DIR
   // so the test never depends on the dev checkout's fs layout.
   test.beforeAll(async () => {
-    // Copy the bundle the playwright webServer itself built (apps/web/dist,
-    // via web#build) — same process view, unlike dev-checkout artifacts.
-    const src = join(__dirname.replace(/\/e2e$/, ""), "../web/dist");
+    // Copy the bundle the playwright webServer itself built (apps/openchat/dist/client,
+    // via openchat#build) — same process view, unlike dev-checkout artifacts.
+    const src = join(__dirname.replace(/\/e2e$/, ""), "../openchat/dist/client");
     const appDir = mkdtempSync(join(tmpdir(), "openchat-web-dist-"));
     cpSync(src, appDir, { recursive: true });
     app = await electron.launch({
