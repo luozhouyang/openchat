@@ -4,9 +4,15 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 
 function errorsOf(field: AnyFieldApi): string[] {
-  return field.state.meta.errors.map((e) =>
-    typeof e === "string" ? e : e instanceof Error ? e.message : String(e),
-  );
+  return field.state.meta.errors.map((e) => {
+    if (typeof e === "string") return e;
+    if (e instanceof Error) return e.message;
+    if (e !== null && typeof e === "object" && "message" in e) {
+      const message = (e as { message?: unknown }).message;
+      if (typeof message === "string") return message;
+    }
+    return String(e);
+  });
 }
 
 export function FormField({

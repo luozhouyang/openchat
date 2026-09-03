@@ -1,7 +1,12 @@
 import { useState } from "react";
-import { createFileRoute, useRouter } from "@tanstack/react-router";
-import { appClient } from "../app-client";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
+import { useForm } from "@tanstack/react-form";
+import { z } from "zod";
+import { authClient } from "../lib/auth-client";
+import { Alert, AlertDescription, AlertTitle } from "../components/ui/alert";
 import { Button } from "../components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
+import { FormField } from "../components/ui/form-field";
 import { Input } from "../components/ui/input";
 
 export const Route = createFileRoute("/login")({
@@ -10,53 +15,107 @@ export const Route = createFileRoute("/login")({
 
 function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    setError(null);
-    try {
-      // Shared auth service: cookie session in the browser, safeStorage
-      // bearer token in the Electron file:// shell.
-      await appClient.auth.signIn(email, password);
-      void router.navigate({ to: "/" });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "登录失败");
-    } finally {
-      setBusy(false);
-    }
-  }
+  const form = useForm({
+    defaultValues: { email: "", password: "" },
+    onSubmit: async ({ value }) => {
+      setError(null);
+      try {
+        const res = await authClient.signIn.email({
+          email: value.email,
+          password: value.password,
+        });
+        if (res.error) throw new Error(res.error.message ?? "登录失败");
+        void router.navigate({ to: "/" });
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "登录失败");
+      }
+    },
+  });
 
   return (
-    <div className="flex min-h-screen items-center justify-center">
-      <form onSubmit={submit} className="w-80 space-y-3">
-        <h1 className="text-xl font-semibold">登录 openchat</h1>
-        <Input
-          type="email"
-          placeholder="邮箱"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-        />
-        <Input
-          type="password"
-          placeholder="密码"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-        />
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        <Button type="submit" disabled={busy} className="w-full">
-          登录
-        </Button>
-        <a className="block text-sm text-center text-blue-600" href="/signup">
-          注册新账号
-        </a>
-      </form>
+    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+      <Card className="w-full max-w-sm">
+        <CardHeader>
+          <CardTitle className="text-xl">登录 openchat</CardTitle>
+          <CardDescription>使用邮箱和密码登录你的工作区</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              form.handleSubmit();
+            }}
+            className="space-y-4"
+          >
+            <form.Field
+              name="email"
+              validators={{
+                onChange: z.string().email("请输入有效的邮箱地址"),
+                onSubmit: z.string().email("请输入有效的邮箱地址"),
+              }}
+            >
+              {(field) => (
+                <FormField field={field} label="邮箱">
+                  {(f) => (
+                    <Input
+                      type="email"
+                      placeholder="you@example.com"
+                      value={f.state.value}
+                      onChange={(e) => f.handleChange(e.target.value)}
+                      onBlur={f.handleBlur}
+                      aria-invalid={f.state.meta.errors.length > 0}
+                    />
+                  )}
+                </FormField>
+              )}
+            </form.Field>
+            <form.Field
+              name="password"
+              validators={{
+                onChange: z.string().min(1, "请输入密码"),
+                onSubmit: z.string().min(1, "请输入密码"),
+              }}
+            >
+              {(field) => (
+                <FormField field={field} label="密码">
+                  {(f) => (
+                    <Input
+                      type="password"
+                      placeholder="••••••••"
+                      value={f.state.value}
+                      onChange={(e) => f.handleChange(e.target.value)}
+                      onBlur={f.handleBlur}
+                      aria-invalid={f.state.meta.errors.length > 0}
+                    />
+                  )}
+                </FormField>
+              )}
+            </form.Field>
+            {error && (
+              <Alert variant="destructive">
+                <AlertTitle>登录失败</AlertTitle>
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+            <form.Subscribe selector={(s) => ({ isSubmitting: s.isSubmitting })}>
+              {({ isSubmitting }) => (
+                <Button type="submit" disabled={isSubmitting} className="w-full">
+                  {isSubmitting ? "登录中…" : "登录"}
+                </Button>
+              )}
+            </form.Subscribe>
+          </form>
+          <p className="mt-4 text-center text-sm text-muted-foreground">
+            还没有账号？{" "}
+            <Link to="/signup" className="text-primary underline-offset-4 hover:underline">
+              注册新账号
+            </Link>
+          </p>
+        </CardContent>
+      </Card>
     </div>
   );
 }

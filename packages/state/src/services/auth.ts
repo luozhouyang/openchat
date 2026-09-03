@@ -111,8 +111,12 @@ export function createAuthService(deps: AuthServiceDeps): AuthService {
 
     async getWsJwt() {
       if (cookieMode) {
-        const { data } = await authClient.token();
-        return data?.token ?? null;
+        try {
+          const { data } = await authClient.token();
+          return data?.token ?? null;
+        } catch {
+          return null;
+        }
       }
       const session = await deps.getSessionToken();
       if (!session) return null;
