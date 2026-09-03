@@ -37,6 +37,7 @@ catalog:
   "@tanstack/react-query": ^5.102.8
   "@tanstack/react-virtual": ^3.14.10
   "@tanstack/router-plugin": ^1.168.35
+  "@tanstack/react-form": ^1.33.5
   zustand: ^5.0.15
   clsx: ^2.1.1
   tailwind-merge: ^3.6.0
