@@ -7,6 +7,7 @@ import { getDb } from "./db/client.ts";
 import * as schema from "./db/schema-d1.ts";
 import { users } from "./db/schema-d1.ts";
 import { auditLog } from "./audit.ts";
+import { sendVerificationMail } from "./email.ts";
 
 let currentEnv: Env | null = null;
 
@@ -25,6 +26,13 @@ export function makeAuth(env: Env) {
       usePlural: true,
     }),
     emailAndPassword: { enabled: true },
+    emailVerification: {
+      sendOnSignUp: true,
+      autoSignInAfterVerification: true,
+      sendVerificationEmail: async ({ user, url }) => {
+        void sendVerificationMail(env, user.email, url);
+      },
+    },
     user: {
       additionalFields: {
         nickname: { type: "string", required: false },
