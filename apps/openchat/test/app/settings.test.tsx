@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider, createRouter, createMemoryHistory } from "@tanstack/react-router";
 import { routeTree } from "@/routeTree.gen";
 import { api } from "@/lib/api";
+import "@/i18n";
 
 vi.mock("@/app-client", () => ({
   appClient: { auth: { hasSession: async () => true } },
@@ -60,7 +61,7 @@ describe("/$teamId/settings", () => {
       ],
     });
     renderAt("/t1/settings");
-    expect(await screen.findByText("团队设置")).toBeInTheDocument();
+    expect(await screen.findByText("Team settings")).toBeInTheDocument();
     expect(await screen.findByDisplayValue("Team One")).toBeInTheDocument();
     expect(await screen.findByText("u2")).toBeInTheDocument();
   });
