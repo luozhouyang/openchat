@@ -1,0 +1,65 @@
+{
+  "auth": {
+    "login": {
+      "title": "登录 openchat",
+      "subtitle": "使用邮箱和密码登录你的工作区",
+      "email": "邮箱",
+      "password": "密码",
+      "emailPlaceholder": "you@example.com",
+      "passwordPlaceholder": "••••••••",
+      "submit": "登录",
+      "submitting": "登录中…",
+      "failed": "登录失败",
+      "errors": { "email": "请输入有效的邮箱地址", "password": "请输入密码" },
+      "noAccount": "还没有账号？",
+      "signupLink": "注册新账号"
+    },
+    "signup": {
+      "title": "注册 openchat",
+      "subtitle": "创建你的账号，验证邮箱后开始协作",
+      "name": "昵称",
+      "namePlaceholder": "昵称",
+      "email": "邮箱",
+      "emailPlaceholder": "you@example.com",
+      "password": "密码",
+      "passwordPlaceholder": "至少 8 位密码",
+      "submit": "注册",
+      "submitting": "注册中…",
+      "failed": "注册失败",
+      "errors": {
+        "name": "请输入昵称",
+        "email": "请输入有效的邮箱地址",
+        "password": "密码至少 8 位"
+      },
+      "hasAccount": "已有账号？",
+      "loginLink": "登录"
+    },
+    "checkEmail": {
+      "title": "验证你的邮箱",
+      "description": "验证邮件已发送至 {{email}}，请点击邮件中的链接完成验证。",
+      "sent": "已发送",
+      "sentDescription": "验证邮件已重新发送，请查收。",
+      "sendFailed": "发送失败",
+      "resend": "重新发送验证邮件",
+      "sending": "发送中…",
+      "backToLogin": "返回登录"
+    },
+    "verifyEmail": {
+      "successTitle": "邮箱验证成功",
+      "successDescription": "你的邮箱已通过验证，可以开始使用了。",
+      "enterWorkspace": "进入工作区",
+      "signInAgain": "重新登录",
+      "failTitle": "验证失败",
+      "failDescription": "验证链接无效或已过期。",
+      "failAlertTitle": "无法完成验证",
+      "resend": "重新发送验证邮件",
+      "sending": "发送中…",
+      "backToLogin": "返回登录",
+      "verifying": "正在验证邮箱…",
+      "sendFailed": "发送失败",
+      "sent": "已发送",
+      "sentDescription": "验证邮件已重新发送，请查收。"
+    }
+  },
+  "common": { "lang": { "en": "English", "zh": "中文" } }
+}

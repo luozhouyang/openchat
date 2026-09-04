@@ -1,0 +1,65 @@
+{
+  "auth": {
+    "login": {
+      "title": "Sign in to openchat",
+      "subtitle": "Enter your email and password to access your workspace",
+      "email": "Email",
+      "password": "Password",
+      "emailPlaceholder": "you@example.com",
+      "passwordPlaceholder": "••••••••",
+      "submit": "Sign in",
+      "submitting": "Signing in…",
+      "failed": "Sign-in failed",
+      "errors": { "email": "Enter a valid email address", "password": "Password is required" },
+      "noAccount": "No account?",
+      "signupLink": "Create an account"
+    },
+    "signup": {
+      "title": "Create your account",
+      "subtitle": "Create an account, verify your email, and start collaborating",
+      "name": "Name",
+      "namePlaceholder": "Your name",
+      "email": "Email",
+      "emailPlaceholder": "you@example.com",
+      "password": "Password",
+      "passwordPlaceholder": "At least 8 characters",
+      "submit": "Sign up",
+      "submitting": "Signing up…",
+      "failed": "Sign-up failed",
+      "errors": {
+        "name": "Name is required",
+        "email": "Enter a valid email address",
+        "password": "Password must be at least 8 characters"
+      },
+      "hasAccount": "Already have an account?",
+      "loginLink": "Sign in"
+    },
+    "checkEmail": {
+      "title": "Verify your email",
+      "description": "A verification email has been sent to {{email}}. Click the link in the email to complete verification.",
+      "sent": "Sent",
+      "sentDescription": "A verification email has been resent. Check your inbox.",
+      "sendFailed": "Send failed",
+      "resend": "Resend verification email",
+      "sending": "Sending…",
+      "backToLogin": "Back to sign in"
+    },
+    "verifyEmail": {
+      "successTitle": "Email verified",
+      "successDescription": "Your email has been verified. You can start using openchat.",
+      "enterWorkspace": "Enter workspace",
+      "signInAgain": "Sign in again",
+      "failTitle": "Verification failed",
+      "failDescription": "The verification link is invalid or has expired.",
+      "failAlertTitle": "Couldn't verify your email",
+      "resend": "Resend verification email",
+      "sending": "Sending…",
+      "backToLogin": "Back to sign in",
+      "verifying": "Verifying your email…",
+      "sendFailed": "Send failed",
+      "sent": "Sent",
+      "sentDescription": "A verification email has been resent. Check your inbox."
+    }
+  },
+  "common": { "lang": { "en": "English", "zh": "中文" } }
+}
