@@ -34,6 +34,7 @@
     "hono": "catalog:",
     "i18next": "catalog:",
     "jose": "catalog:",
+    "lucide-react": "catalog:",
     "platform": "workspace:*",
     "protocol": "workspace:*",
     "react": "catalog:",
