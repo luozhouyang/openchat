@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { usePermissions } from "@/lib/use-permissions";
 
 export function TeamRail({
   teams,
@@ -7,6 +8,8 @@ export function TeamRail({
   teams: Array<{ id: string; displayName: string }>;
   currentTeamId: string;
 }) {
+  const permissions = usePermissions();
+  const canCreate = permissions.includes("create_team");
   return (
     <nav className="flex w-14 flex-col items-center gap-2 border-r bg-zinc-900 py-3">
       {teams.map((t) => (
@@ -24,6 +27,15 @@ export function TeamRail({
           {t.displayName.slice(0, 2)}
         </Link>
       ))}
+      {canCreate && (
+        <Link
+          to="/teams/new"
+          className="mt-auto flex h-10 w-10 items-center justify-center rounded-lg bg-zinc-700 text-xl text-zinc-300 hover:bg-zinc-600"
+          title="创建团队"
+        >
+          +
+        </Link>
+      )}
     </nav>
   );
 }

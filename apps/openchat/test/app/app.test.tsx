@@ -22,6 +22,7 @@ vi.mock("@/ws/client", () => ({
 
 vi.mock("@/lib/api", () => ({
   api: {
+    me: async () => ({ user: { id: "u1", email: "a@b.c", permissions: ["create_team"] } }),
     workspaces: vi.fn(),
     sidebar: async () => ({ channels: [] }),
   },
