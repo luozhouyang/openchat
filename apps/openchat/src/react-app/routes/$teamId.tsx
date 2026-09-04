@@ -10,7 +10,7 @@ export const Route = createFileRoute("/$teamId")({
   component: WorkspaceLayout,
   loader: async () => {
     const workspaces = await api.workspaces();
-    if (workspaces.teams.length === 0) throw redirect({ to: "/login" });
+    if (workspaces.teams.length === 0) throw redirect({ to: "/auth/login" });
     return workspaces;
   },
 });

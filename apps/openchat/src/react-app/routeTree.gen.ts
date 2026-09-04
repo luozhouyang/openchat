@@ -12,12 +12,12 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as TeamIdRouteImport } from './routes/$teamId'
 import { Route as AdminRouteImport } from './routes/admin'
-import { Route as CheckEmailRouteImport } from './routes/check-email'
-import { Route as LoginRouteImport } from './routes/login'
 import { Route as SettingsRouteImport } from './routes/settings'
-import { Route as SignupRouteImport } from './routes/signup'
-import { Route as VerifyEmailRouteImport } from './routes/verify-email'
 import { Route as TeamIdIndexRouteImport } from './routes/$teamId/index'
+import { Route as AuthCheckEmailRouteImport } from './routes/auth/check-email'
+import { Route as AuthLoginRouteImport } from './routes/auth/login'
+import { Route as AuthSignupRouteImport } from './routes/auth/signup'
+import { Route as AuthVerifyEmailRouteImport } from './routes/auth/verify-email'
 import { Route as TeamIdCChannelIdRouteImport } from './routes/$teamId/c.$channelId'
 import { Route as TeamIdDmChannelIdRouteImport } from './routes/$teamId/dm.$channelId'
 import { Route as TeamIdCChannelIdTThreadIdRouteImport } from './routes/$teamId/c.$channelId.t.$threadId'
@@ -37,35 +37,35 @@ const AdminRoute = AdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
-const CheckEmailRoute = CheckEmailRouteImport.update({
-  id: '/check-email',
-  path: '/check-email',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LoginRoute = LoginRouteImport.update({
-  id: '/login',
-  path: '/login',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SignupRoute = SignupRouteImport.update({
-  id: '/signup',
-  path: '/signup',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const VerifyEmailRoute = VerifyEmailRouteImport.update({
-  id: '/verify-email',
-  path: '/verify-email',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TeamIdIndexRoute = TeamIdIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => TeamIdRoute,
+} as any)
+const AuthCheckEmailRoute = AuthCheckEmailRouteImport.update({
+  id: '/auth/check-email',
+  path: '/auth/check-email',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthLoginRoute = AuthLoginRouteImport.update({
+  id: '/auth/login',
+  path: '/auth/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthSignupRoute = AuthSignupRouteImport.update({
+  id: '/auth/signup',
+  path: '/auth/signup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthVerifyEmailRoute = AuthVerifyEmailRouteImport.update({
+  id: '/auth/verify-email',
+  path: '/auth/verify-email',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const TeamIdCChannelIdRoute = TeamIdCChannelIdRouteImport.update({
   id: '/c/$channelId',
@@ -88,11 +88,11 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/$teamId': typeof TeamIdRouteWithChildren
   '/admin': typeof AdminRoute
-  '/check-email': typeof CheckEmailRoute
-  '/login': typeof LoginRoute
   '/settings': typeof SettingsRoute
-  '/signup': typeof SignupRoute
-  '/verify-email': typeof VerifyEmailRoute
+  '/auth/check-email': typeof AuthCheckEmailRoute
+  '/auth/login': typeof AuthLoginRoute
+  '/auth/signup': typeof AuthSignupRoute
+  '/auth/verify-email': typeof AuthVerifyEmailRoute
   '/$teamId/': typeof TeamIdIndexRoute
   '/$teamId/c/$channelId': typeof TeamIdCChannelIdRouteWithChildren
   '/$teamId/dm/$channelId': typeof TeamIdDmChannelIdRoute
@@ -101,11 +101,11 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
-  '/check-email': typeof CheckEmailRoute
-  '/login': typeof LoginRoute
   '/settings': typeof SettingsRoute
-  '/signup': typeof SignupRoute
-  '/verify-email': typeof VerifyEmailRoute
+  '/auth/check-email': typeof AuthCheckEmailRoute
+  '/auth/login': typeof AuthLoginRoute
+  '/auth/signup': typeof AuthSignupRoute
+  '/auth/verify-email': typeof AuthVerifyEmailRoute
   '/$teamId': typeof TeamIdIndexRoute
   '/$teamId/c/$channelId': typeof TeamIdCChannelIdRouteWithChildren
   '/$teamId/dm/$channelId': typeof TeamIdDmChannelIdRoute
@@ -116,11 +116,11 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/$teamId': typeof TeamIdRouteWithChildren
   '/admin': typeof AdminRoute
-  '/check-email': typeof CheckEmailRoute
-  '/login': typeof LoginRoute
   '/settings': typeof SettingsRoute
-  '/signup': typeof SignupRoute
-  '/verify-email': typeof VerifyEmailRoute
+  '/auth/check-email': typeof AuthCheckEmailRoute
+  '/auth/login': typeof AuthLoginRoute
+  '/auth/signup': typeof AuthSignupRoute
+  '/auth/verify-email': typeof AuthVerifyEmailRoute
   '/$teamId/': typeof TeamIdIndexRoute
   '/$teamId/c/$channelId': typeof TeamIdCChannelIdRouteWithChildren
   '/$teamId/dm/$channelId': typeof TeamIdDmChannelIdRoute
@@ -132,11 +132,11 @@ export interface FileRouteTypes {
     | '/'
     | '/$teamId'
     | '/admin'
-    | '/check-email'
-    | '/login'
     | '/settings'
-    | '/signup'
-    | '/verify-email'
+    | '/auth/check-email'
+    | '/auth/login'
+    | '/auth/signup'
+    | '/auth/verify-email'
     | '/$teamId/'
     | '/$teamId/c/$channelId'
     | '/$teamId/dm/$channelId'
@@ -145,11 +145,11 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/admin'
-    | '/check-email'
-    | '/login'
     | '/settings'
-    | '/signup'
-    | '/verify-email'
+    | '/auth/check-email'
+    | '/auth/login'
+    | '/auth/signup'
+    | '/auth/verify-email'
     | '/$teamId'
     | '/$teamId/c/$channelId'
     | '/$teamId/dm/$channelId'
@@ -159,11 +159,11 @@ export interface FileRouteTypes {
     | '/'
     | '/$teamId'
     | '/admin'
-    | '/check-email'
-    | '/login'
     | '/settings'
-    | '/signup'
-    | '/verify-email'
+    | '/auth/check-email'
+    | '/auth/login'
+    | '/auth/signup'
+    | '/auth/verify-email'
     | '/$teamId/'
     | '/$teamId/c/$channelId'
     | '/$teamId/dm/$channelId'
@@ -174,11 +174,11 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   TeamIdRoute: typeof TeamIdRouteWithChildren
   AdminRoute: typeof AdminRoute
-  CheckEmailRoute: typeof CheckEmailRoute
-  LoginRoute: typeof LoginRoute
   SettingsRoute: typeof SettingsRoute
-  SignupRoute: typeof SignupRoute
-  VerifyEmailRoute: typeof VerifyEmailRoute
+  AuthCheckEmailRoute: typeof AuthCheckEmailRoute
+  AuthLoginRoute: typeof AuthLoginRoute
+  AuthSignupRoute: typeof AuthSignupRoute
+  AuthVerifyEmailRoute: typeof AuthVerifyEmailRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -204,39 +204,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/check-email': {
-      id: '/check-email'
-      path: '/check-email'
-      fullPath: '/check-email'
-      preLoaderRoute: typeof CheckEmailRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/login': {
-      id: '/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof LoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/settings': {
       id: '/settings'
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/signup': {
-      id: '/signup'
-      path: '/signup'
-      fullPath: '/signup'
-      preLoaderRoute: typeof SignupRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/verify-email': {
-      id: '/verify-email'
-      path: '/verify-email'
-      fullPath: '/verify-email'
-      preLoaderRoute: typeof VerifyEmailRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/$teamId/': {
@@ -245,6 +217,34 @@ declare module '@tanstack/react-router' {
       fullPath: '/$teamId/'
       preLoaderRoute: typeof TeamIdIndexRouteImport
       parentRoute: typeof TeamIdRoute
+    }
+    '/auth/check-email': {
+      id: '/auth/check-email'
+      path: '/auth/check-email'
+      fullPath: '/auth/check-email'
+      preLoaderRoute: typeof AuthCheckEmailRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth/login': {
+      id: '/auth/login'
+      path: '/auth/login'
+      fullPath: '/auth/login'
+      preLoaderRoute: typeof AuthLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth/signup': {
+      id: '/auth/signup'
+      path: '/auth/signup'
+      fullPath: '/auth/signup'
+      preLoaderRoute: typeof AuthSignupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth/verify-email': {
+      id: '/auth/verify-email'
+      path: '/auth/verify-email'
+      fullPath: '/auth/verify-email'
+      preLoaderRoute: typeof AuthVerifyEmailRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/$teamId/c/$channelId': {
       id: '/$teamId/c/$channelId'
@@ -300,11 +300,11 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   TeamIdRoute: TeamIdRouteWithChildren,
   AdminRoute: AdminRoute,
-  CheckEmailRoute: CheckEmailRoute,
-  LoginRoute: LoginRoute,
   SettingsRoute: SettingsRoute,
-  SignupRoute: SignupRoute,
-  VerifyEmailRoute: VerifyEmailRoute,
+  AuthCheckEmailRoute: AuthCheckEmailRoute,
+  AuthLoginRoute: AuthLoginRoute,
+  AuthSignupRoute: AuthSignupRoute,
+  AuthVerifyEmailRoute: AuthVerifyEmailRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

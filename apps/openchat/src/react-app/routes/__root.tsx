@@ -3,7 +3,7 @@ import { createRootRoute, Outlet, redirect, useRouterState } from "@tanstack/rea
 import { appClient } from "../app-client";
 import { wsClient } from "../ws/client";
 
-const PUBLIC_PATHS = ["/login", "/signup", "/check-email", "/verify-email"];
+const PUBLIC_PATHS = ["/auth/login", "/auth/signup", "/auth/check-email", "/auth/verify-email"];
 
 // beforeLoad runs on every navigation; probe cheaply with a short-lived
 // positive cache (the cookie-mode equivalent of better-auth's cookieCache).
@@ -64,7 +64,7 @@ export const Route = createRootRoute({
   beforeLoad: async ({ location }) => {
     if (PUBLIC_PATHS.some((p) => location.pathname.startsWith(p))) return;
     if (!(await guardSession())) {
-      throw redirect({ to: "/login" });
+      throw redirect({ to: "/auth/login" });
     }
   },
 });

@@ -1,12 +1,18 @@
 import { useEffect, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
-import { authClient } from "../lib/auth-client";
-import { Alert, AlertDescription, AlertTitle } from "../components/ui/alert";
-import { Button } from "../components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
+import { authClient } from "../../lib/auth-client";
+import { Alert, AlertDescription, AlertTitle } from "../../components/ui/alert";
+import { Button } from "../../components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "../../components/ui/card";
 
-export const Route = createFileRoute("/verify-email")({
+export const Route = createFileRoute("/auth/verify-email")({
   component: VerifyEmailPage,
   validateSearch: z.object({
     error: z.string().optional(),
@@ -29,7 +35,7 @@ function VerifyEmailPage() {
   useEffect(() => {
     if (!search.token) return;
     authClient
-      .verifyEmail({ query: { token: search.token, callbackURL: "/verify-email" } })
+      .verifyEmail({ query: { token: search.token, callbackURL: "/auth/verify-email" } })
       .then((res) => {
         if (res.error) throw new Error(res.error.message ?? "验证失败");
         setState("success");
@@ -48,7 +54,7 @@ function VerifyEmailPage() {
     try {
       const res = await authClient.sendVerificationEmail({
         email: search.email,
-        callbackURL: "/verify-email",
+        callbackURL: "/auth/verify-email",
       });
       if (res.error) throw new Error(res.error.message ?? "发送失败");
       setSent(true);
@@ -98,7 +104,7 @@ function VerifyEmailPage() {
               </Button>
             )}
             <p className="text-center text-sm text-muted-foreground">
-              <Link to="/login" className="text-primary underline-offset-4 hover:underline">
+              <Link to="/auth/login" className="text-primary underline-offset-4 hover:underline">
                 返回登录
               </Link>
             </p>
@@ -120,7 +126,7 @@ function VerifyEmailPage() {
             进入工作区
           </Button>
           <p className="text-center text-sm text-muted-foreground">
-            <Link to="/login" className="text-primary underline-offset-4 hover:underline">
+            <Link to="/auth/login" className="text-primary underline-offset-4 hover:underline">
               重新登录
             </Link>
           </p>

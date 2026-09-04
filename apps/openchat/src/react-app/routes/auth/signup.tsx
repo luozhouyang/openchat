@@ -2,34 +2,41 @@ import { useState } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useForm } from "@tanstack/react-form";
 import { z } from "zod";
-import { authClient } from "../lib/auth-client";
-import { Alert, AlertDescription, AlertTitle } from "../components/ui/alert";
-import { Button } from "../components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
-import { FormField } from "../components/ui/form-field";
-import { Input } from "../components/ui/input";
+import { authClient } from "../../lib/auth-client";
+import { Alert, AlertDescription, AlertTitle } from "../../components/ui/alert";
+import { Button } from "../../components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "../../components/ui/card";
+import { FormField } from "../../components/ui/form-field";
+import { Input } from "../../components/ui/input";
 
-export const Route = createFileRoute("/login")({
-  component: LoginPage,
+export const Route = createFileRoute("/auth/signup")({
+  component: SignupPage,
 });
 
-function LoginPage() {
+function SignupPage() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
 
   const form = useForm({
-    defaultValues: { email: "", password: "" },
+    defaultValues: { name: "", email: "", password: "" },
     onSubmit: async ({ value }) => {
       setError(null);
       try {
-        const res = await authClient.signIn.email({
+        const res = await authClient.signUp.email({
+          name: value.name,
           email: value.email,
           password: value.password,
         });
-        if (res.error) throw new Error(res.error.message ?? "登录失败");
-        void router.navigate({ to: "/" });
+        if (res.error) throw new Error(res.error.message ?? "注册失败");
+        void router.navigate({ to: "/auth/check-email", search: { email: value.email } });
       } catch (err) {
-        setError(err instanceof Error ? err.message : "登录失败");
+        setError(err instanceof Error ? err.message : "注册失败");
       }
     },
   });
@@ -38,8 +45,8 @@ function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle className="text-xl">登录 openchat</CardTitle>
-          <CardDescription>使用邮箱和密码登录你的工作区</CardDescription>
+          <CardTitle className="text-xl">注册 openchat</CardTitle>
+          <CardDescription>创建你的账号，验证邮箱后开始协作</CardDescription>
         </CardHeader>
         <CardContent>
           <form
@@ -50,6 +57,30 @@ function LoginPage() {
             }}
             className="space-y-4"
           >
+            <form.Field
+              name="name"
+              validators={{
+                onChange: z.string().min(1, "请输入昵称"),
+                onSubmit: z.string().min(1, "请输入昵称"),
+              }}
+            >
+              {(field) => (
+                <FormField field={field} label="昵称">
+                  {(f) => (
+                    <Input
+                      id={f.name}
+                      name={f.name}
+                      autoComplete="name"
+                      placeholder="昵称"
+                      value={f.state.value}
+                      onChange={(e) => f.handleChange(e.target.value)}
+                      onBlur={f.handleBlur}
+                      aria-invalid={f.state.meta.errors.length > 0}
+                    />
+                  )}
+                </FormField>
+              )}
+            </form.Field>
             <form.Field
               name="email"
               validators={{
@@ -78,8 +109,8 @@ function LoginPage() {
             <form.Field
               name="password"
               validators={{
-                onChange: z.string().min(1, "请输入密码"),
-                onSubmit: z.string().min(1, "请输入密码"),
+                onChange: z.string().min(8, "密码至少 8 位"),
+                onSubmit: z.string().min(8, "密码至少 8 位"),
               }}
             >
               {(field) => (
@@ -89,8 +120,8 @@ function LoginPage() {
                       type="password"
                       id={f.name}
                       name={f.name}
-                      autoComplete="current-password"
-                      placeholder="••••••••"
+                      autoComplete="new-password"
+                      placeholder="至少 8 位密码"
                       value={f.state.value}
                       onChange={(e) => f.handleChange(e.target.value)}
                       onBlur={f.handleBlur}
@@ -102,22 +133,22 @@ function LoginPage() {
             </form.Field>
             {error && (
               <Alert variant="destructive">
-                <AlertTitle>登录失败</AlertTitle>
+                <AlertTitle>注册失败</AlertTitle>
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
             <form.Subscribe selector={(s) => ({ isSubmitting: s.isSubmitting })}>
               {({ isSubmitting }) => (
                 <Button type="submit" disabled={isSubmitting} className="w-full">
-                  {isSubmitting ? "登录中…" : "登录"}
+                  {isSubmitting ? "注册中…" : "注册"}
                 </Button>
               )}
             </form.Subscribe>
           </form>
           <p className="mt-4 text-center text-sm text-muted-foreground">
-            还没有账号？{" "}
-            <Link to="/signup" className="text-primary underline-offset-4 hover:underline">
-              注册新账号
+            已有账号？{" "}
+            <Link to="/auth/login" className="text-primary underline-offset-4 hover:underline">
+              登录
             </Link>
           </p>
         </CardContent>

@@ -47,12 +47,12 @@ describe("login page", () => {
   });
 
   it("renders the login card", async () => {
-    await renderRoute("/login");
+    await renderRoute("/auth/login");
     expect(await screen.findByText("登录 openchat")).toBeInTheDocument();
   });
 
   it("shows field errors and does not submit an empty form", async () => {
-    await renderRoute("/login");
+    await renderRoute("/auth/login");
     fireEvent.submit(screen.getByRole("button", { name: "登录" }));
     expect(await screen.findByTestId("email-field-error")).toHaveTextContent(
       "请输入有效的邮箱地址",
@@ -61,7 +61,7 @@ describe("login page", () => {
   });
 
   it("associates labels with the email and password inputs", async () => {
-    await renderRoute("/login");
+    await renderRoute("/auth/login");
     const email = screen.getByLabelText("邮箱");
     expect(email).toHaveAttribute("id", "email");
     expect(email).toHaveAttribute("name", "email");
@@ -69,7 +69,7 @@ describe("login page", () => {
   });
 
   it("submits valid credentials to authClient.signIn.email", async () => {
-    await renderRoute("/login");
+    await renderRoute("/auth/login");
     fireEvent.change(screen.getByPlaceholderText("you@example.com"), {
       target: { value: "alice@test.dev" },
     });
@@ -87,7 +87,7 @@ describe("login page", () => {
 
   it("shows the server error in a destructive alert", async () => {
     auth.signIn.email.mockRejectedValueOnce(new Error("密码错误"));
-    await renderRoute("/login");
+    await renderRoute("/auth/login");
     fireEvent.change(screen.getByPlaceholderText("you@example.com"), {
       target: { value: "alice@test.dev" },
     });
@@ -106,7 +106,7 @@ describe("signup page", () => {
   });
 
   it("shows a short-password error", async () => {
-    await renderRoute("/signup");
+    await renderRoute("/auth/signup");
     fireEvent.change(screen.getByPlaceholderText("昵称"), { target: { value: "Alice" } });
     fireEvent.change(screen.getByPlaceholderText("you@example.com"), {
       target: { value: "alice@test.dev" },
@@ -120,7 +120,7 @@ describe("signup page", () => {
   });
 
   it("submits and navigates to /check-email with the email", async () => {
-    await renderRoute("/signup");
+    await renderRoute("/auth/signup");
     fireEvent.change(screen.getByPlaceholderText("昵称"), { target: { value: "Alice" } });
     fireEvent.change(screen.getByPlaceholderText("you@example.com"), {
       target: { value: "alice@test.dev" },
@@ -147,14 +147,14 @@ describe("check-email page", () => {
   });
 
   it("renders the target email and resends via authClient", async () => {
-    await renderRoute("/check-email", { email: "alice@test.dev" });
+    await renderRoute("/auth/check-email", { email: "alice@test.dev" });
     expect(await screen.findByText("验证你的邮箱")).toBeInTheDocument();
     expect(screen.getByText(/alice@test\.dev/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "重新发送验证邮件" }));
     await vi.waitFor(() =>
       expect(auth.sendVerificationEmail).toHaveBeenCalledWith({
         email: "alice@test.dev",
-        callbackURL: "/verify-email",
+        callbackURL: "/auth/verify-email",
       }),
     );
   });
@@ -168,28 +168,28 @@ describe("verify-email page", () => {
   });
 
   it("shows the success state with workspace/login actions", async () => {
-    await renderRoute("/verify-email");
+    await renderRoute("/auth/verify-email");
     expect(await screen.findByText("邮箱验证成功")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "进入工作区" })).toBeInTheDocument();
   });
 
   it("shows the failure state when error is present", async () => {
-    await renderRoute("/verify-email", { error: "invalid_token", email: "alice@test.dev" });
+    await renderRoute("/auth/verify-email", { error: "invalid_token", email: "alice@test.dev" });
     expect(await screen.findByText("验证失败")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "重新发送验证邮件" }));
     await vi.waitFor(() =>
       expect(auth.sendVerificationEmail).toHaveBeenCalledWith({
         email: "alice@test.dev",
-        callbackURL: "/verify-email",
+        callbackURL: "/auth/verify-email",
       }),
     );
   });
 
   it("verifies via the token query when present", async () => {
-    await renderRoute("/verify-email", { token: "tok-1" });
+    await renderRoute("/auth/verify-email", { token: "tok-1" });
     await vi.waitFor(() =>
       expect(auth.verifyEmail).toHaveBeenCalledWith({
-        query: { token: "tok-1", callbackURL: "/verify-email" },
+        query: { token: "tok-1", callbackURL: "/auth/verify-email" },
       }),
     );
     expect(await screen.findByText("邮箱验证成功")).toBeInTheDocument();
@@ -197,13 +197,13 @@ describe("verify-email page", () => {
 
   it("shows a failure alert when resending the verification email fails", async () => {
     auth.sendVerificationEmail.mockRejectedValueOnce(new Error("发送失败"));
-    await renderRoute("/verify-email", { error: "invalid_token", email: "alice@test.dev" });
+    await renderRoute("/auth/verify-email", { error: "invalid_token", email: "alice@test.dev" });
     fireEvent.click(screen.getByRole("button", { name: "重新发送验证邮件" }));
     expect(await screen.findAllByText("发送失败")).toHaveLength(2);
   });
 
   it("shows a success alert after resending the verification email", async () => {
-    await renderRoute("/verify-email", { error: "invalid_token", email: "alice@test.dev" });
+    await renderRoute("/auth/verify-email", { error: "invalid_token", email: "alice@test.dev" });
     fireEvent.click(screen.getByRole("button", { name: "重新发送验证邮件" }));
     expect(await screen.findByText("已发送")).toBeInTheDocument();
   });

@@ -13,7 +13,7 @@ class WsClient {
   private connection = appClient.createRealtime({
     onMessageNew: (channelId, message) => this.notifyBackground(channelId, message),
     onAuthMissing: () => {
-      window.location.href = "/login";
+      window.location.href = "/auth/login";
     },
   });
 

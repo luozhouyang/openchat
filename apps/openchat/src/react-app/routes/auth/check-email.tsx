@@ -1,12 +1,18 @@
 import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { z } from "zod";
-import { authClient } from "../lib/auth-client";
-import { Alert, AlertDescription, AlertTitle } from "../components/ui/alert";
-import { Button } from "../components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
+import { authClient } from "../../lib/auth-client";
+import { Alert, AlertDescription, AlertTitle } from "../../components/ui/alert";
+import { Button } from "../../components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "../../components/ui/card";
 
-export const Route = createFileRoute("/check-email")({
+export const Route = createFileRoute("/auth/check-email")({
   component: CheckEmailPage,
   validateSearch: z.object({ email: z.string().optional() }),
 });
@@ -23,7 +29,10 @@ function CheckEmailPage() {
     setError(null);
     setSent(false);
     try {
-      const res = await authClient.sendVerificationEmail({ email, callbackURL: "/verify-email" });
+      const res = await authClient.sendVerificationEmail({
+        email,
+        callbackURL: "/auth/verify-email",
+      });
       if (res.error) throw new Error(res.error.message ?? "发送失败");
       setSent(true);
     } catch (err) {
@@ -59,7 +68,7 @@ function CheckEmailPage() {
             {sending ? "发送中…" : "重新发送验证邮件"}
           </Button>
           <p className="text-center text-sm text-muted-foreground">
-            <Link to="/login" className="text-primary underline-offset-4 hover:underline">
+            <Link to="/auth/login" className="text-primary underline-offset-4 hover:underline">
               返回登录
             </Link>
           </p>
