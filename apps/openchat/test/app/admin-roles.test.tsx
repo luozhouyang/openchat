@@ -7,6 +7,8 @@ import { RouterProvider, createRouter, createMemoryHistory } from "@tanstack/rea
 import { routeTree } from "@/routeTree.gen";
 import { api } from "@/lib/api";
 
+import "@/i18n";
+
 vi.mock("@/app-client", () => ({
   appClient: { auth: { hasSession: async () => true } },
 }));
@@ -69,12 +71,12 @@ describe("admin roles tab", () => {
       },
     });
     renderAdmin();
-    fireEvent.click(await screen.findByRole("tab", { name: "角色" }));
+    fireEvent.click(await screen.findByRole("tab", { name: "Roles" }));
     expect(await screen.findByText("system_user")).toBeInTheDocument();
-    const createBox = screen.getByLabelText("create_team") as HTMLInputElement;
-    expect(createBox.checked).toBe(true);
+    const createBox = screen.getByRole("checkbox", { name: "create_team" });
+    expect(createBox).toHaveAttribute("aria-checked", "true");
     fireEvent.click(createBox);
-    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
     expect(api.roles.updatePermissions).toHaveBeenCalledWith("r1", ["view_team"]);
   });
 });

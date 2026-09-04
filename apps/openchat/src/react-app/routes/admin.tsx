@@ -1,9 +1,11 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
+import { useTranslation } from "react-i18next";
 
 import { UserTable } from "@/components/admin/UserTable";
 import { StatsCards } from "@/components/admin/StatsCards";
 import { StructurePanel } from "@/components/admin/StructurePanel";
 import { RolesPanel } from "@/components/admin/RolesPanel";
+import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { authClient } from "@/lib/auth-client";
 
@@ -16,18 +18,21 @@ export const Route = createFileRoute("/admin")({
 });
 
 function AdminPage() {
+  const { t } = useTranslation();
   return (
     <div className="mx-auto max-w-5xl p-8">
-      <h1 className="mb-4 text-xl font-semibold">管理控制台</h1>
-      <p className="mb-4 rounded border bg-muted/40 px-3 py-2 text-sm text-zinc-600">
-        平台注册永久开放（openRegistration: true）
-      </p>
+      <h1 className="mb-4 text-xl font-semibold">{t("admin.title")}</h1>
+      <Card className="mb-4">
+        <CardContent className="py-2 text-sm text-muted-foreground">
+          {t("admin.openRegistration")}
+        </CardContent>
+      </Card>
       <Tabs defaultValue="users">
         <TabsList>
-          <TabsTrigger value="users">用户</TabsTrigger>
-          <TabsTrigger value="structure">结构</TabsTrigger>
-          <TabsTrigger value="stats">统计</TabsTrigger>
-          <TabsTrigger value="roles">角色</TabsTrigger>
+          <TabsTrigger value="users">{t("admin.users")}</TabsTrigger>
+          <TabsTrigger value="structure">{t("admin.structure")}</TabsTrigger>
+          <TabsTrigger value="stats">{t("admin.stats")}</TabsTrigger>
+          <TabsTrigger value="roles">{t("admin.roles")}</TabsTrigger>
         </TabsList>
         <TabsContent value="users">
           <UserTable />
