@@ -30,7 +30,7 @@ describe("app", () => {
         <RouterProvider router={router} />
       </QueryClientProvider>,
     );
-    expect(await screen.findByText("登录 openchat")).toBeInTheDocument();
+    expect(await screen.findByText("Sign in to openchat")).toBeInTheDocument();
   });
 });
 

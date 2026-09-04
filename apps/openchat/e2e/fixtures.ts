@@ -58,7 +58,7 @@ export async function createChannel(
 
 export async function loginAs(page: Page, email: string, password: string) {
   await page.goto("/auth/login");
-  await page.getByPlaceholder("邮箱").fill(email);
-  await page.getByPlaceholder("密码").fill(password);
-  await page.getByRole("button", { name: "登录" }).click();
+  await page.getByLabel("Email").fill(email);
+  await page.getByLabel("Password").fill(password);
+  await page.getByRole("button", { name: "Sign in" }).click();
 }

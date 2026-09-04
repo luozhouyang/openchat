@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useTranslation } from "react-i18next";
 import { z } from "zod";
 import { authClient } from "../../lib/auth-client";
+import { LanguageSwitcher } from "../../components/auth/LanguageSwitcher";
 import { Alert, AlertDescription, AlertTitle } from "../../components/ui/alert";
 import { Button } from "../../components/ui/button";
 import {
@@ -19,6 +21,7 @@ export const Route = createFileRoute("/auth/check-email")({
 
 function CheckEmailPage() {
   const { email } = Route.useSearch();
+  const { t } = useTranslation();
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,43 +36,46 @@ function CheckEmailPage() {
         email,
         callbackURL: "/auth/verify-email",
       });
-      if (res.error) throw new Error(res.error.message ?? "发送失败");
+      if (res.error) throw new Error(res.error.message ?? t("auth.checkEmail.sendFailed"));
       setSent(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "发送失败");
+      setError(err instanceof Error ? err.message : t("auth.checkEmail.sendFailed"));
     } finally {
       setSending(false);
     }
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+    <div className="relative flex min-h-screen items-center justify-center bg-background p-4">
+      <div className="absolute top-4 right-4">
+        <LanguageSwitcher />
+      </div>
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle className="text-xl">验证你的邮箱</CardTitle>
+          <CardTitle className="text-xl">{t("auth.checkEmail.title")}</CardTitle>
           <CardDescription>
-            验证邮件已发送至{email ? ` ${email}` : "你的邮箱"}，请点击邮件中的链接完成验证。
+            {t("auth.checkEmail.description", { email: email ?? "" })}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {sent && (
             <Alert>
-              <AlertTitle>已发送</AlertTitle>
-              <AlertDescription>验证邮件已重新发送，请查收。</AlertDescription>
+              <AlertTitle>{t("auth.checkEmail.sent")}</AlertTitle>
+              <AlertDescription>{t("auth.checkEmail.sentDescription")}</AlertDescription>
             </Alert>
           )}
           {error && (
             <Alert variant="destructive">
-              <AlertTitle>发送失败</AlertTitle>
+              <AlertTitle>{t("auth.checkEmail.sendFailed")}</AlertTitle>
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
           <Button onClick={resend} disabled={sending || !email} className="w-full">
-            {sending ? "发送中…" : "重新发送验证邮件"}
+            {sending ? t("auth.checkEmail.sending") : t("auth.checkEmail.resend")}
           </Button>
           <p className="text-center text-sm text-muted-foreground">
             <Link to="/auth/login" className="text-primary underline-offset-4 hover:underline">
-              返回登录
+              {t("auth.checkEmail.backToLogin")}
             </Link>
           </p>
         </CardContent>

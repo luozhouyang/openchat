@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useForm } from "@tanstack/react-form";
+import { useTranslation } from "react-i18next";
 import { z } from "zod";
 import { authClient } from "../../lib/auth-client";
+import { LanguageSwitcher } from "../../components/auth/LanguageSwitcher";
 import { Alert, AlertDescription, AlertTitle } from "../../components/ui/alert";
 import { Button } from "../../components/ui/button";
 import {
@@ -21,31 +23,37 @@ export const Route = createFileRoute("/auth/login")({
 
 function LoginPage() {
   const router = useRouter();
+  const { t } = useTranslation();
   const [error, setError] = useState<string | null>(null);
+
+  const emailValidator = ({ value }: { value: string }) =>
+    z.string().email().safeParse(value).success ? undefined : t("auth.login.errors.email");
+  const passwordValidator = ({ value }: { value: string }) =>
+    z.string().min(1).safeParse(value).success ? undefined : t("auth.login.errors.password");
 
   const form = useForm({
     defaultValues: { email: "", password: "" },
     onSubmit: async ({ value }) => {
       setError(null);
       try {
-        const res = await authClient.signIn.email({
-          email: value.email,
-          password: value.password,
-        });
-        if (res.error) throw new Error(res.error.message ?? "登录失败");
+        const res = await authClient.signIn.email({ email: value.email, password: value.password });
+        if (res.error) throw new Error(res.error.message ?? t("auth.login.failed"));
         void router.navigate({ to: "/" });
       } catch (err) {
-        setError(err instanceof Error ? err.message : "登录失败");
+        setError(err instanceof Error ? err.message : t("auth.login.failed"));
       }
     },
   });
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+    <div className="relative flex min-h-screen items-center justify-center bg-background p-4">
+      <div className="absolute top-4 right-4">
+        <LanguageSwitcher />
+      </div>
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle className="text-xl">登录 openchat</CardTitle>
-          <CardDescription>使用邮箱和密码登录你的工作区</CardDescription>
+          <CardTitle className="text-xl">{t("auth.login.title")}</CardTitle>
+          <CardDescription>{t("auth.login.subtitle")}</CardDescription>
         </CardHeader>
         <CardContent>
           <form
@@ -58,20 +66,17 @@ function LoginPage() {
           >
             <form.Field
               name="email"
-              validators={{
-                onChange: z.string().email("请输入有效的邮箱地址"),
-                onSubmit: z.string().email("请输入有效的邮箱地址"),
-              }}
+              validators={{ onChange: emailValidator, onSubmit: emailValidator }}
             >
               {(field) => (
-                <FormField field={field} label="邮箱">
+                <FormField field={field} label={t("auth.login.email")}>
                   {(f) => (
                     <Input
-                      type="email"
                       id={f.name}
                       name={f.name}
+                      type="email"
                       autoComplete="email"
-                      placeholder="you@example.com"
+                      placeholder={t("auth.login.emailPlaceholder")}
                       value={f.state.value}
                       onChange={(e) => f.handleChange(e.target.value)}
                       onBlur={f.handleBlur}
@@ -83,20 +88,17 @@ function LoginPage() {
             </form.Field>
             <form.Field
               name="password"
-              validators={{
-                onChange: z.string().min(1, "请输入密码"),
-                onSubmit: z.string().min(1, "请输入密码"),
-              }}
+              validators={{ onChange: passwordValidator, onSubmit: passwordValidator }}
             >
               {(field) => (
-                <FormField field={field} label="密码">
+                <FormField field={field} label={t("auth.login.password")}>
                   {(f) => (
                     <Input
-                      type="password"
                       id={f.name}
                       name={f.name}
+                      type="password"
                       autoComplete="current-password"
-                      placeholder="••••••••"
+                      placeholder={t("auth.login.passwordPlaceholder")}
                       value={f.state.value}
                       onChange={(e) => f.handleChange(e.target.value)}
                       onBlur={f.handleBlur}
@@ -108,22 +110,22 @@ function LoginPage() {
             </form.Field>
             {error && (
               <Alert variant="destructive">
-                <AlertTitle>登录失败</AlertTitle>
+                <AlertTitle>{t("auth.login.failed")}</AlertTitle>
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
             <form.Subscribe selector={(s) => ({ isSubmitting: s.isSubmitting })}>
               {({ isSubmitting }) => (
                 <Button type="submit" disabled={isSubmitting} className="w-full">
-                  {isSubmitting ? "登录中…" : "登录"}
+                  {isSubmitting ? t("auth.login.submitting") : t("auth.login.submit")}
                 </Button>
               )}
             </form.Subscribe>
           </form>
           <p className="mt-4 text-center text-sm text-muted-foreground">
-            还没有账号？{" "}
+            {t("auth.login.noAccount")}{" "}
             <Link to="/auth/signup" className="text-primary underline-offset-4 hover:underline">
-              注册新账号
+              {t("auth.login.signupLink")}
             </Link>
           </p>
         </CardContent>

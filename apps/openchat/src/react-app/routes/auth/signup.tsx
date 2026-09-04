@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useForm } from "@tanstack/react-form";
+import { useTranslation } from "react-i18next";
 import { z } from "zod";
 import { authClient } from "../../lib/auth-client";
+import { LanguageSwitcher } from "../../components/auth/LanguageSwitcher";
 import { Alert, AlertDescription, AlertTitle } from "../../components/ui/alert";
 import { Button } from "../../components/ui/button";
 import {
@@ -21,7 +23,15 @@ export const Route = createFileRoute("/auth/signup")({
 
 function SignupPage() {
   const router = useRouter();
+  const { t } = useTranslation();
   const [error, setError] = useState<string | null>(null);
+
+  const nameValidator = ({ value }: { value: string }) =>
+    z.string().min(1).safeParse(value).success ? undefined : t("auth.signup.errors.name");
+  const emailValidator = ({ value }: { value: string }) =>
+    z.string().email().safeParse(value).success ? undefined : t("auth.signup.errors.email");
+  const passwordValidator = ({ value }: { value: string }) =>
+    z.string().min(8).safeParse(value).success ? undefined : t("auth.signup.errors.password");
 
   const form = useForm({
     defaultValues: { name: "", email: "", password: "" },
@@ -33,20 +43,23 @@ function SignupPage() {
           email: value.email,
           password: value.password,
         });
-        if (res.error) throw new Error(res.error.message ?? "注册失败");
+        if (res.error) throw new Error(res.error.message ?? t("auth.signup.failed"));
         void router.navigate({ to: "/auth/check-email", search: { email: value.email } });
       } catch (err) {
-        setError(err instanceof Error ? err.message : "注册失败");
+        setError(err instanceof Error ? err.message : t("auth.signup.failed"));
       }
     },
   });
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+    <div className="relative flex min-h-screen items-center justify-center bg-background p-4">
+      <div className="absolute top-4 right-4">
+        <LanguageSwitcher />
+      </div>
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle className="text-xl">注册 openchat</CardTitle>
-          <CardDescription>创建你的账号，验证邮箱后开始协作</CardDescription>
+          <CardTitle className="text-xl">{t("auth.signup.title")}</CardTitle>
+          <CardDescription>{t("auth.signup.subtitle")}</CardDescription>
         </CardHeader>
         <CardContent>
           <form
@@ -59,19 +72,16 @@ function SignupPage() {
           >
             <form.Field
               name="name"
-              validators={{
-                onChange: z.string().min(1, "请输入昵称"),
-                onSubmit: z.string().min(1, "请输入昵称"),
-              }}
+              validators={{ onChange: nameValidator, onSubmit: nameValidator }}
             >
               {(field) => (
-                <FormField field={field} label="昵称">
+                <FormField field={field} label={t("auth.signup.name")}>
                   {(f) => (
                     <Input
                       id={f.name}
                       name={f.name}
                       autoComplete="name"
-                      placeholder="昵称"
+                      placeholder={t("auth.signup.namePlaceholder")}
                       value={f.state.value}
                       onChange={(e) => f.handleChange(e.target.value)}
                       onBlur={f.handleBlur}
@@ -83,20 +93,17 @@ function SignupPage() {
             </form.Field>
             <form.Field
               name="email"
-              validators={{
-                onChange: z.string().email("请输入有效的邮箱地址"),
-                onSubmit: z.string().email("请输入有效的邮箱地址"),
-              }}
+              validators={{ onChange: emailValidator, onSubmit: emailValidator }}
             >
               {(field) => (
-                <FormField field={field} label="邮箱">
+                <FormField field={field} label={t("auth.signup.email")}>
                   {(f) => (
                     <Input
-                      type="email"
                       id={f.name}
                       name={f.name}
+                      type="email"
                       autoComplete="email"
-                      placeholder="you@example.com"
+                      placeholder={t("auth.signup.emailPlaceholder")}
                       value={f.state.value}
                       onChange={(e) => f.handleChange(e.target.value)}
                       onBlur={f.handleBlur}
@@ -108,20 +115,17 @@ function SignupPage() {
             </form.Field>
             <form.Field
               name="password"
-              validators={{
-                onChange: z.string().min(8, "密码至少 8 位"),
-                onSubmit: z.string().min(8, "密码至少 8 位"),
-              }}
+              validators={{ onChange: passwordValidator, onSubmit: passwordValidator }}
             >
               {(field) => (
-                <FormField field={field} label="密码">
+                <FormField field={field} label={t("auth.signup.password")}>
                   {(f) => (
                     <Input
-                      type="password"
                       id={f.name}
                       name={f.name}
+                      type="password"
                       autoComplete="new-password"
-                      placeholder="至少 8 位密码"
+                      placeholder={t("auth.signup.passwordPlaceholder")}
                       value={f.state.value}
                       onChange={(e) => f.handleChange(e.target.value)}
                       onBlur={f.handleBlur}
@@ -133,22 +137,22 @@ function SignupPage() {
             </form.Field>
             {error && (
               <Alert variant="destructive">
-                <AlertTitle>注册失败</AlertTitle>
+                <AlertTitle>{t("auth.signup.failed")}</AlertTitle>
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
             <form.Subscribe selector={(s) => ({ isSubmitting: s.isSubmitting })}>
               {({ isSubmitting }) => (
                 <Button type="submit" disabled={isSubmitting} className="w-full">
-                  {isSubmitting ? "注册中…" : "注册"}
+                  {isSubmitting ? t("auth.signup.submitting") : t("auth.signup.submit")}
                 </Button>
               )}
             </form.Subscribe>
           </form>
           <p className="mt-4 text-center text-sm text-muted-foreground">
-            已有账号？{" "}
+            {t("auth.signup.hasAccount")}{" "}
             <Link to="/auth/login" className="text-primary underline-offset-4 hover:underline">
-              登录
+              {t("auth.signup.loginLink")}
             </Link>
           </p>
         </CardContent>
