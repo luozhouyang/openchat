@@ -11,6 +11,7 @@ import { routeTree } from "@/routeTree.gen";
 import { hydrateChannel } from "@/lib/message-db";
 import { useMessageStore } from "@/stores/messages";
 import { api } from "@/lib/api";
+import "@/i18n";
 
 vi.mock("@/app-client", () => ({
   appClient: { auth: { hasSession: async () => true } },
@@ -45,7 +46,9 @@ describe("root redirect", () => {
     (api.workspaces as ReturnType<typeof vi.fn>).mockResolvedValue({ teams: [], directs: [] });
     renderApp();
     expect(
-      await screen.findByText("还没有会话。加入团队或发起私信后即可开始聊天。"),
+      await screen.findByText(
+        "No conversations yet. Join a team or start a direct message to begin chatting.",
+      ),
     ).toBeInTheDocument();
   });
 

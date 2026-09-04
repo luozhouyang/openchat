@@ -1,7 +1,16 @@
 import { Outlet } from "@tanstack/react-router";
 import type { ChannelSummary } from "protocol";
-import { TeamRail } from "./TeamRail";
-import { Sidebar } from "./Sidebar";
+import { useTranslation } from "react-i18next";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import {
+  Sidebar,
+  SidebarInset,
+  SidebarProvider,
+  SidebarRail,
+  SidebarTrigger,
+} from "@/components/ui/sidebar";
+import { TeamSwitcher } from "./TeamSwitcher";
+import { WorkspaceMenu } from "./WorkspaceMenu";
 
 interface WorkspaceShellProps {
   teams: Array<{ id: string; displayName: string }>;
@@ -18,18 +27,25 @@ export function WorkspaceShell({
   channels,
   directs,
 }: WorkspaceShellProps) {
+  const { t } = useTranslation();
   return (
-    <div className="flex h-screen">
-      {currentTeamId && <TeamRail teams={teams} currentTeamId={currentTeamId} />}
-      <Sidebar
-        title={title}
-        channels={channels}
-        directs={directs}
-        teamId={currentTeamId ?? undefined}
-      />
-      <main className="flex min-w-0 flex-1 flex-col">
-        <Outlet />
-      </main>
-    </div>
+    <TooltipProvider delay={0}>
+      <SidebarProvider>
+        <Sidebar collapsible="icon">
+          <TeamSwitcher teams={teams} currentTeamId={currentTeamId} />
+          <WorkspaceMenu teamId={currentTeamId} channels={channels} directs={directs} />
+          <SidebarRail />
+        </Sidebar>
+        <SidebarInset>
+          <header className="flex h-12 items-center gap-2 border-b px-4">
+            <SidebarTrigger aria-label={t("workspace.directs")} />
+            <span className="font-semibold">{title}</span>
+          </header>
+          <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
+            <Outlet />
+          </main>
+        </SidebarInset>
+      </SidebarProvider>
+    </TooltipProvider>
   );
 }

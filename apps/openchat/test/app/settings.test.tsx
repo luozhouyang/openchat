@@ -61,7 +61,7 @@ describe("/$teamId/settings", () => {
     });
     renderAt("/t1/settings");
     expect(await screen.findByText("团队设置")).toBeInTheDocument();
-    expect(await screen.findByText("Team One")).toBeInTheDocument();
+    expect(await screen.findByDisplayValue("Team One")).toBeInTheDocument();
     expect(await screen.findByText("u2")).toBeInTheDocument();
   });
 });
