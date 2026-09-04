@@ -85,11 +85,11 @@ test.describe("openchat desktop shell", () => {
     const channel = await createChannel(request, user.token, team.id, `general-${seq}`);
     seq += 1;
 
-    // The fresh renderer redirects an unauthenticated visitor to /login.
-    await page.goto(`${RENDERER}/login`);
-    await page.getByPlaceholder("邮箱").fill(email);
-    await page.getByPlaceholder("密码").fill(password);
-    await page.getByRole("button", { name: "登录" }).click();
+    // The fresh renderer redirects an unauthenticated visitor to /auth/login.
+    await page.goto(`${RENDERER}/auth/login`);
+    await page.getByLabel("Email").fill(email);
+    await page.getByLabel("Password").fill(password);
+    await page.getByRole("button", { name: "Sign in" }).click();
     await expect(page).toHaveURL(new RegExp(`/${team.id}/c/${channel.id}`), { timeout: 20_000 });
     await expect(page.getByPlaceholder("输入消息…")).toBeVisible();
   });
@@ -205,10 +205,10 @@ test.describe("openchat desktop app:// bundled renderer mode", () => {
     const team = await createTeam(request, user.token, `app-team-${seq}`);
     const channel = await createChannel(request, user.token, team.id, `general-${seq}`);
 
-    // Fresh instance without a session: the root guard redirects to /login.
-    await page.getByPlaceholder("邮箱").fill(email);
-    await page.getByPlaceholder("密码").fill(password);
-    await page.getByRole("button", { name: "登录" }).click();
+    // Fresh instance without a session: the root guard redirects to /auth/login.
+    await page.getByLabel("Email").fill(email);
+    await page.getByLabel("Password").fill(password);
+    await page.getByRole("button", { name: "Sign in" }).click();
     await expect(page.getByPlaceholder("输入消息…")).toBeVisible({ timeout: 20_000 });
     await expect(page).toHaveURL(new RegExp(`app://-/.*/${channel.id}`));
   });
