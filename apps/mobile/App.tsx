@@ -11,7 +11,7 @@ import {
   View,
 } from "react-native";
 import type { StoreMessage } from "state";
-import { useSidebarStore, useStructureStore } from "state";
+import { useSidebarStore, useTeamsStore } from "state";
 import { appClient } from "./src/app-client";
 import { consumeDeepLink, registerPush } from "./src/lib/push";
 
@@ -19,8 +19,6 @@ import { createMobilePlatform } from "./src/platform";
 import { useMessages } from "./src/stores/messages";
 import { closeRealtime, connectRealtime, sendActivity, sendFrame } from "./src/ws/client";
 
-type TeamSummary = { id: string; displayName: string; channels: ChannelSummary[] };
-type ChannelSummary = { id: string; displayName: string; type: string; member?: unknown };
 type Route =
   | { screen: "workspace" }
   | { screen: "channel"; teamId: string; channelId: string; title: string };
@@ -153,22 +151,22 @@ function WorkspaceScreen({
 }: {
   onOpenChannel: (teamId: string, channelId: string, title: string) => void;
 }) {
-  const [teams, setTeams] = useState<TeamSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const structureVersion = useStructureStore((s) => s.version);
+  const teams = useTeamsStore((s) => s.teams);
+  const loaded = useTeamsStore((s) => s.loaded);
 
   useEffect(() => {
     (async () => {
       try {
         const res = await appClient.api.workspaces();
-        setTeams(res.teams as TeamSummary[]);
+        useTeamsStore.getState().loadAll(res);
         setError(null);
       } catch (e) {
         setError(e instanceof Error ? e.message : "加载失败");
-        setTeams((t) => t ?? []);
       }
     })();
-  }, [structureVersion]);
+    // Live updates arrive via the resident realtime connection's dispatcher.
+  }, []);
 
   // Sidebar counts (unread/mentions) come from the shared store: seeded via
   // REST here, then kept live by sidebar.update / channel.read WS events.
@@ -181,9 +179,9 @@ function WorkspaceScreen({
         // offline: badges resume from live events
       }
     })();
-  }, [structureVersion]);
+  }, []);
 
-  if (teams === null) {
+  if (!loaded && !error) {
     return (
       <View style={styles.center}>
         <ActivityIndicator />

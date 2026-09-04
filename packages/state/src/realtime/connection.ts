@@ -12,6 +12,8 @@ export interface RealtimeConnectionDeps {
   getDb(): Promise<LocalDatabase>;
   fetchHistory(channelId: string, beforeSeq?: number): Promise<Message[]>;
   onAuthMissing?(): void;
+  /** Current user id for self-targeted events (team.member_removed). */
+  selfUserId?: () => string | null;
   /** UI hooks: notifications, self-message filtering, sidebar extras. */
   onMessageNew?(channelId: string, message: Message): void;
   /** Test seam for a fake socket. */
@@ -40,6 +42,7 @@ export function createRealtimeConnection(deps: RealtimeConnectionDeps): Realtime
   });
   const dispatch = createDispatcher({
     getDb: deps.getDb,
+    selfUserId: deps.selfUserId,
     onMessageNew: deps.onMessageNew,
     onSyncGap: (channelId) => void handleSyncGap(channelId),
   } satisfies Partial<DispatcherDeps> & Pick<DispatcherDeps, "getDb">);

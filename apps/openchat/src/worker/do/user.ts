@@ -344,20 +344,6 @@ export class UserDO extends DurableObject<Env> {
     return { changed: true };
   }
 
-  /**
-   * Push a structure.update event to every connected device of this user, so
-   * clients refetch workspaces/sidebar live instead of on the next navigation
-   * (closes the structure-blindness gap flagged in the Mattermost alignment
-   * review: no channel_created/member_added polling).
-   */
-  async structureNotify(body: { scope: "channels" | "teams" }): Promise<{ ok: boolean }> {
-    const payload = JSON.stringify({ type: "structure.update", scope: body.scope });
-    for (const ws of this.ctx.getWebSockets()) {
-      if (ws.readyState === WebSocket.OPEN) ws.send(payload);
-    }
-    return { ok: true };
-  }
-
   async pushStructure(event: unknown): Promise<void> {
     const payload = JSON.stringify(event);
     for (const ws of this.ctx.getWebSockets()) {

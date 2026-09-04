@@ -7,7 +7,7 @@ async function signup(email: string, username: string): Promise<string> {
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       email,
-      password: "structure-notify-password",
+      password: "live-events-password",
       name: username,
       username,
     }),
@@ -78,10 +78,6 @@ function collectEventsWithin(sock: TestSocket, windowMs: number): Promise<{ type
   });
 }
 
-function structureUpdateCount(frames: { type: string }[]): number {
-  return frames.filter((f) => f.type === "structure.update").length;
-}
-
 async function getWorkspaces(cookie: string): Promise<void> {
   const res = await exports.default.fetch("http://localhost/api/v1/users/me/workspaces", {
     headers: { cookie },
@@ -98,19 +94,19 @@ async function createTeamViaApi(cookie: string, name: string): Promise<void> {
   expect(res.status).toBe(201);
 }
 
-test("repeated workspaces reads do not re-broadcast structure.update", async () => {
+test("workspaces reads broadcast no WS frames", async () => {
   const cookie = await signup("loop-read@test.dev", "loopread");
   const ws = await upgrade(cookie, "loop-read-d1");
   const hello = await nextMessage(ws);
   expect(JSON.parse(String(hello.data))).toMatchObject({ type: "hello" });
 
   await getWorkspaces(cookie);
-  expect(structureUpdateCount(await collectEventsWithin(ws, 400))).toBe(0);
+  expect(await collectEventsWithin(ws, 400)).toHaveLength(0);
 
-  // Regression: before the fix every read re-broadcast, echo-looping with the
-  // client's structure-driven invalidation (~40 req/s of workspaces+sidebar).
+  // Regression: reads must never broadcast (they used to feed a refetch
+  // echo loop of ~40 req/s of workspaces+sidebar).
   for (let i = 0; i < 5; i++) await getWorkspaces(cookie);
-  expect(structureUpdateCount(await collectEventsWithin(ws, 400))).toBe(0);
+  expect(await collectEventsWithin(ws, 400)).toHaveLength(0);
   ws.ws.close(1000, "done");
 });
 
@@ -126,6 +122,6 @@ test("team create emits team.member_added exactly once, later reads stay quiet",
   await getWorkspaces(cookie);
   const frames = await counting;
   expect(frames.filter((f) => f.type === "team.member_added")).toHaveLength(1);
-  expect(frames.filter((f) => f.type === "structure.update")).toHaveLength(0);
+  expect(frames.filter((f) => f.type !== "team.member_added")).toHaveLength(0);
   ws.ws.close(1000, "done");
 });

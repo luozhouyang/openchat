@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
+import { useTeamsStore } from "state";
 import { api } from "@/lib/api";
 import { usePermissions } from "@/lib/use-permissions";
 import {
@@ -35,6 +36,7 @@ export function TeamSwitcher({
     setError(null);
     try {
       await api.teams.leave(currentTeamId);
+      useTeamsStore.getState().dropTeam(currentTeamId);
       setOpen(false);
       await navigate({ to: "/dm" });
     } catch (err) {

@@ -41,7 +41,10 @@ export interface AppClient {
   registerPush(): Promise<void>;
   /** Apps create their connection here, injecting UI hooks only. */
   createRealtime(
-    hooks?: Pick<RealtimeConnectionDeps, "onMessageNew" | "onAuthMissing" | "createSocket">,
+    hooks?: Pick<
+      RealtimeConnectionDeps,
+      "onMessageNew" | "onAuthMissing" | "createSocket" | "selfUserId"
+    >,
   ): RealtimeConnection;
 }
 

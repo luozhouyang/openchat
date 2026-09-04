@@ -3,7 +3,6 @@ import { serverEventSchema } from "protocol";
 import type { LocalDatabase } from "../db/database.ts";
 import { useMessageStore } from "../stores/messages.ts";
 import { useSidebarStore } from "../stores/sidebar.ts";
-import { useStructureStore } from "../stores/structure.ts";
 import { useTeamsStore } from "../stores/teams.ts";
 import { useTypingStore } from "../stores/typing.ts";
 
@@ -89,10 +88,6 @@ export function createDispatcher(deps: DispatcherDeps) {
         break;
       case "channel.read":
         useSidebarStore.getState().readSync(ev.channelId, ev.lastReadSeq);
-        deps.onLocal?.(ev);
-        break;
-      case "structure.update":
-        useStructureStore.getState().bump(ev.scope);
         deps.onLocal?.(ev);
         break;
       case "channel.created":

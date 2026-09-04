@@ -7,8 +7,7 @@ export const Route = createFileRoute("/$teamId/")({
 });
 
 // The parent /$teamId loader already fetched workspaces; reuse it instead of
-// issuing a second workspaces request on every visit (which also fed the
-// structure.update echo loop).
+// issuing a second workspaces request on every visit.
 function TeamIndex() {
   const { teamId } = teamIdApi.useParams();
   const data = teamIdApi.useLoaderData();

@@ -42,7 +42,4 @@ test("legacy events still parse", () => {
   expect(
     serverEventSchema.parse({ type: "channel.read", channelId: "c1", lastReadSeq: 3 }).type,
   ).toBe("channel.read");
-  expect(serverEventSchema.parse({ type: "structure.update", scope: "channels" }).type).toBe(
-    "structure.update",
-  );
 });

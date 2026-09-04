@@ -122,7 +122,6 @@ export const serverEventSchema = z.discriminatedUnion("type", [
     lastMessage: z.object({ preview: z.string(), userId: z.string(), at: z.number() }),
   }),
   z.object({ type: z.literal("channel.read"), channelId: z.string(), lastReadSeq: z.number() }),
-  z.object({ type: z.literal("structure.update"), scope: z.enum(["channels", "teams"]) }),
   channelCreatedEvent,
   channelUpdatedEvent,
   channelDeletedEvent,

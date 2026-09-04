@@ -9,10 +9,22 @@ import { getDeviceId } from "../lib/secure";
  * is mobile code: background closes the socket, foreground reconnects and
  * re-syncs (p10 spec §4.1).
  */
-const connection = appClient.createRealtime();
+let selfUserId: string | null = null;
+
+const connection = appClient.createRealtime({
+  selfUserId: () => selfUserId,
+});
 
 /** Opens the realtime socket for this device (token from SecureStore). */
 export async function connectRealtime(): Promise<void> {
+  if (selfUserId === null) {
+    try {
+      const me = await appClient.api.me();
+      selfUserId = me.user.id;
+    } catch {
+      selfUserId = null;
+    }
+  }
   await connection.connect(await getDeviceId());
 }
 

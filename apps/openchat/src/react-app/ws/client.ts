@@ -15,6 +15,7 @@ class WsClient {
     onAuthMissing: () => {
       window.location.href = "/auth/login";
     },
+    selfUserId: () => this.selfUserId,
   });
 
   /**

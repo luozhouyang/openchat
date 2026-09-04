@@ -14,7 +14,6 @@ export { useMessageStore, type StoreMessage } from "./stores/messages.ts";
 export { useSidebarStore } from "./stores/sidebar.ts";
 export { useTypingStore } from "./stores/typing.ts";
 export { useConnectionStore } from "./stores/connection.ts";
-export { useStructureStore } from "./stores/structure.ts";
 export { useTeamsStore, type StoreTeam } from "./stores/teams.ts";
 
 export { createDispatcher, type DispatcherDeps } from "./realtime/dispatch.ts";
