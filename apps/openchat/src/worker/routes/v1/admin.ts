@@ -6,17 +6,29 @@ import {
   EmailInput,
   PatchTeamInput,
   RolesInput,
+  channelUpdatedEvent,
+  channelMemberRemovedEvent,
+  channelDeletedEvent,
+  teamUpdatedEvent,
+  teamMemberRemovedEvent,
   type AdminStatsOutput,
   type TeamMembersOutput,
   type CreateInviteOutput,
+  type ChannelSummary,
+  type TeamUpdatePayload,
 } from "protocol";
 import { requireAdmin } from "../../auth/admin-gate.ts";
 import type { SessionContext } from "../../auth/session.ts";
 import { getDb } from "../../db/client.ts";
 import { users, teams, channels, teamMembers, channelMembers } from "../../db/schema-d1.ts";
-import { listChannelsForTeam, listChannelMemberIds } from "../../db/repos/channels.ts";
-import { getTeamMember, countTeamAdmins } from "../../db/repos/teams.ts";
+import { listChannelsForTeam, listChannelMemberIds, getChannel } from "../../db/repos/channels.ts";
+import { getTeam, getTeamMember, countTeamAdmins } from "../../db/repos/teams.ts";
 import { removeChannelMemberFromDo, syncUserChannels } from "../../user-do-sync.ts";
+import {
+  createChannelBroadcaster,
+  createTeamBroadcaster,
+  deliverStructure,
+} from "../../structure-broadcast.ts";
 import { auditLog } from "../../audit.ts";
 import { zodValidator } from "../../lib/validation.ts";
 import { apiError } from "../../lib/errors.ts";
@@ -76,13 +88,46 @@ adminV1.post("/teams/:teamId/archive", async (c) => {
   for (const ch of chs) {
     await db.update(channels).set({ archivedAt: now }).where(eq(channels.id, ch.id));
   }
+  const team = await getTeam(db, teamId);
+  if (team) {
+    await createTeamBroadcaster(c.env, teamId).broadcast(
+      teamUpdatedEvent.parse({
+        type: "team.updated",
+        team: {
+          id: team.id,
+          name: team.name,
+          displayName: team.displayName,
+          type: team.type as TeamUpdatePayload["type"],
+          archivedAt: team.archivedAt,
+        },
+      }),
+    );
+  }
   auditLog({ actor: c.get("adminUserId"), action: "team.archive", target: teamId, status: "ok" });
   return c.json({ ok: true });
 });
 adminV1.post("/channels/:channelId/archive", async (c) => {
   const db = getDb(c.env.DB);
   const channelId = c.req.param("channelId");
-  await db.update(channels).set({ archivedAt: Date.now() }).where(eq(channels.id, channelId));
+  const now = Date.now();
+  await db.update(channels).set({ archivedAt: now }).where(eq(channels.id, channelId));
+  const ch = await getChannel(db, channelId);
+  if (ch) {
+    await createChannelBroadcaster(c.env, channelId).broadcast(
+      channelUpdatedEvent.parse({
+        type: "channel.updated",
+        channel: {
+          id: ch.id,
+          teamId: ch.teamId,
+          name: ch.name,
+          displayName: ch.displayName,
+          type: ch.type as ChannelSummary["type"],
+          member: true,
+          archivedAt: now,
+        },
+      }),
+    );
+  }
   auditLog({
     actor: c.get("adminUserId"),
     action: "channel.archive",
@@ -94,8 +139,11 @@ adminV1.post("/channels/:channelId/archive", async (c) => {
 adminV1.post("/channels/:channelId/delete", async (c) => {
   const db = getDb(c.env.DB);
   const channelId = c.req.param("channelId");
+  const memberIds = await listChannelMemberIds(db, channelId);
   await db.delete(channelMembers).where(eq(channelMembers.channelId, channelId));
   await db.delete(channels).where(eq(channels.id, channelId));
+  const deleted = channelDeletedEvent.parse({ type: "channel.deleted", channelId });
+  await Promise.all(memberIds.map((uid) => deliverStructure(c.env, uid, deleted)));
   auditLog({
     actor: c.get("adminUserId"),
     action: "channel.delete",
@@ -120,12 +168,23 @@ adminV1.post(
           .delete(channelMembers)
           .where(and(eq(channelMembers.channelId, ch.id), eq(channelMembers.userId, userId)));
         await removeChannelMemberFromDo(c.env, ch.id, userId);
+        const removed = channelMemberRemovedEvent.parse({
+          type: "channel.member_removed",
+          channelId: ch.id,
+          userId,
+        });
+        await createChannelBroadcaster(c.env, ch.id).broadcast(removed);
+        await deliverStructure(c.env, userId, removed);
       }
     }
     await db
       .delete(teamMembers)
       .where(and(eq(teamMembers.teamId, teamId), eq(teamMembers.userId, userId)));
-    await syncUserChannels(c.env, userId, "teams");
+    await syncUserChannels(c.env, userId);
+    await createTeamBroadcaster(c.env, teamId).broadcast(
+      teamMemberRemovedEvent.parse({ type: "team.member_removed", teamId, userId }),
+      [userId],
+    );
     auditLog({
       actor: c.get("adminUserId"),
       action: "team.member.remove",
@@ -165,7 +224,22 @@ adminV1.put("/teams/:teamId/members/:userId/roles", zodValidator("json", RolesIn
     .update(teamMembers)
     .set({ roles: roles.join(" ") })
     .where(and(eq(teamMembers.teamId, teamId), eq(teamMembers.userId, userId)));
-  await syncUserChannels(c.env, userId, "teams");
+  await syncUserChannels(c.env, userId);
+  const team = await getTeam(db, teamId);
+  if (team) {
+    await createTeamBroadcaster(c.env, teamId).broadcast(
+      teamUpdatedEvent.parse({
+        type: "team.updated",
+        team: {
+          id: team.id,
+          name: team.name,
+          displayName: team.displayName,
+          type: team.type as TeamUpdatePayload["type"],
+          archivedAt: team.archivedAt,
+        },
+      }),
+    );
+  }
   return c.json({ ok: true });
 });
 
@@ -176,7 +250,24 @@ adminV1.post("/teams/:teamId/patch", zodValidator("json", PatchTeamInput), async
   if (body.description !== undefined) patch.description = body.description;
   if (body.archived !== undefined) patch.archived = body.archived;
   if (Object.keys(patch).length === 0) throw apiError("invalid", "invalid", 422);
-  await updateTeam(getDb(c.env.DB), { teamId: c.req.param("teamId"), patch });
+  const db = getDb(c.env.DB);
+  const teamId = c.req.param("teamId");
+  await updateTeam(db, { teamId, patch });
+  const team = await getTeam(db, teamId);
+  if (team) {
+    await createTeamBroadcaster(c.env, teamId).broadcast(
+      teamUpdatedEvent.parse({
+        type: "team.updated",
+        team: {
+          id: team.id,
+          name: team.name,
+          displayName: team.displayName,
+          type: team.type as TeamUpdatePayload["type"],
+          archivedAt: team.archivedAt,
+        },
+      }),
+    );
+  }
   return c.json({ ok: true });
 });
 

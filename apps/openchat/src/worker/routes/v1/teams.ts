@@ -8,9 +8,13 @@ import {
   JoinByInviteInput,
   MyTeamsOutput,
   TeamOutput,
+  teamUpdatedEvent,
+  teamMemberAddedEvent,
+  teamMemberRemovedEvent,
   type JoinByInviteOutput,
   type TeamMembersOutput,
   type TeamType,
+  type TeamUpdatePayload,
 } from "protocol";
 import { requireSession } from "../../auth/session.ts";
 import { requireTeamRole, requirePermission } from "../../auth/guards.ts";
@@ -28,8 +32,22 @@ import {
 import { zodValidator } from "../../lib/validation.ts";
 import { apiError } from "../../lib/errors.ts";
 import { syncUserChannels } from "../../user-do-sync.ts";
+import { createTeamBroadcaster } from "../../structure-broadcast.ts";
+import type { Db } from "../../db/types.ts";
 
 export const teamsV1 = new Hono<{ Bindings: Env }>();
+
+async function teamPayload(db: Db, teamId: string): Promise<TeamUpdatePayload | null> {
+  const team = await getTeam(db, teamId);
+  if (!team) return null;
+  return {
+    id: team.id,
+    name: team.name,
+    displayName: team.displayName,
+    type: team.type as TeamUpdatePayload["type"],
+    archivedAt: team.archivedAt,
+  };
+}
 
 teamsV1.post(
   "/teams",
@@ -47,10 +65,15 @@ teamsV1.post(
       description: body.description,
       creatorId,
     });
-    // Refresh the creator's User DO channel list (they just gained a team) and
-    // notify their devices. Gaining a team does not move the channel set, so
-    // force the teams-scope notification.
-    await syncUserChannels(c.env, creatorId, "teams");
+    await syncUserChannels(c.env, creatorId);
+    const member = await getTeamMember(db, teamId, creatorId);
+    await createTeamBroadcaster(c.env, teamId).broadcast(
+      teamMemberAddedEvent.parse({
+        type: "team.member_added",
+        team: { ...(await teamPayload(db, teamId))!, roles: member?.roles ?? "team_admin" },
+        userId: creatorId,
+      }),
+    );
     const out: CreateTeamOutput = inviteCode ? { id: teamId, inviteCode } : { id: teamId };
     return c.json(out, 201);
   },
@@ -61,7 +84,15 @@ teamsV1.post("/teams/join", requireSession, zodValidator("json", JoinByInviteInp
   const db = getDb(c.env.DB);
   const userId = c.get("session")!.user.id;
   const teamId = await joinByInvite(db, { inviteCode: body.inviteCode, userId });
-  await syncUserChannels(c.env, userId, "teams");
+  await syncUserChannels(c.env, userId);
+  const member = await getTeamMember(db, teamId, userId);
+  await createTeamBroadcaster(c.env, teamId).broadcast(
+    teamMemberAddedEvent.parse({
+      type: "team.member_added",
+      team: { ...(await teamPayload(db, teamId))!, roles: member?.roles ?? "team_user" },
+      userId,
+    }),
+  );
   return c.json({ teamId } satisfies JoinByInviteOutput, 201);
 });
 
@@ -123,8 +154,14 @@ teamsV1.put(
     if (body.archived !== undefined) patch.archived = body.archived;
     if (Object.keys(patch).length === 0) throw apiError("invalid", "invalid", 422);
     const db = getDb(c.env.DB);
-    await updateTeam(db, { teamId: c.req.param("teamId"), patch });
-    await syncUserChannels(c.env, c.get("session")!.user.id, "teams");
+    const teamId = c.req.param("teamId");
+    await updateTeam(db, { teamId, patch });
+    await syncUserChannels(c.env, c.get("session")!.user.id);
+    const payload = await teamPayload(db, teamId);
+    if (payload)
+      await createTeamBroadcaster(c.env, teamId).broadcast(
+        teamUpdatedEvent.parse({ type: "team.updated", team: payload }),
+      );
     return c.json({ ok: true });
   },
 );
@@ -136,15 +173,24 @@ teamsV1.post(
   async (c) => {
     const body = c.req.valid("json");
     const db = getDb(c.env.DB);
-    await joinTeam(db, {
-      teamId: c.req.param("teamId"),
-      userId: c.get("session")!.user.id,
-      inviteCode: body.inviteCode,
-    });
+    const teamId = c.req.param("teamId");
+    const userId = c.get("session")!.user.id;
+    const alreadyMember = (await getTeamMember(db, teamId, userId)) !== null;
+    await joinTeam(db, { teamId, userId, inviteCode: body.inviteCode });
     // Joining a team changes the user's workspace view: refresh the User DO
     // subscriptions and notify devices (previously missed — the new team's
     // channels never reached the User DO until the next workspaces call).
-    await syncUserChannels(c.env, c.get("session")!.user.id, "teams");
+    await syncUserChannels(c.env, userId);
+    if (!alreadyMember) {
+      const member = await getTeamMember(db, teamId, userId);
+      await createTeamBroadcaster(c.env, teamId).broadcast(
+        teamMemberAddedEvent.parse({
+          type: "team.member_added",
+          team: { ...(await teamPayload(db, teamId))!, roles: member?.roles ?? "team_user" },
+          userId,
+        }),
+      );
+    }
     return c.json({ ok: true });
   },
 );
@@ -163,8 +209,16 @@ teamsV1.delete(
       if (!member || !member.roles.split(" ").includes("team_admin"))
         throw apiError("forbidden", "forbidden", 403);
     }
-    await leaveTeam(db, { teamId: c.req.param("teamId"), userId });
-    await syncUserChannels(c.env, userId, "teams");
+    const teamId = c.req.param("teamId");
+    const member = await getTeamMember(db, teamId, userId);
+    await leaveTeam(db, { teamId, userId });
+    await syncUserChannels(c.env, userId);
+    if (member) {
+      await createTeamBroadcaster(c.env, teamId).broadcast(
+        teamMemberRemovedEvent.parse({ type: "team.member_removed", teamId, userId }),
+        [userId],
+      );
+    }
     return c.json({ ok: true });
   },
 );

@@ -3,7 +3,7 @@ import { channelDoName, userDoName, type ServerEvent } from "protocol";
 import { getDb } from "./db/client.ts";
 import { teamMembers, userStatus } from "./db/schema-d1.ts";
 
-async function deliver(env: Env, userId: string, event: ServerEvent) {
+export async function deliverStructure(env: Env, userId: string, event: ServerEvent) {
   const id = env.USER_DO.idFromName(userDoName(userId));
   await env.USER_DO.get(id).pushStructure(event);
 }
@@ -13,7 +13,7 @@ export function createChannelBroadcaster(env: Env, channelId: string) {
     async broadcast(event: ServerEvent) {
       const stub = env.CHANNEL_DO.get(env.CHANNEL_DO.idFromName(channelDoName(channelId)));
       const targets = await stub.structureTargets();
-      await Promise.all(targets.map((uid) => deliver(env, uid, event)));
+      await Promise.all(targets.map((uid) => deliverStructure(env, uid, event)));
     },
   };
 }
@@ -34,7 +34,7 @@ export function createTeamBroadcaster(env: Env, teamId: string) {
         .where(and(inArray(userStatus.userId, ids), eq(userStatus.online, true)));
       const onlineSet = new Set(online.map((r) => r.userId));
       await Promise.all(
-        ids.filter((uid) => onlineSet.has(uid)).map((uid) => deliver(env, uid, event)),
+        ids.filter((uid) => onlineSet.has(uid)).map((uid) => deliverStructure(env, uid, event)),
       );
     },
   };

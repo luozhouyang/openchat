@@ -12,6 +12,11 @@ import {
   ListMembersQuery,
   ChannelsListOutput,
   NotifyPropsInput,
+  channelCreatedEvent,
+  channelUpdatedEvent,
+  channelMemberAddedEvent,
+  channelMemberRemovedEvent,
+  type ChannelSummary,
 } from "protocol";
 import { requireSession } from "../../auth/session.ts";
 import { requireTeamRole, requireChannelRole } from "../../auth/guards.ts";
@@ -35,8 +40,22 @@ import {
   syncUserChannels,
   removeChannelMemberFromDo,
 } from "../../user-do-sync.ts";
+import { createChannelBroadcaster, deliverStructure } from "../../structure-broadcast.ts";
+import type { Channel } from "../../db/types.ts";
 
 export const channelsV1 = new Hono<{ Bindings: Env }>();
+
+function toSummary(ch: Channel, member: boolean): ChannelSummary {
+  return {
+    id: ch.id,
+    teamId: ch.teamId,
+    name: ch.name,
+    displayName: ch.displayName,
+    type: ch.type as ChannelSummary["type"],
+    member,
+    archivedAt: ch.archivedAt,
+  };
+}
 
 channelsV1.post(
   "/channels",
@@ -58,6 +77,9 @@ channelsV1.post(
       creatorId: me,
     });
     await syncChannelMember(c.env, ch.id, ch.creatorId!, "channel_admin");
+    await createChannelBroadcaster(c.env, ch.id).broadcast(
+      channelCreatedEvent.parse({ type: "channel.created", channel: toSummary(ch, true) }),
+    );
     const out: CreateChannelOutput = { id: ch.id };
     return c.json(out, 201);
   },
@@ -113,6 +135,14 @@ channelsV1.post("/channels/:channelId/members", requireSession, async (c) => {
   if (joined) {
     await syncChannelMember(c.env, channelId, userId, "channel_user");
     await syncUserChannels(c.env, userId);
+    await createChannelBroadcaster(c.env, channelId).broadcast(
+      channelMemberAddedEvent.parse({
+        type: "channel.member_added",
+        channelId,
+        userId,
+        roles: "channel_user",
+      }),
+    );
   }
   return c.json({ ok: true });
 });
@@ -130,6 +160,13 @@ channelsV1.delete(
     await leaveChannel(db, { channelId, userId });
     await removeChannelMemberFromDo(c.env, channelId, userId);
     await syncUserChannels(c.env, userId);
+    const removed = channelMemberRemovedEvent.parse({
+      type: "channel.member_removed",
+      channelId,
+      userId,
+    });
+    await createChannelBroadcaster(c.env, channelId).broadcast(removed);
+    await deliverStructure(c.env, userId, removed);
     return c.json({ ok: true });
   },
 );
@@ -151,6 +188,10 @@ channelsV1.post(
       await syncChannelMember(c.env, channelId, withUserId, "channel_user");
       await syncUserChannels(c.env, me);
       await syncUserChannels(c.env, withUserId);
+      const ch = (await getChannel(db, channelId))!;
+      await createChannelBroadcaster(c.env, channelId).broadcast(
+        channelCreatedEvent.parse({ type: "channel.created", channel: toSummary(ch, true) }),
+      );
     }
     const out: OpenChannelOutput = { id: channelId, existing };
     return c.json(out, existing ? 200 : 201);
@@ -174,6 +215,10 @@ channelsV1.post(
         await syncChannelMember(c.env, channelId, uid, "channel_user");
         await syncUserChannels(c.env, uid);
       }
+      const ch = (await getChannel(db, channelId))!;
+      await createChannelBroadcaster(c.env, channelId).broadcast(
+        channelCreatedEvent.parse({ type: "channel.created", channel: toSummary(ch, true) }),
+      );
     }
     const out: OpenChannelOutput = { id: channelId, existing };
     return c.json(out, existing ? 200 : 201);
@@ -186,7 +231,13 @@ channelsV1.delete(
   requireChannelRole("admin"),
   async (c) => {
     const db = getDb(c.env.DB);
-    await archiveChannel(db, { channelId: c.req.param("channelId") });
+    const channelId = c.req.param("channelId");
+    await archiveChannel(db, { channelId });
+    const ch = await getChannel(db, channelId);
+    if (ch)
+      await createChannelBroadcaster(c.env, channelId).broadcast(
+        channelUpdatedEvent.parse({ type: "channel.updated", channel: toSummary(ch, true) }),
+      );
     return c.json({ ok: true });
   },
 );
@@ -197,7 +248,13 @@ channelsV1.post(
   requireChannelRole("admin"),
   async (c) => {
     const db = getDb(c.env.DB);
-    await restoreChannel(db, { channelId: c.req.param("channelId") });
+    const channelId = c.req.param("channelId");
+    await restoreChannel(db, { channelId });
+    const ch = await getChannel(db, channelId);
+    if (ch)
+      await createChannelBroadcaster(c.env, channelId).broadcast(
+        channelUpdatedEvent.parse({ type: "channel.updated", channel: toSummary(ch, true) }),
+      );
     return c.json({ ok: true });
   },
 );
