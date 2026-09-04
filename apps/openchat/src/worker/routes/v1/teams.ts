@@ -152,8 +152,9 @@ teamsV1.delete(
   requireSession,
   requireTeamRole("member"),
   async (c) => {
-    const userId = c.req.param("userId");
+    const rawUserId = c.req.param("userId");
     const me = c.get("session")!.user.id;
+    const userId = rawUserId === "me" ? me : rawUserId;
     const db = getDb(c.env.DB);
     if (userId !== me) {
       const member = await getTeamMember(db, c.req.param("teamId"), me);

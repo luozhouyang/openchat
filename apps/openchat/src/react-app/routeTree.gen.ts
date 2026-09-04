@@ -15,6 +15,7 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as DmRouteImport } from './routes/dm'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as TeamIdIndexRouteImport } from './routes/$teamId/index'
+import { Route as TeamIdSettingsRouteImport } from './routes/$teamId/settings'
 import { Route as AuthCheckEmailRouteImport } from './routes/auth/check-email'
 import { Route as AuthLoginRouteImport } from './routes/auth/login'
 import { Route as AuthSignupRouteImport } from './routes/auth/signup'
@@ -53,6 +54,11 @@ const SettingsRoute = SettingsRouteImport.update({
 const TeamIdIndexRoute = TeamIdIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => TeamIdRoute,
+} as any)
+const TeamIdSettingsRoute = TeamIdSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => TeamIdRoute,
 } as any)
 const AuthCheckEmailRoute = AuthCheckEmailRouteImport.update({
@@ -108,6 +114,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRoute
   '/dm': typeof DmRouteWithChildren
   '/settings': typeof SettingsRoute
+  '/$teamId/settings': typeof TeamIdSettingsRoute
   '/auth/check-email': typeof AuthCheckEmailRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/signup': typeof AuthSignupRoute
@@ -123,6 +130,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/settings': typeof SettingsRoute
+  '/$teamId/settings': typeof TeamIdSettingsRoute
   '/auth/check-email': typeof AuthCheckEmailRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/signup': typeof AuthSignupRoute
@@ -141,6 +149,7 @@ export interface FileRoutesById {
   '/admin': typeof AdminRoute
   '/dm': typeof DmRouteWithChildren
   '/settings': typeof SettingsRoute
+  '/$teamId/settings': typeof TeamIdSettingsRoute
   '/auth/check-email': typeof AuthCheckEmailRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/signup': typeof AuthSignupRoute
@@ -160,6 +169,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/dm'
     | '/settings'
+    | '/$teamId/settings'
     | '/auth/check-email'
     | '/auth/login'
     | '/auth/signup'
@@ -175,6 +185,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/settings'
+    | '/$teamId/settings'
     | '/auth/check-email'
     | '/auth/login'
     | '/auth/signup'
@@ -192,6 +203,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/dm'
     | '/settings'
+    | '/$teamId/settings'
     | '/auth/check-email'
     | '/auth/login'
     | '/auth/signup'
@@ -259,6 +271,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/$teamId/'
       preLoaderRoute: typeof TeamIdIndexRouteImport
+      parentRoute: typeof TeamIdRoute
+    }
+    '/$teamId/settings': {
+      id: '/$teamId/settings'
+      path: '/settings'
+      fullPath: '/$teamId/settings'
+      preLoaderRoute: typeof TeamIdSettingsRouteImport
       parentRoute: typeof TeamIdRoute
     }
     '/auth/check-email': {
@@ -339,11 +358,13 @@ const TeamIdCChannelIdRouteWithChildren =
   TeamIdCChannelIdRoute._addFileChildren(TeamIdCChannelIdRouteChildren)
 
 interface TeamIdRouteChildren {
+  TeamIdSettingsRoute: typeof TeamIdSettingsRoute
   TeamIdIndexRoute: typeof TeamIdIndexRoute
   TeamIdCChannelIdRoute: typeof TeamIdCChannelIdRouteWithChildren
 }
 
 const TeamIdRouteChildren: TeamIdRouteChildren = {
+  TeamIdSettingsRoute: TeamIdSettingsRoute,
   TeamIdIndexRoute: TeamIdIndexRoute,
   TeamIdCChannelIdRoute: TeamIdCChannelIdRouteWithChildren,
 }

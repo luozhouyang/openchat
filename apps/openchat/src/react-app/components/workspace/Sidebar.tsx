@@ -1,7 +1,9 @@
-import { Link } from "@tanstack/react-router";
+import { useState } from "react";
+import { Link, useNavigate } from "@tanstack/react-router";
 import type { ChannelSummary } from "protocol";
 import { useSidebarStore } from "@/stores/sidebar";
 import { Badge } from "@/components/ui/badge";
+import { api } from "@/lib/api";
 
 interface SidebarProps {
   title: string;
@@ -12,10 +14,53 @@ interface SidebarProps {
 
 export function Sidebar({ title, channels, directs, teamId }: SidebarProps) {
   const entries = useSidebarStore((s) => s.entries);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const navigate = useNavigate();
+
+  async function leaveTeam(teamId: string, navigate: ReturnType<typeof useNavigate>) {
+    await api.teams.leave(teamId);
+    setMenuOpen(false);
+    await navigate({ to: "/dm" });
+  }
 
   return (
     <aside className="flex w-60 flex-col border-r bg-zinc-50">
-      <div className="border-b px-3 py-2 font-semibold">{title}</div>
+      <div className="relative border-b px-3 py-2">
+        <div className="flex items-center justify-between">
+          <span className="font-semibold">{title}</span>
+          {teamId && (
+            <button
+              type="button"
+              onClick={() => setMenuOpen((v) => !v)}
+              className="rounded px-1.5 text-zinc-500 hover:bg-zinc-200"
+              aria-label="团队菜单"
+            >
+              ⋯
+            </button>
+          )}
+        </div>
+        {teamId && menuOpen && (
+          <div className="absolute right-0 top-full z-10 mt-1 w-40 rounded border bg-white py-1 shadow">
+            <Link
+              to="/$teamId/settings"
+              params={{ teamId }}
+              className="block px-3 py-1.5 text-sm hover:bg-zinc-100"
+            >
+              团队设置
+            </Link>
+            <Link to="/teams/new" className="block px-3 py-1.5 text-sm hover:bg-zinc-100">
+              加入团队
+            </Link>
+            <button
+              type="button"
+              onClick={() => void leaveTeam(teamId, navigate)}
+              className="block w-full px-3 py-1.5 text-left text-sm text-red-600 hover:bg-zinc-100"
+            >
+              退出团队
+            </button>
+          </div>
+        )}
+      </div>
       <div className="flex-1 overflow-y-auto p-2">
         {teamId && (
           <>

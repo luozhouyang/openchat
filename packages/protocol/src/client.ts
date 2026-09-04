@@ -134,6 +134,8 @@ export function createApi(opts: ApiFetchOptions = {}) {
       joinByInvite: (inviteCode: string) =>
         f<JoinByInviteOutput>("/api/v1/teams/join", json("POST", { inviteCode })),
       listMembers: (teamId: string) => f<TeamMembersOutput>(`/api/v1/teams/${teamId}/members`),
+      leave: (teamId: string) =>
+        f<{ ok: true }>(`/api/v1/teams/${teamId}/members/me`, { method: "DELETE" }),
     },
 
     roles: {
