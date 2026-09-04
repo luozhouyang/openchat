@@ -61,5 +61,53 @@
       "sentDescription": "验证邮件已重新发送，请查收。"
     }
   },
-  "common": { "lang": { "en": "English", "zh": "中文" } }
+  "common": { "lang": { "en": "English", "zh": "中文" } },
+  "workspace": {
+    "channels": "频道",
+    "directs": "私信",
+    "noConversations": "还没有会话。加入团队或发起私信后即可开始聊天。",
+    "createTeam": "创建团队",
+    "joinTeam": "加入团队",
+    "teamSettings": "团队设置",
+    "leaveTeam": "退出团队",
+    "leaveFailed": "退出失败"
+  },
+  "teams": {
+    "title": "团队",
+    "createTab": "创建团队",
+    "joinTab": "加入团队",
+    "identifier": "标识（小写字母数字）",
+    "teamName": "团队名称",
+    "type": "类型",
+    "typeOpen": "开放（任何人可加入）",
+    "typeInvite": "邀请制（需邀请码）",
+    "description": "描述（可选）",
+    "create": "创建",
+    "inviteCode": "邀请码",
+    "inviteCodeShown": "邀请码：{{code}}",
+    "enterTeam": "进入团队",
+    "join": "加入",
+    "createFailed": "创建失败",
+    "joinFailed": "加入失败",
+    "settingsTitle": "团队设置",
+    "notFound": "团队不存在",
+    "members": "成员",
+    "save": "保存",
+    "saved": "已保存",
+    "saveFailed": "保存失败",
+    "membersLoadFailed": "无法加载成员"
+  },
+  "admin": {
+    "title": "管理控制台",
+    "openRegistration": "平台注册永久开放（openRegistration: true）",
+    "users": "用户",
+    "structure": "结构",
+    "stats": "统计",
+    "roles": "角色",
+    "builtIn": "内置",
+    "custom": "自定义",
+    "save": "保存",
+    "saved": "已保存",
+    "saveFailed": "保存失败"
+  }
 }

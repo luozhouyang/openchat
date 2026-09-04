@@ -61,5 +61,53 @@
       "sentDescription": "A verification email has been resent. Check your inbox."
     }
   },
-  "common": { "lang": { "en": "English", "zh": "中文" } }
+  "common": { "lang": { "en": "English", "zh": "中文" } },
+  "workspace": {
+    "channels": "Channels",
+    "directs": "Direct messages",
+    "noConversations": "No conversations yet. Join a team or start a direct message to begin chatting.",
+    "createTeam": "Create team",
+    "joinTeam": "Join team",
+    "teamSettings": "Team settings",
+    "leaveTeam": "Leave team",
+    "leaveFailed": "Failed to leave team"
+  },
+  "teams": {
+    "title": "Teams",
+    "createTab": "Create team",
+    "joinTab": "Join team",
+    "identifier": "Identifier (lowercase letters and digits)",
+    "teamName": "Team name",
+    "type": "Type",
+    "typeOpen": "Open (anyone can join)",
+    "typeInvite": "Invite only (requires invite code)",
+    "description": "Description (optional)",
+    "create": "Create",
+    "inviteCode": "Invite code",
+    "inviteCodeShown": "Invite code: {{code}}",
+    "enterTeam": "Enter team",
+    "join": "Join",
+    "createFailed": "Failed to create team",
+    "joinFailed": "Failed to join team",
+    "settingsTitle": "Team settings",
+    "notFound": "Team not found",
+    "members": "Members",
+    "save": "Save",
+    "saved": "Saved",
+    "saveFailed": "Failed to save",
+    "membersLoadFailed": "Failed to load members"
+  },
+  "admin": {
+    "title": "Admin console",
+    "openRegistration": "Platform registration is permanently open (openRegistration: true)",
+    "users": "Users",
+    "structure": "Structure",
+    "stats": "Stats",
+    "roles": "Roles",
+    "builtIn": "Built-in",
+    "custom": "Custom",
+    "save": "Save",
+    "saved": "Saved",
+    "saveFailed": "Failed to save"
+  }
 }
