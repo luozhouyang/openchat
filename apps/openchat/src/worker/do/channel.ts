@@ -81,6 +81,15 @@ export class ChannelDO extends DurableObject<Env> {
     await this.db.delete(schema.memberState).where(eq(schema.memberState.userId, body.userId));
   }
 
+  async structureTargets(): Promise<string[]> {
+    const rows = await this.db
+      .select({ userId: schema.memberState.userId })
+      .from(schema.memberState);
+    if (rows.length <= SMALL_CHANNEL_THRESHOLD) return rows.map((r) => r.userId);
+    const online = await this.fetchOnlineMemberIds(rows.map((r) => r.userId));
+    return online === null ? rows.map((r) => r.userId) : online;
+  }
+
   async typing(callerUserId: string): Promise<{ error: string; status: 403 } | void> {
     const member = await this.db
       .select()

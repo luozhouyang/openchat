@@ -358,6 +358,13 @@ export class UserDO extends DurableObject<Env> {
     return { ok: true };
   }
 
+  async pushStructure(event: unknown): Promise<void> {
+    const payload = JSON.stringify(event);
+    for (const ws of this.ctx.getWebSockets()) {
+      if (ws.readyState === WebSocket.OPEN) ws.send(payload);
+    }
+  }
+
   private async ensureDefaultCategories(userId: string): Promise<void> {
     const existing = await this.db
       .select()
