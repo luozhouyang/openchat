@@ -48,8 +48,9 @@ teamsV1.post(
       creatorId,
     });
     // Refresh the creator's User DO channel list (they just gained a team) and
-    // notify their devices.
-    await syncUserChannels(c.env, creatorId);
+    // notify their devices. Gaining a team does not move the channel set, so
+    // force the teams-scope notification.
+    await syncUserChannels(c.env, creatorId, "teams");
     const out: CreateTeamOutput = inviteCode ? { id: teamId, inviteCode } : { id: teamId };
     return c.json(out, 201);
   },
@@ -60,7 +61,7 @@ teamsV1.post("/teams/join", requireSession, zodValidator("json", JoinByInviteInp
   const db = getDb(c.env.DB);
   const userId = c.get("session")!.user.id;
   const teamId = await joinByInvite(db, { inviteCode: body.inviteCode, userId });
-  await syncUserChannels(c.env, userId);
+  await syncUserChannels(c.env, userId, "teams");
   return c.json({ teamId } satisfies JoinByInviteOutput, 201);
 });
 
@@ -123,6 +124,7 @@ teamsV1.put(
     if (Object.keys(patch).length === 0) throw apiError("invalid", "invalid", 422);
     const db = getDb(c.env.DB);
     await updateTeam(db, { teamId: c.req.param("teamId"), patch });
+    await syncUserChannels(c.env, c.get("session")!.user.id, "teams");
     return c.json({ ok: true });
   },
 );
@@ -139,10 +141,10 @@ teamsV1.post(
       userId: c.get("session")!.user.id,
       inviteCode: body.inviteCode,
     });
-    // Joining a team changes the user's channel set: refresh the User DO
+    // Joining a team changes the user's workspace view: refresh the User DO
     // subscriptions and notify devices (previously missed — the new team's
     // channels never reached the User DO until the next workspaces call).
-    await syncUserChannels(c.env, c.get("session")!.user.id);
+    await syncUserChannels(c.env, c.get("session")!.user.id, "teams");
     return c.json({ ok: true });
   },
 );
@@ -162,7 +164,7 @@ teamsV1.delete(
         throw apiError("forbidden", "forbidden", 403);
     }
     await leaveTeam(db, { teamId: c.req.param("teamId"), userId });
-    await syncUserChannels(c.env, userId);
+    await syncUserChannels(c.env, userId, "teams");
     return c.json({ ok: true });
   },
 );

@@ -16,7 +16,7 @@ export const Route = createFileRoute("/dm")({
 function DmLayout() {
   const data = Route.useLoaderData();
   const { t } = useTranslation();
-  const sidebar = useQuery({ queryKey: ["sidebar"], queryFn: api.sidebar });
+  const sidebar = useQuery({ queryKey: ["sidebar"], queryFn: api.sidebar, staleTime: 30_000 });
   useEffect(() => {
     if (sidebar.data) useSidebarStore.getState().loadAll(sidebar.data.channels);
   }, [sidebar.data]);

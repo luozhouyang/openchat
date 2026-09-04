@@ -332,11 +332,16 @@ export class UserDO extends DurableObject<Env> {
     return { channels: results };
   }
 
-  async channelsSubscribe(channelIds: string[]): Promise<void> {
+  async channelsSubscribe(channelIds: string[]): Promise<{ changed: boolean }> {
+    const existing = await this.db.select().from(schema.channelsCache);
+    const current = new Set(existing.map((r) => r.channelId));
+    const same = channelIds.length === current.size && channelIds.every((id) => current.has(id));
+    if (same) return { changed: false };
     await this.db.delete(schema.channelsCache);
-    if (channelIds.length === 0) return;
+    if (channelIds.length === 0) return { changed: true };
     await this.db.insert(schema.channelsCache).values(channelIds.map((id) => ({ channelId: id })));
     await this.ensureDefaultCategories(this.userId);
+    return { changed: true };
   }
 
   /**

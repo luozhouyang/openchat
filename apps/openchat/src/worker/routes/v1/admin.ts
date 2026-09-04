@@ -125,7 +125,7 @@ adminV1.post(
     await db
       .delete(teamMembers)
       .where(and(eq(teamMembers.teamId, teamId), eq(teamMembers.userId, userId)));
-    await syncUserChannels(c.env, userId);
+    await syncUserChannels(c.env, userId, "teams");
     auditLog({
       actor: c.get("adminUserId"),
       action: "team.member.remove",
@@ -165,7 +165,7 @@ adminV1.put("/teams/:teamId/members/:userId/roles", zodValidator("json", RolesIn
     .update(teamMembers)
     .set({ roles: roles.join(" ") })
     .where(and(eq(teamMembers.teamId, teamId), eq(teamMembers.userId, userId)));
-  await syncUserChannels(c.env, userId);
+  await syncUserChannels(c.env, userId, "teams");
   return c.json({ ok: true });
 });
 

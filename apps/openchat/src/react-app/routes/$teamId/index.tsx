@@ -1,18 +1,23 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
-import { api } from "@/lib/api";
+import { createFileRoute, getRouteApi, Navigate } from "@tanstack/react-router";
+
+const teamIdApi = getRouteApi("/$teamId");
 
 export const Route = createFileRoute("/$teamId/")({
-  beforeLoad: async ({ params }) => {
-    const workspaces = await api.workspaces();
-    const team = workspaces.teams.find((t) => t.id === params.teamId);
-    const first = team?.channels.find(
-      (c) => c.member && (c.type === "public" || c.type === "private"),
-    );
-    if (first)
-      throw redirect({
-        to: "/$teamId/c/$channelId",
-        params: { teamId: params.teamId, channelId: first.id },
-      });
-  },
-  component: () => <div className="p-8 text-zinc-500">尚未加入任何频道</div>,
+  component: TeamIndex,
 });
+
+// The parent /$teamId loader already fetched workspaces; reuse it instead of
+// issuing a second workspaces request on every visit (which also fed the
+// structure.update echo loop).
+function TeamIndex() {
+  const { teamId } = teamIdApi.useParams();
+  const data = teamIdApi.useLoaderData();
+  const team = data.teams.find((t) => t.id === teamId);
+  const first = team?.channels.find(
+    (c) => c.member && (c.type === "public" || c.type === "private"),
+  );
+  if (first) {
+    return <Navigate to="/$teamId/c/$channelId" params={{ teamId, channelId: first.id }} replace />;
+  }
+  return <div className="p-8 text-zinc-500">尚未加入任何频道</div>;
+}

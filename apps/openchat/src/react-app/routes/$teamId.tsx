@@ -23,7 +23,7 @@ function WorkspaceLayout() {
   const structureVersion = useStructureStore((s) => s.version);
   const lastVersion = useRef(0);
 
-  const sidebar = useQuery({ queryKey: ["sidebar"], queryFn: api.sidebar });
+  const sidebar = useQuery({ queryKey: ["sidebar"], queryFn: api.sidebar, staleTime: 30_000 });
   useEffect(() => {
     if (sidebar.data) useSidebarStore.getState().loadAll(sidebar.data.channels);
   }, [sidebar.data]);
