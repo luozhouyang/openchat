@@ -23,7 +23,7 @@ function TeamsNewPage() {
   const [type, setType] = useState<"open" | "invite">("open");
   const [description, setDescription] = useState("");
   const [inviteCode, setInviteCode] = useState("");
-  const [createdCode, setCreatedCode] = useState<string | null>(null);
+  const [created, setCreated] = useState<{ id: string; inviteCode?: string } | null>(null);
 
   async function createTeam() {
     setError(null);
@@ -34,7 +34,10 @@ function TeamsNewPage() {
         type,
         description: description || undefined,
       });
-      if (type === "invite") setCreatedCode(res.inviteCode ?? null);
+      if (type === "invite") {
+        setCreated({ id: res.id, inviteCode: res.inviteCode ?? undefined });
+        return;
+      }
       await navigate({ to: "/$teamId", params: { teamId: res.id } });
     } catch (err) {
       setError(err instanceof Error ? err.message : "创建失败");
@@ -58,7 +61,7 @@ function TeamsNewPage() {
           <CardTitle>团队</CardTitle>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue={canCreate ? "create" : "join"}>
+          <Tabs key={canCreate ? "create" : "join"} defaultValue={canCreate ? "create" : "join"}>
             <TabsList>
               {canCreate && <TabsTrigger value="create">创建团队</TabsTrigger>}
               <TabsTrigger value="join">加入团队</TabsTrigger>
@@ -101,11 +104,6 @@ function TeamsNewPage() {
                   <Button className="w-full" onClick={createTeam}>
                     创建
                   </Button>
-                  {createdCode && (
-                    <p className="rounded border bg-muted/40 px-3 py-2 text-sm">
-                      邀请码：<span className="font-mono">{createdCode}</span>
-                    </p>
-                  )}
                 </div>
               </TabsContent>
             )}
@@ -125,6 +123,21 @@ function TeamsNewPage() {
               </div>
             </TabsContent>
           </Tabs>
+          {created && (
+            <div className="mt-4 space-y-3">
+              {created.inviteCode && (
+                <p className="rounded border bg-muted/40 px-3 py-2 text-sm">
+                  邀请码：<span className="font-mono">{created.inviteCode}</span>
+                </p>
+              )}
+              <Button
+                className="w-full"
+                onClick={() => navigate({ to: "/$teamId", params: { teamId: created.id } })}
+              >
+                进入团队
+              </Button>
+            </div>
+          )}
           {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
         </CardContent>
       </Card>

@@ -42,6 +42,8 @@ describe("/teams/new", () => {
     renderAt("/teams/new");
     expect(await screen.findByText("创建团队")).toBeInTheDocument();
     expect(screen.getByText("加入团队")).toBeInTheDocument();
+    expect(await screen.findByText("标识（小写字母数字）")).toBeInTheDocument();
+    expect(screen.queryByLabelText("邀请码")).not.toBeInTheDocument();
   });
 
   it("hides the create tab without create_team permission", async () => {
