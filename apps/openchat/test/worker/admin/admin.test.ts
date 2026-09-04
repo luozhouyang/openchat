@@ -237,3 +237,51 @@ test("no session returns 401", async () => {
   );
   expect(res.status).toBe(401);
 });
+
+test("system admin can manage any team without membership", async () => {
+  const owner = await signup("adminnm-owner@test.dev", "team-test-password");
+  const create = await exports.default.fetch("http://localhost/api/v1/teams", {
+    method: "POST",
+    headers: { cookie: owner.cookie, "content-type": "application/json" },
+    body: JSON.stringify({ name: "adminnmteam", displayName: "Admin NM", type: "open" }),
+  });
+  const { id: teamId } = (await create.json()) as { id: string };
+
+  const admin = await signup("adminnm-admin@test.dev", "team-test-password");
+  const adminCookie = await makeAdmin(admin.cookie, admin.id);
+
+  const patch = await exports.default.fetch(`http://localhost/api/v1/admin/teams/${teamId}/patch`, {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json" },
+    body: JSON.stringify({ displayName: "Renamed By Admin" }),
+  });
+  expect(patch.status).toBe(200);
+
+  const members = await exports.default.fetch(
+    `http://localhost/api/v1/admin/teams/${teamId}/members`,
+    { headers: { cookie: adminCookie } },
+  );
+  expect(members.status).toBe(200);
+  const body = (await members.json()) as {
+    members: { userId: string; roles: string }[];
+  };
+  const ownerRow = body.members.find((m) => m.roles.includes("team_admin"));
+  expect(ownerRow).toBeTruthy();
+
+  const setRole = await exports.default.fetch(
+    `http://localhost/api/v1/admin/teams/${teamId}/members/${ownerRow!.userId}/roles`,
+    {
+      method: "PUT",
+      headers: { cookie: adminCookie, "content-type": "application/json" },
+      body: JSON.stringify({ roles: ["team_user"] }),
+    },
+  );
+  expect(setRole.status).toBe(200);
+
+  const nonAdmin = await signup("adminnm-non@test.dev", "team-test-password");
+  const forbidden = await exports.default.fetch(
+    `http://localhost/api/v1/admin/teams/${teamId}/members`,
+    { headers: { cookie: nonAdmin.cookie } },
+  );
+  expect(forbidden.status).toBe(403);
+});

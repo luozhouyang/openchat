@@ -6,11 +6,13 @@ import type {
   CompleteUploadOutput,
   CreateChannelInput,
   CreateChannelOutput,
+  CreateInviteOutput,
   CreateTeamInput,
   CreateTeamOutput,
   CreateUploadOutput,
   CreatePostInput,
   DeletePostInput,
+  EmailInput,
   JoinByInviteOutput,
   JoinTeamInput,
   ListMembersQuery,
@@ -186,6 +188,17 @@ export function createApi(opts: ApiFetchOptions = {}) {
       deleteChannel: (channelId: string) =>
         f<{ ok: true }>(`/api/v1/admin/channels/${channelId}/delete`, { method: "POST" }),
       stats: () => f<AdminStatsOutput>("/api/v1/admin/stats"),
+      listTeamMembers: (teamId: string) =>
+        f<TeamMembersOutput>(`/api/v1/admin/teams/${teamId}/members`),
+      setTeamMemberRoles: (teamId: string, userId: string, roles: string[]) =>
+        f<{ ok: true }>(
+          `/api/v1/admin/teams/${teamId}/members/${userId}/roles`,
+          json("PUT", { roles }),
+        ),
+      patchTeam: (teamId: string, input: PatchTeamInput) =>
+        f<{ ok: true }>(`/api/v1/admin/teams/${teamId}/patch`, json("POST", input)),
+      inviteEmail: (teamId: string, input: EmailInput) =>
+        f<CreateInviteOutput>(`/api/v1/admin/teams/${teamId}/invite/email`, json("POST", input)),
     },
 
     uploads: {
