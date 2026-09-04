@@ -2,8 +2,10 @@ import { expect, test, beforeAll } from "vite-plus/test";
 import { env } from "cloudflare:test";
 import { exports } from "cloudflare:workers";
 import { userDoName } from "protocol";
+import { eq } from "drizzle-orm";
 import { getDb } from "../../../src/worker/db/client.ts";
 import { createChannel } from "../../../src/worker/db/repos/channels.ts";
+import { roles } from "../../../src/worker/db/schema-d1.ts";
 import { openDirect } from "../../../src/worker/services/channel.service.ts";
 
 async function signup(email: string, password: string): Promise<string> {
@@ -296,4 +298,25 @@ test("workspaces returns teamless dm channels as directs", async () => {
   expect(body.directs[0].type).toBe("dm");
   expect(body.directs[0].teamId).toBeNull();
   expect(body.directs[0].member).toBe(true);
+});
+
+test("create team requires create_team permission", async () => {
+  const db = getDb(env.DB);
+  const [systemUser] = await db.select().from(roles).where(eq(roles.name, "system_user")).limit(1);
+  expect(systemUser).toBeTruthy();
+  const orig = systemUser!.permissions;
+  await db
+    .update(roles)
+    .set({ permissions: JSON.stringify([]) })
+    .where(eq(roles.name, "system_user"));
+  try {
+    const res = await exports.default.fetch("http://localhost/api/v1/teams", {
+      method: "POST",
+      headers: { cookie: ownerCookie, "content-type": "application/json" },
+      body: JSON.stringify({ name: "nopermteam", displayName: "No Perm", type: "open" }),
+    });
+    expect(res.status).toBe(403);
+  } finally {
+    await db.update(roles).set({ permissions: orig }).where(eq(roles.name, "system_user"));
+  }
 });

@@ -9,7 +9,8 @@ import {
   type TeamType,
 } from "protocol";
 import { requireSession } from "../../auth/session.ts";
-import { requireTeamRole } from "../../auth/guards.ts";
+import { requireTeamRole, requirePermission } from "../../auth/guards.ts";
+import { PERMISSIONS } from "../../auth/rbac.ts";
 import { getDb } from "../../db/client.ts";
 import { getTeam, listTeamsForUser, getTeamMember } from "../../db/repos/teams.ts";
 import { createTeam, joinTeam, leaveTeam, updateTeam } from "../../services/team.service.ts";
@@ -19,23 +20,29 @@ import { syncUserChannels } from "../../user-do-sync.ts";
 
 export const teamsV1 = new Hono<{ Bindings: Env }>();
 
-teamsV1.post("/teams", requireSession, zodValidator("json", CreateTeamInput), async (c) => {
-  const body = c.req.valid("json");
-  const db = getDb(c.env.DB);
-  const creatorId = c.get("session")!.user.id;
-  const { id: teamId, inviteCode } = await createTeam(db, {
-    name: body.name,
-    displayName: body.displayName,
-    type: body.type,
-    description: body.description,
-    creatorId,
-  });
-  // Refresh the creator's User DO channel list (they just gained a team) and
-  // notify their devices.
-  await syncUserChannels(c.env, creatorId);
-  const out: CreateTeamOutput = inviteCode ? { id: teamId, inviteCode } : { id: teamId };
-  return c.json(out, 201);
-});
+teamsV1.post(
+  "/teams",
+  requireSession,
+  requirePermission(PERMISSIONS.CREATE_TEAM),
+  zodValidator("json", CreateTeamInput),
+  async (c) => {
+    const body = c.req.valid("json");
+    const db = getDb(c.env.DB);
+    const creatorId = c.get("session")!.user.id;
+    const { id: teamId, inviteCode } = await createTeam(db, {
+      name: body.name,
+      displayName: body.displayName,
+      type: body.type,
+      description: body.description,
+      creatorId,
+    });
+    // Refresh the creator's User DO channel list (they just gained a team) and
+    // notify their devices.
+    await syncUserChannels(c.env, creatorId);
+    const out: CreateTeamOutput = inviteCode ? { id: teamId, inviteCode } : { id: teamId };
+    return c.json(out, 201);
+  },
+);
 
 teamsV1.get("/users/me/teams", requireSession, async (c) => {
   const db = getDb(c.env.DB);

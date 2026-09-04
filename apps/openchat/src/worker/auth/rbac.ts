@@ -34,6 +34,7 @@ export const PERMISSIONS = {
   MANAGE_CHANNEL_ROLES: "manage_channel_roles",
   DELETE_PUBLIC_CHANNEL: "delete_public_channel",
   DELETE_PRIVATE_CHANNEL: "delete_private_channel",
+  CREATE_TEAM: "create_team",
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -51,6 +52,7 @@ const SYSTEM_USER_PERMS: Permission[] = [
   PERMISSIONS.REMOVE_REACTION,
   PERMISSIONS.USE_GROUP_MENTIONS,
   PERMISSIONS.VIEW_MEMBERS,
+  PERMISSIONS.CREATE_TEAM,
 ];
 
 const TEAM_USER_PERMS: Permission[] = [
