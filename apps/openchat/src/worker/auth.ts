@@ -44,7 +44,8 @@ export function makeAuth(env: Env) {
       user: {
         create: {
           before: async (user) => {
-            return { data: { ...user, id: id("usr") } };
+            const username = user.username ?? user.email.split("@")[0] + "-" + id("usr").slice(-6);
+            return { data: { ...user, id: id("usr"), username } };
           },
         },
         update: {

@@ -50,6 +50,8 @@ describe("root redirect", () => {
         "No conversations yet. Join a team or start a direct message to begin chatting.",
       ),
     ).toBeInTheDocument();
+    expect(await screen.findAllByRole("link", { name: "Create team" })).toHaveLength(1);
+    expect(await screen.findByRole("link", { name: "Join team" })).toBeInTheDocument();
   });
 
   it("routes to the first team when the user has teams", async () => {

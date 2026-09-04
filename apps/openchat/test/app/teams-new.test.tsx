@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
 import { describe, expect, it, vi } from "vite-plus/test";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider, createRouter, createMemoryHistory } from "@tanstack/react-router";
 import { routeTree } from "@/routeTree.gen";
@@ -67,5 +67,19 @@ describe("/teams/new", () => {
     await screen.findByLabelText("Identifier (lowercase letters and digits)");
     const trigger = screen.getByRole("combobox");
     expect(trigger).toHaveTextContent("Open (anyone can join)");
+  });
+
+  it("navigates to /dm when the dialog is closed without history to go back to", async () => {
+    (api.me as ReturnType<typeof vi.fn>).mockResolvedValue({
+      user: { id: "u1", email: "a@b.c", permissions: ["create_team"] },
+    });
+    renderAt("/teams/new");
+    await screen.findByText("Create team");
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(
+      await screen.findByText(
+        "No conversations yet. Join a team or start a direct message to begin chatting.",
+      ),
+    ).toBeInTheDocument();
   });
 });

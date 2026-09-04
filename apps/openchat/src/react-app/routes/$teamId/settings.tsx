@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { createFileRoute, getRouteApi } from "@tanstack/react-router";
+import { createFileRoute, getRouteApi, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api } from "@/lib/api";
@@ -7,8 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardAction } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { ArrowLeftIcon } from "lucide-react";
 
 export const Route = createFileRoute("/$teamId/settings")({
   component: TeamSettingsPage,
@@ -21,6 +22,7 @@ function TeamSettingsPage() {
   const data = teamIdApi.useLoaderData();
   const team = data.teams.find((tm) => tm.id === teamId);
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [displayName, setDisplayName] = useState(team?.displayName ?? "");
   const [description, setDescription] = useState("");
   const [saved, setSaved] = useState(false);
@@ -52,6 +54,16 @@ function TeamSettingsPage() {
       <Card>
         <CardHeader>
           <CardTitle>{t("teams.settingsTitle")}</CardTitle>
+          <CardAction>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => navigate({ to: "/$teamId", params: { teamId } })}
+            >
+              <ArrowLeftIcon />
+              <span className="sr-only">Back</span>
+            </Button>
+          </CardAction>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-1.5">

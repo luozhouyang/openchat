@@ -6,6 +6,7 @@ import { usePermissions } from "@/lib/use-permissions";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -60,9 +61,11 @@ export function TeamSwitcher({
             }
           />
           <DropdownMenuContent align="start" side="right" className="w-(--sidebar-width)">
-            <DropdownMenuLabel className="text-xs text-muted-foreground">
-              {t("teams.title")}
-            </DropdownMenuLabel>
+            <DropdownMenuGroup>
+              <DropdownMenuLabel className="text-xs text-muted-foreground">
+                {t("teams.title")}
+              </DropdownMenuLabel>
+            </DropdownMenuGroup>
             {teams.map((tm) => (
               <DropdownMenuItem
                 key={tm.id}
