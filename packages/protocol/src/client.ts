@@ -106,7 +106,7 @@ function json(method: string, body?: unknown): RequestInit {
 export function createApi(opts: ApiFetchOptions = {}) {
   const f = createApiFetch(opts);
   return {
-    me: () => f<{ user: { id: string; email: string } }>("/api/v1/users/me"),
+    me: () => f<{ user: { id: string; email: string; permissions: string[] } }>("/api/v1/users/me"),
     workspaces: () => f<WorkspaceResponse>("/api/v1/users/me/workspaces"),
     sidebar: () =>
       f<{

@@ -77,3 +77,14 @@ test("permissions endpoint lists the permission catalog", async () => {
   const body = (await res.json()) as { permissions: string[] };
   expect(body.permissions).toContain("create_team");
 });
+
+test("me returns system permissions including create_team", async () => {
+  const user = await signup("roles-me@test.dev");
+  await makeAdmin(user.userId);
+  const res = await exports.default.fetch("http://localhost/api/v1/users/me", {
+    headers: { cookie: user.cookie },
+  });
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as { user: { permissions?: string[] } };
+  expect(body.user.permissions).toContain("create_team");
+});

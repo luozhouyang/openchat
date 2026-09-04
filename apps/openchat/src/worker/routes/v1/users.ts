@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { eq, inArray } from "drizzle-orm";
 import { WorkspaceResponse, type ChannelSummary, type ChannelType, type TeamType } from "protocol";
 import { requireSession } from "../../auth/session.ts";
+import { resolvePermissions } from "../../auth/rbac.ts";
 import { getDb } from "../../db/client.ts";
 import { users } from "../../db/schema-d1.ts";
 import type { Db } from "../../db/types.ts";
@@ -30,6 +31,7 @@ usersV1.get("/users/me", requireSession, async (c) => {
       nickname: row.nickname ?? null,
       avatarUrl: row.avatarUrl ?? row.image ?? null,
       createdAt: row.createdAt.toISOString(),
+      permissions: [...(await resolvePermissions(db, row.id))],
     },
   });
 });
