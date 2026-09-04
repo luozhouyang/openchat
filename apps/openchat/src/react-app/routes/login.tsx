@@ -62,6 +62,9 @@ function LoginPage() {
                   {(f) => (
                     <Input
                       type="email"
+                      id={f.name}
+                      name={f.name}
+                      autoComplete="email"
                       placeholder="you@example.com"
                       value={f.state.value}
                       onChange={(e) => f.handleChange(e.target.value)}
@@ -84,6 +87,9 @@ function LoginPage() {
                   {(f) => (
                     <Input
                       type="password"
+                      id={f.name}
+                      name={f.name}
+                      autoComplete="current-password"
                       placeholder="••••••••"
                       value={f.state.value}
                       onChange={(e) => f.handleChange(e.target.value)}

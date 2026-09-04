@@ -62,6 +62,9 @@ function SignupPage() {
                 <FormField field={field} label="昵称">
                   {(f) => (
                     <Input
+                      id={f.name}
+                      name={f.name}
+                      autoComplete="name"
                       placeholder="昵称"
                       value={f.state.value}
                       onChange={(e) => f.handleChange(e.target.value)}
@@ -84,6 +87,9 @@ function SignupPage() {
                   {(f) => (
                     <Input
                       type="email"
+                      id={f.name}
+                      name={f.name}
+                      autoComplete="email"
                       placeholder="you@example.com"
                       value={f.state.value}
                       onChange={(e) => f.handleChange(e.target.value)}
@@ -106,6 +112,9 @@ function SignupPage() {
                   {(f) => (
                     <Input
                       type="password"
+                      id={f.name}
+                      name={f.name}
+                      autoComplete="new-password"
                       placeholder="至少 8 位密码"
                       value={f.state.value}
                       onChange={(e) => f.handleChange(e.target.value)}

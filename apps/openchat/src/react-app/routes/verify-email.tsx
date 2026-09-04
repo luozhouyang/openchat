@@ -23,6 +23,8 @@ function VerifyEmailPage() {
   );
   const [verifyError, setVerifyError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!search.token) return;
@@ -41,8 +43,17 @@ function VerifyEmailPage() {
   async function resend() {
     if (!search.email) return;
     setSending(true);
+    setSendError(null);
+    setSent(false);
     try {
-      await authClient.sendVerificationEmail({ email: search.email, callbackURL: "/verify-email" });
+      const res = await authClient.sendVerificationEmail({
+        email: search.email,
+        callbackURL: "/verify-email",
+      });
+      if (res.error) throw new Error(res.error.message ?? "发送失败");
+      setSent(true);
+    } catch (err) {
+      setSendError(err instanceof Error ? err.message : "发送失败");
     } finally {
       setSending(false);
     }
@@ -69,6 +80,18 @@ function VerifyEmailPage() {
               <AlertTitle>无法完成验证</AlertTitle>
               <AlertDescription>{verifyError ?? search.error}</AlertDescription>
             </Alert>
+            {sent && (
+              <Alert>
+                <AlertTitle>已发送</AlertTitle>
+                <AlertDescription>验证邮件已重新发送，请查收。</AlertDescription>
+              </Alert>
+            )}
+            {sendError && (
+              <Alert variant="destructive">
+                <AlertTitle>发送失败</AlertTitle>
+                <AlertDescription>{sendError}</AlertDescription>
+              </Alert>
+            )}
             {search.email && (
               <Button onClick={resend} disabled={sending} className="w-full">
                 {sending ? "发送中…" : "重新发送验证邮件"}

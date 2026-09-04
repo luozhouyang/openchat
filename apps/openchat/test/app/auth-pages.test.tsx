@@ -60,6 +60,14 @@ describe("login page", () => {
     expect(auth.signIn.email).not.toHaveBeenCalled();
   });
 
+  it("associates labels with the email and password inputs", async () => {
+    await renderRoute("/login");
+    const email = screen.getByLabelText("邮箱");
+    expect(email).toHaveAttribute("id", "email");
+    expect(email).toHaveAttribute("name", "email");
+    expect(screen.getByLabelText("密码")).toHaveAttribute("id", "password");
+  });
+
   it("submits valid credentials to authClient.signIn.email", async () => {
     await renderRoute("/login");
     fireEvent.change(screen.getByPlaceholderText("you@example.com"), {
@@ -185,5 +193,18 @@ describe("verify-email page", () => {
       }),
     );
     expect(await screen.findByText("邮箱验证成功")).toBeInTheDocument();
+  });
+
+  it("shows a failure alert when resending the verification email fails", async () => {
+    auth.sendVerificationEmail.mockRejectedValueOnce(new Error("发送失败"));
+    await renderRoute("/verify-email", { error: "invalid_token", email: "alice@test.dev" });
+    fireEvent.click(screen.getByRole("button", { name: "重新发送验证邮件" }));
+    expect(await screen.findAllByText("发送失败")).toHaveLength(2);
+  });
+
+  it("shows a success alert after resending the verification email", async () => {
+    await renderRoute("/verify-email", { error: "invalid_token", email: "alice@test.dev" });
+    fireEvent.click(screen.getByRole("button", { name: "重新发送验证邮件" }));
+    expect(await screen.findByText("已发送")).toBeInTheDocument();
   });
 });
