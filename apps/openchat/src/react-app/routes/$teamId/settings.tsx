@@ -19,6 +19,7 @@ function TeamSettingsPage() {
   const [displayName, setDisplayName] = useState(team?.displayName ?? "");
   const [description, setDescription] = useState("");
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const members = useQuery({
     queryKey: ["team-members", teamId],
@@ -27,11 +28,16 @@ function TeamSettingsPage() {
   });
 
   async function save() {
-    await api.teams.patch(teamId, {
-      displayName: displayName || undefined,
-      description: description || undefined,
-    });
-    setSaved(true);
+    setError(null);
+    try {
+      await api.teams.patch(teamId, {
+        displayName: displayName || undefined,
+        description: description || undefined,
+      });
+      setSaved(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "保存失败");
+    }
   }
 
   if (!team) return <div className="p-8">团队不存在</div>;
@@ -58,6 +64,7 @@ function TeamSettingsPage() {
         </div>
         <Button onClick={() => void save()}>保存</Button>
         {saved && <span className="ml-2 text-sm text-green-600">已保存</span>}
+        {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
       </div>
       <div className="rounded border p-4">
         <h2 className="mb-2 font-semibold">成员</h2>

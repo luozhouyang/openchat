@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -12,10 +12,12 @@ interface RoleRow {
 }
 
 export function RolesPanel() {
+  const queryClient = useQueryClient();
   const catalog = useQuery({ queryKey: ["permissions"], queryFn: api.roles.listPermissions });
   const roles = useQuery<{ roles: RoleRow[] }>({ queryKey: ["roles"], queryFn: api.roles.list });
   const [draft, setDraft] = useState<Record<string, string[]>>({});
   const [saved, setSaved] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const allPerms = catalog.data?.permissions ?? [];
 
@@ -27,17 +29,24 @@ export function RolesPanel() {
   }
 
   async function saveRole(role: RoleRow) {
+    setError(null);
     const next = draft[role.id] ?? role.permissions;
-    await api.roles.updatePermissions(role.id, next);
-    setSaved(role.name);
-    setDraft((d) => {
-      const { [role.id]: _omit, ...rest } = d;
-      return rest;
-    });
+    try {
+      await api.roles.updatePermissions(role.id, next);
+      setSaved(role.name);
+      setDraft((d) => {
+        const { [role.id]: _omit, ...rest } = d;
+        return rest;
+      });
+      await queryClient.invalidateQueries({ queryKey: ["roles"] });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "保存失败");
+    }
   }
 
   return (
     <div className="space-y-6">
+      {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
       {roles.data?.roles.map((role) => {
         const checked = draft[role.id] ?? role.permissions;
         return (

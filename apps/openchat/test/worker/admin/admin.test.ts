@@ -268,15 +268,35 @@ test("system admin can manage any team without membership", async () => {
   const ownerRow = body.members.find((m) => m.roles.includes("team_admin"));
   expect(ownerRow).toBeTruthy();
 
+  const second = await signup("adminnm-second@test.dev", "team-test-password");
+  const join = await exports.default.fetch(`http://localhost/api/v1/teams/${teamId}/members`, {
+    method: "POST",
+    headers: { cookie: second.cookie, "content-type": "application/json" },
+    body: JSON.stringify({}),
+  });
+  expect(join.status).toBe(200);
+
   const setRole = await exports.default.fetch(
-    `http://localhost/api/v1/admin/teams/${teamId}/members/${ownerRow!.userId}/roles`,
+    `http://localhost/api/v1/admin/teams/${teamId}/members/${second.id}/roles`,
     {
       method: "PUT",
       headers: { cookie: adminCookie, "content-type": "application/json" },
-      body: JSON.stringify({ roles: ["team_user"] }),
+      body: JSON.stringify({ roles: ["team_admin", "team_user"] }),
     },
   );
   expect(setRole.status).toBe(200);
+
+  const after = await exports.default.fetch(
+    `http://localhost/api/v1/admin/teams/${teamId}/members`,
+    { headers: { cookie: adminCookie } },
+  );
+  const afterBody = (await after.json()) as {
+    members: { userId: string; roles: string }[];
+  };
+  const secondRow = afterBody.members.find((m) => m.userId === second.id);
+  expect(secondRow!.roles).toBe("team_admin team_user");
+  const ownerAfter = afterBody.members.find((m) => m.userId === owner.id);
+  expect(ownerAfter!.roles).toBe("team_admin");
 
   const nonAdmin = await signup("adminnm-non@test.dev", "team-test-password");
   const forbidden = await exports.default.fetch(
@@ -284,4 +304,48 @@ test("system admin can manage any team without membership", async () => {
     { headers: { cookie: nonAdmin.cookie } },
   );
   expect(forbidden.status).toBe(403);
+});
+
+test("admin roles endpoint protects the last team_admin and rejects non-members", async () => {
+  const owner = await signup("adminlast-owner@test.dev", "team-test-password");
+  const create = await exports.default.fetch("http://localhost/api/v1/teams", {
+    method: "POST",
+    headers: { cookie: owner.cookie, "content-type": "application/json" },
+    body: JSON.stringify({ name: "adminlastteam", displayName: "Admin Last", type: "open" }),
+  });
+  const { id: teamId } = (await create.json()) as { id: string };
+
+  const admin = await signup("adminlast-admin@test.dev", "team-test-password");
+  const adminCookie = await makeAdmin(admin.cookie, admin.id);
+
+  const members = await exports.default.fetch(
+    `http://localhost/api/v1/admin/teams/${teamId}/members`,
+    { headers: { cookie: adminCookie } },
+  );
+  expect(members.status).toBe(200);
+  const body = (await members.json()) as {
+    members: { userId: string; roles: string }[];
+  };
+  const ownerRow = body.members.find((m) => m.roles.includes("team_admin"));
+  expect(ownerRow).toBeTruthy();
+
+  const demote = await exports.default.fetch(
+    `http://localhost/api/v1/admin/teams/${teamId}/members/${ownerRow!.userId}/roles`,
+    {
+      method: "PUT",
+      headers: { cookie: adminCookie, "content-type": "application/json" },
+      body: JSON.stringify({ roles: ["team_user"] }),
+    },
+  );
+  expect(demote.status).toBe(409);
+
+  const missing = await exports.default.fetch(
+    `http://localhost/api/v1/admin/teams/${teamId}/members/no-such-user/roles`,
+    {
+      method: "PUT",
+      headers: { cookie: adminCookie, "content-type": "application/json" },
+      body: JSON.stringify({ roles: ["team_user"] }),
+    },
+  );
+  expect(missing.status).toBe(404);
 });

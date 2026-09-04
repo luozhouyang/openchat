@@ -15,12 +15,18 @@ interface SidebarProps {
 export function Sidebar({ title, channels, directs, teamId }: SidebarProps) {
   const entries = useSidebarStore((s) => s.entries);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
   async function leaveTeam(teamId: string, navigate: ReturnType<typeof useNavigate>) {
-    await api.teams.leave(teamId);
-    setMenuOpen(false);
-    await navigate({ to: "/dm" });
+    setError(null);
+    try {
+      await api.teams.leave(teamId);
+      setMenuOpen(false);
+      await navigate({ to: "/dm" });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "退出失败");
+    }
   }
 
   return (
@@ -31,7 +37,10 @@ export function Sidebar({ title, channels, directs, teamId }: SidebarProps) {
           {teamId && (
             <button
               type="button"
-              onClick={() => setMenuOpen((v) => !v)}
+              onClick={() => {
+                setError(null);
+                setMenuOpen((v) => !v);
+              }}
               className="rounded px-1.5 text-zinc-500 hover:bg-zinc-200"
               aria-label="团队菜单"
             >
@@ -51,6 +60,7 @@ export function Sidebar({ title, channels, directs, teamId }: SidebarProps) {
             <Link to="/teams/new" className="block px-3 py-1.5 text-sm hover:bg-zinc-100">
               加入团队
             </Link>
+            {error && <p className="px-3 py-1.5 text-sm text-red-600">{error}</p>}
             <button
               type="button"
               onClick={() => void leaveTeam(teamId, navigate)}

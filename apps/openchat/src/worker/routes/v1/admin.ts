@@ -15,6 +15,7 @@ import type { SessionContext } from "../../auth/session.ts";
 import { getDb } from "../../db/client.ts";
 import { users, teams, channels, teamMembers, channelMembers } from "../../db/schema-d1.ts";
 import { listChannelsForTeam, listChannelMemberIds } from "../../db/repos/channels.ts";
+import { getTeamMember, countTeamAdmins } from "../../db/repos/teams.ts";
 import { removeChannelMemberFromDo, syncUserChannels } from "../../user-do-sync.ts";
 import { auditLog } from "../../audit.ts";
 import { zodValidator } from "../../lib/validation.ts";
@@ -150,9 +151,19 @@ adminV1.put("/teams/:teamId/members/:userId/roles", zodValidator("json", RolesIn
   const db = getDb(c.env.DB);
   const teamId = c.req.param("teamId");
   const userId = c.req.param("userId");
+  const member = await getTeamMember(db, teamId, userId);
+  if (!member) throw apiError("not found", "not found", 404);
+  const roles = body.roles;
+  if (
+    member.roles.split(" ").includes("team_admin") &&
+    !roles.includes("team_admin") &&
+    (await countTeamAdmins(db, teamId)) <= 1
+  ) {
+    throw apiError("transfer_admin_first", "transfer admin first", 409);
+  }
   await db
     .update(teamMembers)
-    .set({ roles: body.roles.join(" ") })
+    .set({ roles: roles.join(" ") })
     .where(and(eq(teamMembers.teamId, teamId), eq(teamMembers.userId, userId)));
   await syncUserChannels(c.env, userId);
   return c.json({ ok: true });
