@@ -1,3 +1,4 @@
+import { z } from "zod";
 import type { MessageType } from "./enums.ts";
 
 export type PresenceStatus = "online" | "away" | "offline";
@@ -31,3 +32,37 @@ export function messageNewEvent(
 ): { type: "message.new"; channelId: string; event: ChannelEvent } {
   return { type: "message.new", channelId, event: { type: "message.new", message } };
 }
+
+export const messageSchema = z.object({
+  id: z.string(),
+  seq: z.number(),
+  userId: z.string(),
+  parentId: z.string().nullable(),
+  type: z.string(),
+  content: z.string(),
+  attachments: z.array(z.unknown()).nullable(),
+  mentions: z.array(z.string()).nullable(),
+  editedAt: z.number().nullable(),
+  deletedAt: z.number().nullable(),
+  createdAt: z.number(),
+});
+
+export const channelEventSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("message.new"), message: messageSchema }),
+  z.object({
+    type: z.literal("message.edit"),
+    messageId: z.string(),
+    content: z.string(),
+    editedAt: z.number(),
+  }),
+  z.object({ type: z.literal("message.delete"), messageId: z.string() }),
+  z.object({ type: z.literal("typing"), userId: z.string(), expiresAt: z.number() }),
+  z.object({ type: z.literal("typing.start"), userId: z.string(), expiresAt: z.number() }),
+  z.object({
+    type: z.literal("reaction.update"),
+    messageSeq: z.number(),
+    reactions: z.record(z.string(), z.array(z.string())),
+  }),
+  z.object({ type: z.literal("thread.reply"), parentId: z.string(), message: messageSchema }),
+]);
+export type ChannelEventParsed = z.infer<typeof channelEventSchema>;

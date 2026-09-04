@@ -1,4 +1,4 @@
-import type { ChannelEvent, Message, ServerEvent } from "protocol";
+import type { Message, ServerEvent } from "protocol";
 import type { LocalDatabase } from "../db/database.ts";
 import { useMessageStore } from "../stores/messages.ts";
 import { useSidebarStore } from "../stores/sidebar.ts";
@@ -35,7 +35,7 @@ export function createDispatcher(deps: DispatcherDeps) {
     }
     switch (ev.type) {
       case "channel.event": {
-        const inner = ev.event as ChannelEvent;
+        const inner = ev.event;
         if (inner.type === "message.new") {
           const message = inner.message as Message;
           useMessageStore.getState().ingest(ev.channelId, message);
@@ -48,7 +48,7 @@ export function createDispatcher(deps: DispatcherDeps) {
             .catch(() => {});
           deps.onMessageNew?.(ev.channelId, message);
         } else if (inner.type === "thread.reply") {
-          const message = (inner as unknown as { message: Message }).message;
+          const message = inner.message as Message;
           useMessageStore.getState().ingestThread(ev.channelId, message);
           void deps
             .getDb()
@@ -72,8 +72,7 @@ export function createDispatcher(deps: DispatcherDeps) {
             .then((db) => db.messages.remove(ev.channelId, inner.messageId))
             .catch(() => {});
         } else if (inner.type === "reaction.update") {
-          const e = inner as unknown as { messageSeq: number; reactions: Record<string, string[]> };
-          useMessageStore.getState().setReactions(ev.channelId, e.messageSeq, e.reactions);
+          useMessageStore.getState().setReactions(ev.channelId, inner.messageSeq, inner.reactions);
         } else if (inner.type === "typing.start") {
           useTypingStore.getState().mark(ev.channelId, inner.userId, inner.expiresAt);
         }
@@ -101,13 +100,13 @@ export function createDispatcher(deps: DispatcherDeps) {
         }
         deps.onLocal?.(ev);
         break;
-      case "sync.result":
-        useMessageStore.getState().applySync(ev.channelId, ev.messages);
-        void deps
-          .getDb()
-          .then((db) => db.messages.applyGap(ev.channelId, ev.messages.map(normalize)));
+      case "sync.result": {
+        const messages = ev.messages as Message[];
+        useMessageStore.getState().applySync(ev.channelId, messages);
+        void deps.getDb().then((db) => db.messages.applyGap(ev.channelId, messages.map(normalize)));
         deps.onLocal?.(ev);
         break;
+      }
       case "sync.gap":
         deps.onSyncGap?.(ev.channelId);
         deps.onLocal?.(ev);

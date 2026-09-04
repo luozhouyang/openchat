@@ -1,5 +1,7 @@
 import { z } from "zod";
-import type { Message } from "./events.ts";
+import { TeamTypeSchema } from "./enums.ts";
+import { channelEventSchema, messageSchema } from "./events.ts";
+import { ChannelSummary } from "./rest.ts";
 
 const clientFrameSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("echo"), data: z.string().max(4096) }),
@@ -35,27 +37,101 @@ const clientFrameSchema = z.discriminatedUnion("type", [
 
 export type ClientFrame = z.infer<typeof clientFrameSchema>;
 
-export type ServerEvent =
-  | { type: "hello"; userId: string; serverTime: number }
-  | { type: "channel.event"; channelId: string; event: unknown }
-  | { type: "ack"; clientToken: string; channelId: string; messageId: string; seq: number }
-  | { type: "error"; clientToken?: string; channelId?: string; code: string; message: string }
-  | { type: "sync.result"; channelId: string; messages: Message[] }
-  | { type: "sync.gap"; channelId: string }
-  | {
-      type: "sidebar.update";
-      channelId: string;
-      unread: number;
-      mentions: number;
-      lastMessage: { preview: string; userId: string; at: number };
-    }
-  | { type: "channel.read"; channelId: string; lastReadSeq: number }
-  | {
-      /** Structure changed (channel/team created or archived, membership changed):
-       * clients refetch workspaces + sidebar instead of polling on navigation. */
-      type: "structure.update";
-      scope: "channels" | "teams";
-    };
+export const channelCreatedEvent = z.object({
+  type: z.literal("channel.created"),
+  channel: ChannelSummary,
+});
+export const channelUpdatedEvent = z.object({
+  type: z.literal("channel.updated"),
+  channel: ChannelSummary,
+});
+export const channelDeletedEvent = z.object({
+  type: z.literal("channel.deleted"),
+  channelId: z.string().min(1),
+});
+export const channelMemberAddedEvent = z.object({
+  type: z.literal("channel.member_added"),
+  channelId: z.string().min(1),
+  userId: z.string().min(1),
+  roles: z.string(),
+});
+export const channelMemberRemovedEvent = z.object({
+  type: z.literal("channel.member_removed"),
+  channelId: z.string().min(1),
+  userId: z.string().min(1),
+});
+export const TeamUpdatePayload = z.object({
+  id: z.string().min(1),
+  name: z.string(),
+  displayName: z.string(),
+  type: TeamTypeSchema,
+  archivedAt: z.number().nullable(),
+});
+export const teamUpdatedEvent = z.object({
+  type: z.literal("team.updated"),
+  team: TeamUpdatePayload,
+});
+export const teamMemberAddedEvent = z.object({
+  type: z.literal("team.member_added"),
+  team: TeamUpdatePayload.extend({ roles: z.string() }),
+  userId: z.string().min(1),
+});
+export const teamMemberRemovedEvent = z.object({
+  type: z.literal("team.member_removed"),
+  teamId: z.string().min(1),
+  userId: z.string().min(1),
+});
+export type ChannelCreatedEvent = z.infer<typeof channelCreatedEvent>;
+export type ChannelUpdatedEvent = z.infer<typeof channelUpdatedEvent>;
+export type ChannelDeletedEvent = z.infer<typeof channelDeletedEvent>;
+export type ChannelMemberAddedEvent = z.infer<typeof channelMemberAddedEvent>;
+export type ChannelMemberRemovedEvent = z.infer<typeof channelMemberRemovedEvent>;
+export type TeamUpdatedEvent = z.infer<typeof teamUpdatedEvent>;
+export type TeamMemberAddedEvent = z.infer<typeof teamMemberAddedEvent>;
+export type TeamMemberRemovedEvent = z.infer<typeof teamMemberRemovedEvent>;
+
+export const serverEventSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("hello"), userId: z.string(), serverTime: z.number() }),
+  z.object({ type: z.literal("channel.event"), channelId: z.string(), event: channelEventSchema }),
+  z.object({
+    type: z.literal("ack"),
+    clientToken: z.string(),
+    channelId: z.string(),
+    messageId: z.string(),
+    seq: z.number(),
+  }),
+  z.object({
+    type: z.literal("error"),
+    clientToken: z.string().optional(),
+    channelId: z.string().optional(),
+    code: z.string(),
+    message: z.string(),
+  }),
+  z.object({
+    type: z.literal("sync.result"),
+    channelId: z.string(),
+    messages: z.array(messageSchema),
+  }),
+  z.object({ type: z.literal("sync.gap"), channelId: z.string() }),
+  z.object({
+    type: z.literal("sidebar.update"),
+    channelId: z.string(),
+    unread: z.number(),
+    mentions: z.number(),
+    lastMessage: z.object({ preview: z.string(), userId: z.string(), at: z.number() }),
+  }),
+  z.object({ type: z.literal("channel.read"), channelId: z.string(), lastReadSeq: z.number() }),
+  z.object({ type: z.literal("structure.update"), scope: z.enum(["channels", "teams"]) }),
+  channelCreatedEvent,
+  channelUpdatedEvent,
+  channelDeletedEvent,
+  channelMemberAddedEvent,
+  channelMemberRemovedEvent,
+  teamUpdatedEvent,
+  teamMemberAddedEvent,
+  teamMemberRemovedEvent,
+]);
+export type ServerEvent = z.infer<typeof serverEventSchema>;
 
 export function parseClientFrame(raw: string): ClientFrame | null {
   try {
