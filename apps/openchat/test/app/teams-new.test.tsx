@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider, createRouter, createMemoryHistory } from "@tanstack/react-router";
 import { routeTree } from "@/routeTree.gen";
 import { api } from "@/lib/api";
+import "@/i18n";
 
 vi.mock("@/app-client", () => ({
   appClient: { auth: { hasSession: async () => true } },
@@ -35,23 +36,36 @@ function renderAt(path: string) {
 }
 
 describe("/teams/new", () => {
-  it("shows create and join tabs when permitted", async () => {
+  it("opens a dialog with create and join tabs when permitted, defaulting to create", async () => {
     (api.me as ReturnType<typeof vi.fn>).mockResolvedValue({
       user: { id: "u1", email: "a@b.c", permissions: ["create_team"] },
     });
     renderAt("/teams/new");
-    expect(await screen.findByText("创建团队")).toBeInTheDocument();
-    expect(screen.getByText("加入团队")).toBeInTheDocument();
-    expect(await screen.findByText("标识（小写字母数字）")).toBeInTheDocument();
-    expect(screen.queryByLabelText("邀请码")).not.toBeInTheDocument();
+    expect(await screen.findByText("Create team")).toBeInTheDocument();
+    expect(screen.getByText("Join team")).toBeInTheDocument();
+    expect(screen.getByLabelText("Identifier (lowercase letters and digits)")).toBeInTheDocument();
   });
 
-  it("hides the create tab without create_team permission", async () => {
+  it("hides the create tab and defaults to join without create_team", async () => {
     (api.me as ReturnType<typeof vi.fn>).mockResolvedValue({
       user: { id: "u1", email: "a@b.c", permissions: [] },
     });
     renderAt("/teams/new");
-    await screen.findByText("加入团队");
-    expect(screen.queryByText("创建团队")).not.toBeInTheDocument();
+    await screen.findByText("Join team");
+    expect(screen.queryByText("Create team")).not.toBeInTheDocument();
+    expect(
+      screen.queryByLabelText("Identifier (lowercase letters and digits)"),
+    ).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Invite code")).toBeInTheDocument();
+  });
+
+  it("switches team type with the shadcn select", async () => {
+    (api.me as ReturnType<typeof vi.fn>).mockResolvedValue({
+      user: { id: "u1", email: "a@b.c", permissions: ["create_team"] },
+    });
+    renderAt("/teams/new");
+    await screen.findByLabelText("Identifier (lowercase letters and digits)");
+    const trigger = screen.getByRole("combobox");
+    expect(trigger).toHaveTextContent("Open (anyone can join)");
   });
 });
