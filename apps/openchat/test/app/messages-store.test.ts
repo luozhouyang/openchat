@@ -1,10 +1,10 @@
 import { expect, test } from "vite-plus/test";
 // The full store semantics suite lives in packages/state (canonical shared
 // layer); here we only pin the re-export wiring the web app relies on.
-import { useMessageStore } from "../../src/react-app/stores/messages";
-import { useConnectionStore } from "../../src/react-app/stores/connection";
-import { useSidebarStore } from "../../src/react-app/stores/sidebar";
-import { useTypingStore } from "../../src/react-app/stores/typing";
+import { useMessageStore } from "@/stores/messages";
+import { useConnectionStore } from "@/stores/connection";
+import { useSidebarStore } from "@/stores/sidebar";
+import { useTypingStore } from "@/stores/typing";
 
 const msg = (seq: number) => ({
   id: `m${seq}`,

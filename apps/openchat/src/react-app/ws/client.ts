@@ -1,6 +1,6 @@
 import type { ClientFrame } from "protocol";
-import { appClient } from "../app-client";
-import { platform } from "../lib/platform";
+import { appClient } from "@/app-client";
+import { platform } from "@/lib/platform";
 
 /**
  * Thin web wrapper over the shared realtime connection (P12-D): everything

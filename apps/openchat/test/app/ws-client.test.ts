@@ -3,8 +3,8 @@
 // window.location at module init; jsdom keeps that working under the root
 // aggregate runner too (the web package config already sets jsdom).
 import { expect, test } from "vite-plus/test";
-import { useConnectionStore } from "../../src/react-app/stores/connection";
-import { useSidebarStore } from "../../src/react-app/stores/sidebar";
+import { useConnectionStore } from "@/stores/connection";
+import { useSidebarStore } from "@/stores/sidebar";
 
 test("connection store transitions", () => {
   useConnectionStore.getState().set("open");
@@ -12,7 +12,7 @@ test("connection store transitions", () => {
 });
 
 test("platform instance resolves urls and the adapter surface", async () => {
-  const { platform } = await import("../../src/react-app/lib/platform");
+  const { platform } = await import("@/lib/platform");
   expect(platform.platform).toBe("web");
   expect(platform.wsUrl).toMatch(/^wss?:\/\/.*\/ws$/);
   expect(typeof platform.openLocalDatabase).toBe("function");

@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
-import { setLanguage } from "../../i18n";
-import { Button } from "../ui/button";
+import { setLanguage } from "@/i18n";
+import { Button } from "@/components/ui/button";
 
 export function LanguageSwitcher() {
   const { i18n } = useTranslation();

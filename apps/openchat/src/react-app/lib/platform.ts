@@ -1,6 +1,6 @@
 import type { PlatformAdapter } from "platform";
-import { createDesktopFilePlatform } from "../platform/desktop-file";
-import { createWebPlatform } from "../platform/web";
+import { createDesktopFilePlatform } from "@/platform/desktop-file";
+import { createWebPlatform } from "@/platform/web";
 import { desktopBridge } from "./desktop-bridge";
 import { desktopFileMode, desktopServerUrl } from "./desktop-mode";
 

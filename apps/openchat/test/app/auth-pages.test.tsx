@@ -7,11 +7,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test"
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider, createRouter } from "@tanstack/react-router";
-import { routeTree } from "../../src/react-app/routeTree.gen";
-import { setLanguage } from "../../src/react-app/i18n";
-import * as authClientMod from "../../src/react-app/lib/auth-client";
+import { routeTree } from "@/routeTree.gen";
+import { setLanguage } from "@/i18n";
+import * as authClientMod from "@/lib/auth-client";
 
-vi.mock("../../src/react-app/lib/auth-client", () => ({
+vi.mock("@/lib/auth-client", () => ({
   authClient: {
     signIn: { email: vi.fn() },
     signUp: { email: vi.fn() },

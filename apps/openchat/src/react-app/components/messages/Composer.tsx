@@ -1,8 +1,8 @@
 import { useRef, useState } from "react";
-import { appClient } from "../../app-client";
-import { wsClient } from "../../ws/client";
-import { Button } from "../ui/button";
-import { UploadButton } from "../upload/UploadButton";
+import { appClient } from "@/app-client";
+import { wsClient } from "@/ws/client";
+import { Button } from "@/components/ui/button";
+import { UploadButton } from "@/components/upload/UploadButton";
 
 export function Composer({ channelId }: { channelId: string }) {
   const [text, setText] = useState("");

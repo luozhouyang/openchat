@@ -1,14 +1,14 @@
 import { createFileRoute, Outlet } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect } from "react";
-import { appClient } from "../../app-client";
-import { api } from "../../lib/api";
-import { wsClient } from "../../ws/client";
-import { useMessageStore } from "../../stores/messages";
-import { useSidebarStore } from "../../stores/sidebar";
-import { MessageList } from "../../components/messages/MessageList";
-import { Composer } from "../../components/messages/Composer";
-import { TypingIndicator } from "../../components/messages/TypingIndicator";
+import { appClient } from "@/app-client";
+import { api } from "@/lib/api";
+import { wsClient } from "@/ws/client";
+import { useMessageStore } from "@/stores/messages";
+import { useSidebarStore } from "@/stores/sidebar";
+import { MessageList } from "@/components/messages/MessageList";
+import { Composer } from "@/components/messages/Composer";
+import { TypingIndicator } from "@/components/messages/TypingIndicator";
 
 export const Route = createFileRoute("/$teamId/c/$channelId")({
   component: ChannelView,

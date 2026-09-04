@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { createRootRoute, Outlet, redirect, useRouterState } from "@tanstack/react-router";
-import { appClient } from "../app-client";
-import { wsClient } from "../ws/client";
+import { appClient } from "@/app-client";
+import { wsClient } from "@/ws/client";
 
 const PUBLIC_PATHS = ["/auth/login", "/auth/signup", "/auth/check-email", "/auth/verify-email"];
 

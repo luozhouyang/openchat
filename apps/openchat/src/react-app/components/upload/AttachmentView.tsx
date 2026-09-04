@@ -1,4 +1,4 @@
-import type { StoreMessage } from "../../stores/messages";
+import type { StoreMessage } from "@/stores/messages";
 
 export function AttachmentView({
   message,

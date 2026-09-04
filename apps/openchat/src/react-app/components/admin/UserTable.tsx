@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { authClient } from "../../lib/auth-client";
-import { Button } from "../ui/button";
+import { authClient } from "@/lib/auth-client";
+import { Button } from "@/components/ui/button";
 
 export function UserTable() {
   const qc = useQueryClient();

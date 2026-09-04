@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { api } from "../lib/api";
-import { Button } from "../components/ui/button";
+import { api } from "@/lib/api";
+import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/settings")({
   component: SettingsPage,

@@ -8,11 +8,11 @@ import { render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider, createRouter } from "@tanstack/react-router";
 import { createMemoryDatabase } from "state";
-import { routeTree } from "../../src/react-app/routeTree.gen";
-import { hydrateChannel } from "../../src/react-app/lib/message-db";
-import { useMessageStore } from "../../src/react-app/stores/messages";
+import { routeTree } from "@/routeTree.gen";
+import { hydrateChannel } from "@/lib/message-db";
+import { useMessageStore } from "@/stores/messages";
 
-vi.mock("../../src/react-app/lib/auth-client", () => ({
+vi.mock("@/lib/auth-client", () => ({
   authClient: {
     getSession: vi.fn().mockResolvedValue({
       data: { user: { id: "u1", email: "a@b.c" }, session: { id: "s1" } },

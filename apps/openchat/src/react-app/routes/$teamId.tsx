@@ -1,10 +1,10 @@
 import { createFileRoute, Outlet, redirect, useRouter } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
-import { api } from "../lib/api";
+import { api } from "@/lib/api";
 import { useSidebarStore, useStructureStore } from "state";
-import { TeamRail } from "../components/workspace/TeamRail";
-import { Sidebar } from "../components/workspace/Sidebar";
+import { TeamRail } from "@/components/workspace/TeamRail";
+import { Sidebar } from "@/components/workspace/Sidebar";
 
 export const Route = createFileRoute("/$teamId")({
   component: WorkspaceLayout,

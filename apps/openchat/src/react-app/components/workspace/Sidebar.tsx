@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import type { ChannelSummary } from "protocol";
-import { useSidebarStore } from "../../stores/sidebar";
-import { Badge } from "../ui/badge";
+import { useSidebarStore } from "@/stores/sidebar";
+import { Badge } from "@/components/ui/badge";
 
 interface Team {
   id: string;

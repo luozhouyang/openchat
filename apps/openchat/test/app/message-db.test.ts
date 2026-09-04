@@ -2,8 +2,8 @@
 // Imports lib/platform (→ auth-client) which reads window.location at init.
 import { expect, test } from "vite-plus/test";
 import { createMemoryDatabase } from "state";
-import { getMessageDB, hydrateChannel, persistMessage } from "../../src/react-app/lib/message-db";
-import { useMessageStore } from "../../src/react-app/stores/messages";
+import { getMessageDB, hydrateChannel, persistMessage } from "@/lib/message-db";
+import { useMessageStore } from "@/stores/messages";
 
 const msg = {
   id: "m1",

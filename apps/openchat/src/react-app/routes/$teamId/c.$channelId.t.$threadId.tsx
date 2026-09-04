@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { ThreadPanel } from "../../components/messages/ThreadPanel";
+import { ThreadPanel } from "@/components/messages/ThreadPanel";
 
 export const Route = createFileRoute("/$teamId/c/$channelId/t/$threadId")({
   component: ThreadView,

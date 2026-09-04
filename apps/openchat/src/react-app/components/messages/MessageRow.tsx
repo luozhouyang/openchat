@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { Link, useParams } from "@tanstack/react-router";
-import { wsClient } from "../../ws/client";
-import { api } from "../../lib/api";
+import { wsClient } from "@/ws/client";
+import { api } from "@/lib/api";
 import { ReactionBar } from "./ReactionBar";
-import { AttachmentView } from "../upload/AttachmentView";
-import type { StoreMessage } from "../../stores/messages";
+import { AttachmentView } from "@/components/upload/AttachmentView";
+import type { StoreMessage } from "@/stores/messages";
 
 export function MessageRow({ message, channelId }: { message: StoreMessage; channelId: string }) {
   const { teamId } = useParams({ strict: false }) as { teamId?: string };

@@ -3,8 +3,8 @@
 // browser and desktop-file adapters against the shared contract.
 import { expect, test, vi } from "vite-plus/test";
 import { deriveWsUrl, type DesktopBridge } from "platform";
-import { createWebPlatform, LocalStorageAdapter } from "../../src/react-app/platform/web";
-import { createDesktopFilePlatform } from "../../src/react-app/platform/desktop-file";
+import { createWebPlatform, LocalStorageAdapter } from "@/platform/web";
+import { createDesktopFilePlatform } from "@/platform/desktop-file";
 
 function mockBridge(overrides: Partial<DesktopBridge> = {}): DesktopBridge {
   return {

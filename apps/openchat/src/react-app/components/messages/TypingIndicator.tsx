@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useTypingStore } from "../../stores/typing";
+import { useTypingStore } from "@/stores/typing";
 
 export function TypingIndicator({ channelId }: { channelId: string }) {
   const [, force] = useState(0);

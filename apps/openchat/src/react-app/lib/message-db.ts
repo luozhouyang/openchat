@@ -1,6 +1,6 @@
 import type { Message } from "protocol";
 import type { LocalDatabase } from "state";
-import { useMessageStore } from "../stores/messages";
+import { useMessageStore } from "@/stores/messages";
 import { platform } from "./platform";
 
 type MessageLike = Omit<Message, "attachments"> & { attachments?: unknown[] | null };

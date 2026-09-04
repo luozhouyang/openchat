@@ -1,10 +1,10 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 
-import { UserTable } from "../components/admin/UserTable";
-import { StatsCards } from "../components/admin/StatsCards";
-import { StructurePanel } from "../components/admin/StructurePanel";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
-import { authClient } from "../lib/auth-client";
+import { UserTable } from "@/components/admin/UserTable";
+import { StatsCards } from "@/components/admin/StatsCards";
+import { StructurePanel } from "@/components/admin/StructurePanel";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { authClient } from "@/lib/auth-client";
 
 export const Route = createFileRoute("/admin")({
   component: AdminPage,

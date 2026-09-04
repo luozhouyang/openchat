@@ -1,8 +1,8 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useCallback, useEffect, useRef } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { appClient } from "../../app-client";
-import { useMessageStore } from "../../stores/messages";
+import { appClient } from "@/app-client";
+import { useMessageStore } from "@/stores/messages";
 import { MessageRow } from "./MessageRow";
 
 export function MessageList({ channelId }: { channelId: string }) {

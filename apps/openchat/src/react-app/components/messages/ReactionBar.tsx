@@ -1,4 +1,4 @@
-import { wsClient } from "../../ws/client";
+import { wsClient } from "@/ws/client";
 
 export function ReactionBar({
   channelId,

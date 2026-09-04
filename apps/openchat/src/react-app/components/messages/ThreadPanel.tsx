@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useShallow } from "zustand/react/shallow";
-import { api } from "../../lib/api";
-import { useMessageStore } from "../../stores/messages";
-import { wsClient } from "../../ws/client";
+import { api } from "@/lib/api";
+import { useMessageStore } from "@/stores/messages";
+import { wsClient } from "@/ws/client";
 import type { ClientFrame } from "protocol";
 
 export function ThreadPanel({ channelId, parentId }: { channelId: string; parentId: string }) {

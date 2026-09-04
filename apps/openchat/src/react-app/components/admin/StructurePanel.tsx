@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { api } from "../../lib/api";
-import { Button } from "../ui/button";
+import { api } from "@/lib/api";
+import { Button } from "@/components/ui/button";
 
 export function StructurePanel() {
   const workspaces = useQuery({
