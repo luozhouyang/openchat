@@ -1,36 +1,70 @@
 // @vitest-environment jsdom
-// Component test (DOM rendering via @testing-library/react); declares jsdom
-// and pulls in the jest-dom matchers itself so it also works under the root
-// aggregate runner (which does not load the web package's setup file).
+// Routing tests for the workspace-less landing: an authenticated user without
+// teams is routed to /dm, with teams to the first team. Network is stubbed.
 import "@testing-library/jest-dom/vitest";
 import { describe, expect, it, vi } from "vite-plus/test";
 import { render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { RouterProvider, createRouter } from "@tanstack/react-router";
+import { RouterProvider, createRouter, createMemoryHistory } from "@tanstack/react-router";
 import { createMemoryDatabase } from "state";
 import { routeTree } from "@/routeTree.gen";
 import { hydrateChannel } from "@/lib/message-db";
 import { useMessageStore } from "@/stores/messages";
+import { api } from "@/lib/api";
 
-vi.mock("@/lib/auth-client", () => ({
-  authClient: {
-    getSession: vi.fn().mockResolvedValue({
-      data: { user: { id: "u1", email: "a@b.c" }, session: { id: "s1" } },
-      error: null,
-    }),
+vi.mock("@/app-client", () => ({
+  appClient: { auth: { hasSession: async () => true } },
+}));
+
+vi.mock("@/ws/client", () => ({
+  wsClient: { ensureConnected: async () => {}, sendActivity: () => {}, send: () => {} },
+}));
+
+vi.mock("@/lib/api", () => ({
+  api: {
+    workspaces: vi.fn(),
+    sidebar: async () => ({ channels: [] }),
   },
 }));
 
-const router = createRouter({ routeTree });
+function renderApp() {
+  const router = createRouter({
+    routeTree,
+    history: createMemoryHistory({ initialEntries: ["/"] }),
+  });
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  );
+}
 
-describe("app", () => {
-  it("redirects an authenticated user without workspaces to login", async () => {
-    render(
-      <QueryClientProvider client={new QueryClient()}>
-        <RouterProvider router={router} />
-      </QueryClientProvider>,
-    );
-    expect(await screen.findByText("Sign in to openchat")).toBeInTheDocument();
+describe("root redirect", () => {
+  it("routes a teamless authenticated user to /dm and shows the empty state", async () => {
+    (api.workspaces as ReturnType<typeof vi.fn>).mockResolvedValue({ teams: [], directs: [] });
+    renderApp();
+    expect(
+      await screen.findByText("还没有会话。加入团队或发起私信后即可开始聊天。"),
+    ).toBeInTheDocument();
+  });
+
+  it("routes to the first team when the user has teams", async () => {
+    (api.workspaces as ReturnType<typeof vi.fn>).mockResolvedValue({
+      teams: [
+        {
+          id: "t1",
+          name: "t1",
+          displayName: "T1",
+          type: "open",
+          roles: "team_admin",
+          archivedAt: null,
+          channels: [],
+        },
+      ],
+      directs: [],
+    });
+    renderApp();
+    expect(await screen.findByText("尚未加入任何频道")).toBeInTheDocument();
   });
 });
 

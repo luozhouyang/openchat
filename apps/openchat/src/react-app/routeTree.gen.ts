@@ -12,14 +12,16 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as TeamIdRouteImport } from './routes/$teamId'
 import { Route as AdminRouteImport } from './routes/admin'
+import { Route as DmRouteImport } from './routes/dm'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as TeamIdIndexRouteImport } from './routes/$teamId/index'
 import { Route as AuthCheckEmailRouteImport } from './routes/auth/check-email'
 import { Route as AuthLoginRouteImport } from './routes/auth/login'
 import { Route as AuthSignupRouteImport } from './routes/auth/signup'
 import { Route as AuthVerifyEmailRouteImport } from './routes/auth/verify-email'
+import { Route as DmIndexRouteImport } from './routes/dm/index'
+import { Route as DmChannelIdRouteImport } from './routes/dm/$channelId'
 import { Route as TeamIdCChannelIdRouteImport } from './routes/$teamId/c.$channelId'
-import { Route as TeamIdDmChannelIdRouteImport } from './routes/$teamId/dm.$channelId'
 import { Route as TeamIdCChannelIdTThreadIdRouteImport } from './routes/$teamId/c.$channelId.t.$threadId'
 
 const IndexRoute = IndexRouteImport.update({
@@ -35,6 +37,11 @@ const TeamIdRoute = TeamIdRouteImport.update({
 const AdminRoute = AdminRouteImport.update({
   id: '/admin',
   path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DmRoute = DmRouteImport.update({
+  id: '/dm',
+  path: '/dm',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsRoute = SettingsRouteImport.update({
@@ -67,14 +74,19 @@ const AuthVerifyEmailRoute = AuthVerifyEmailRouteImport.update({
   path: '/auth/verify-email',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DmIndexRoute = DmIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => DmRoute,
+} as any)
+const DmChannelIdRoute = DmChannelIdRouteImport.update({
+  id: '/$channelId',
+  path: '/$channelId',
+  getParentRoute: () => DmRoute,
+} as any)
 const TeamIdCChannelIdRoute = TeamIdCChannelIdRouteImport.update({
   id: '/c/$channelId',
   path: '/c/$channelId',
-  getParentRoute: () => TeamIdRoute,
-} as any)
-const TeamIdDmChannelIdRoute = TeamIdDmChannelIdRouteImport.update({
-  id: '/dm/$channelId',
-  path: '/dm/$channelId',
   getParentRoute: () => TeamIdRoute,
 } as any)
 const TeamIdCChannelIdTThreadIdRoute =
@@ -88,14 +100,16 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/$teamId': typeof TeamIdRouteWithChildren
   '/admin': typeof AdminRoute
+  '/dm': typeof DmRouteWithChildren
   '/settings': typeof SettingsRoute
   '/auth/check-email': typeof AuthCheckEmailRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/signup': typeof AuthSignupRoute
   '/auth/verify-email': typeof AuthVerifyEmailRoute
+  '/dm/$channelId': typeof DmChannelIdRoute
   '/$teamId/': typeof TeamIdIndexRoute
+  '/dm/': typeof DmIndexRoute
   '/$teamId/c/$channelId': typeof TeamIdCChannelIdRouteWithChildren
-  '/$teamId/dm/$channelId': typeof TeamIdDmChannelIdRoute
   '/$teamId/c/$channelId/t/$threadId': typeof TeamIdCChannelIdTThreadIdRoute
 }
 export interface FileRoutesByTo {
@@ -106,9 +120,10 @@ export interface FileRoutesByTo {
   '/auth/login': typeof AuthLoginRoute
   '/auth/signup': typeof AuthSignupRoute
   '/auth/verify-email': typeof AuthVerifyEmailRoute
+  '/dm/$channelId': typeof DmChannelIdRoute
   '/$teamId': typeof TeamIdIndexRoute
+  '/dm': typeof DmIndexRoute
   '/$teamId/c/$channelId': typeof TeamIdCChannelIdRouteWithChildren
-  '/$teamId/dm/$channelId': typeof TeamIdDmChannelIdRoute
   '/$teamId/c/$channelId/t/$threadId': typeof TeamIdCChannelIdTThreadIdRoute
 }
 export interface FileRoutesById {
@@ -116,14 +131,16 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/$teamId': typeof TeamIdRouteWithChildren
   '/admin': typeof AdminRoute
+  '/dm': typeof DmRouteWithChildren
   '/settings': typeof SettingsRoute
   '/auth/check-email': typeof AuthCheckEmailRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/signup': typeof AuthSignupRoute
   '/auth/verify-email': typeof AuthVerifyEmailRoute
+  '/dm/$channelId': typeof DmChannelIdRoute
   '/$teamId/': typeof TeamIdIndexRoute
+  '/dm/': typeof DmIndexRoute
   '/$teamId/c/$channelId': typeof TeamIdCChannelIdRouteWithChildren
-  '/$teamId/dm/$channelId': typeof TeamIdDmChannelIdRoute
   '/$teamId/c/$channelId/t/$threadId': typeof TeamIdCChannelIdTThreadIdRoute
 }
 export interface FileRouteTypes {
@@ -132,14 +149,16 @@ export interface FileRouteTypes {
     | '/'
     | '/$teamId'
     | '/admin'
+    | '/dm'
     | '/settings'
     | '/auth/check-email'
     | '/auth/login'
     | '/auth/signup'
     | '/auth/verify-email'
+    | '/dm/$channelId'
     | '/$teamId/'
+    | '/dm/'
     | '/$teamId/c/$channelId'
-    | '/$teamId/dm/$channelId'
     | '/$teamId/c/$channelId/t/$threadId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -150,23 +169,26 @@ export interface FileRouteTypes {
     | '/auth/login'
     | '/auth/signup'
     | '/auth/verify-email'
+    | '/dm/$channelId'
     | '/$teamId'
+    | '/dm'
     | '/$teamId/c/$channelId'
-    | '/$teamId/dm/$channelId'
     | '/$teamId/c/$channelId/t/$threadId'
   id:
     | '__root__'
     | '/'
     | '/$teamId'
     | '/admin'
+    | '/dm'
     | '/settings'
     | '/auth/check-email'
     | '/auth/login'
     | '/auth/signup'
     | '/auth/verify-email'
+    | '/dm/$channelId'
     | '/$teamId/'
+    | '/dm/'
     | '/$teamId/c/$channelId'
-    | '/$teamId/dm/$channelId'
     | '/$teamId/c/$channelId/t/$threadId'
   fileRoutesById: FileRoutesById
 }
@@ -174,6 +196,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   TeamIdRoute: typeof TeamIdRouteWithChildren
   AdminRoute: typeof AdminRoute
+  DmRoute: typeof DmRouteWithChildren
   SettingsRoute: typeof SettingsRoute
   AuthCheckEmailRoute: typeof AuthCheckEmailRoute
   AuthLoginRoute: typeof AuthLoginRoute
@@ -202,6 +225,13 @@ declare module '@tanstack/react-router' {
       path: '/admin'
       fullPath: '/admin'
       preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dm': {
+      id: '/dm'
+      path: '/dm'
+      fullPath: '/dm'
+      preLoaderRoute: typeof DmRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings': {
@@ -246,18 +276,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthVerifyEmailRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/dm/': {
+      id: '/dm/'
+      path: '/'
+      fullPath: '/dm/'
+      preLoaderRoute: typeof DmIndexRouteImport
+      parentRoute: typeof DmRoute
+    }
+    '/dm/$channelId': {
+      id: '/dm/$channelId'
+      path: '/$channelId'
+      fullPath: '/dm/$channelId'
+      preLoaderRoute: typeof DmChannelIdRouteImport
+      parentRoute: typeof DmRoute
+    }
     '/$teamId/c/$channelId': {
       id: '/$teamId/c/$channelId'
       path: '/c/$channelId'
       fullPath: '/$teamId/c/$channelId'
       preLoaderRoute: typeof TeamIdCChannelIdRouteImport
-      parentRoute: typeof TeamIdRoute
-    }
-    '/$teamId/dm/$channelId': {
-      id: '/$teamId/dm/$channelId'
-      path: '/dm/$channelId'
-      fullPath: '/$teamId/dm/$channelId'
-      preLoaderRoute: typeof TeamIdDmChannelIdRouteImport
       parentRoute: typeof TeamIdRoute
     }
     '/$teamId/c/$channelId/t/$threadId': {
@@ -284,22 +321,33 @@ const TeamIdCChannelIdRouteWithChildren =
 interface TeamIdRouteChildren {
   TeamIdIndexRoute: typeof TeamIdIndexRoute
   TeamIdCChannelIdRoute: typeof TeamIdCChannelIdRouteWithChildren
-  TeamIdDmChannelIdRoute: typeof TeamIdDmChannelIdRoute
 }
 
 const TeamIdRouteChildren: TeamIdRouteChildren = {
   TeamIdIndexRoute: TeamIdIndexRoute,
   TeamIdCChannelIdRoute: TeamIdCChannelIdRouteWithChildren,
-  TeamIdDmChannelIdRoute: TeamIdDmChannelIdRoute,
 }
 
 const TeamIdRouteWithChildren =
   TeamIdRoute._addFileChildren(TeamIdRouteChildren)
 
+interface DmRouteChildren {
+  DmChannelIdRoute: typeof DmChannelIdRoute
+  DmIndexRoute: typeof DmIndexRoute
+}
+
+const DmRouteChildren: DmRouteChildren = {
+  DmChannelIdRoute: DmChannelIdRoute,
+  DmIndexRoute: DmIndexRoute,
+}
+
+const DmRouteWithChildren = DmRoute._addFileChildren(DmRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   TeamIdRoute: TeamIdRouteWithChildren,
   AdminRoute: AdminRoute,
+  DmRoute: DmRouteWithChildren,
   SettingsRoute: SettingsRoute,
   AuthCheckEmailRoute: AuthCheckEmailRoute,
   AuthLoginRoute: AuthLoginRoute,

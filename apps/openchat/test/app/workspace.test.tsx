@@ -2,12 +2,7 @@
 import "@testing-library/jest-dom/vitest";
 import { describe, expect, it } from "vite-plus/test";
 import { render, screen } from "@testing-library/react";
-import {
-  createRootRoute,
-  createRoute,
-  createRouter,
-  RouterProvider,
-} from "@tanstack/react-router";
+import { createRootRoute, createRoute, createRouter, RouterProvider } from "@tanstack/react-router";
 import type { ChannelSummary } from "protocol";
 import { Sidebar } from "@/components/workspace/Sidebar";
 

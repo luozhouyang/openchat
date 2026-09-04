@@ -3,8 +3,10 @@ import { api } from "@/lib/api";
 
 export const Route = createFileRoute("/")({
   beforeLoad: async () => {
-    const workspaces = await api.workspaces().catch(() => null);
-    if (!workspaces || workspaces.teams.length === 0) throw redirect({ to: "/auth/login" });
-    throw redirect({ to: "/$teamId", params: { teamId: workspaces.teams[0].id } });
+    const workspaces = await api.workspaces().catch(() => ({ teams: [], directs: [] }));
+    if (workspaces.teams.length > 0) {
+      throw redirect({ to: "/$teamId", params: { teamId: workspaces.teams[0].id } });
+    }
+    throw redirect({ to: "/dm" });
   },
 });
