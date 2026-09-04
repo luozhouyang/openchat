@@ -30,6 +30,7 @@ import type {
   PushSubscribeInput,
   PutStatusInput,
   RoleOutput,
+  RolesListOutput,
   StatusIdsInput,
   StatusesOutput,
   StatusOutput,
@@ -139,6 +140,7 @@ export function createApi(opts: ApiFetchOptions = {}) {
     },
 
     roles: {
+      list: () => f<RolesListOutput>("/api/v1/roles"),
       listPermissions: () => f<PermissionsOutput>("/api/v1/permissions"),
       updatePermissions: (roleId: string, permissions: string[]) =>
         f<{ ok: true; role: RoleOutput }>(`/api/v1/roles/${roleId}`, json("PUT", { permissions })),

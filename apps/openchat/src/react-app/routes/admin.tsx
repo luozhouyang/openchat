@@ -3,6 +3,7 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 import { UserTable } from "@/components/admin/UserTable";
 import { StatsCards } from "@/components/admin/StatsCards";
 import { StructurePanel } from "@/components/admin/StructurePanel";
+import { RolesPanel } from "@/components/admin/RolesPanel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { authClient } from "@/lib/auth-client";
 
@@ -26,6 +27,7 @@ function AdminPage() {
           <TabsTrigger value="users">用户</TabsTrigger>
           <TabsTrigger value="structure">结构</TabsTrigger>
           <TabsTrigger value="stats">统计</TabsTrigger>
+          <TabsTrigger value="roles">角色</TabsTrigger>
         </TabsList>
         <TabsContent value="users">
           <UserTable />
@@ -35,6 +37,9 @@ function AdminPage() {
         </TabsContent>
         <TabsContent value="stats">
           <StatsCards />
+        </TabsContent>
+        <TabsContent value="roles">
+          <RolesPanel />
         </TabsContent>
       </Tabs>
     </div>
