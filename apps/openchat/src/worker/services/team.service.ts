@@ -100,3 +100,14 @@ export async function updateTeam(
     values.archivedAt = input.patch.archived ? Date.now() : null;
   await db.update(teams).set(values).where(eq(teams.id, input.teamId));
 }
+
+export async function joinByInvite(
+  db: Db,
+  input: { inviteCode: string; userId: string },
+): Promise<string> {
+  const rows = await db.select().from(teams).where(eq(teams.inviteCode, input.inviteCode)).limit(1);
+  const team = rows[0];
+  if (!team || team.type !== "invite") throw apiError("invalid_invite", "invalid invite", 404);
+  await joinTeam(db, { teamId: team.id, userId: input.userId, inviteCode: input.inviteCode });
+  return team.id;
+}

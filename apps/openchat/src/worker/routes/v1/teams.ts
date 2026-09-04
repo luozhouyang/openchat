@@ -1,19 +1,30 @@
 import { Hono } from "hono";
+import { eq } from "drizzle-orm";
 import {
   CreateTeamInput,
   CreateTeamOutput,
   PatchTeamInput,
   JoinTeamInput,
+  JoinByInviteInput,
   MyTeamsOutput,
   TeamOutput,
+  type JoinByInviteOutput,
+  type TeamMembersOutput,
   type TeamType,
 } from "protocol";
 import { requireSession } from "../../auth/session.ts";
 import { requireTeamRole, requirePermission } from "../../auth/guards.ts";
 import { PERMISSIONS } from "../../auth/rbac.ts";
 import { getDb } from "../../db/client.ts";
+import { teamMembers } from "../../db/schema-d1.ts";
 import { getTeam, listTeamsForUser, getTeamMember } from "../../db/repos/teams.ts";
-import { createTeam, joinTeam, leaveTeam, updateTeam } from "../../services/team.service.ts";
+import {
+  createTeam,
+  joinTeam,
+  leaveTeam,
+  updateTeam,
+  joinByInvite,
+} from "../../services/team.service.ts";
 import { zodValidator } from "../../lib/validation.ts";
 import { apiError } from "../../lib/errors.ts";
 import { syncUserChannels } from "../../user-do-sync.ts";
@@ -43,6 +54,15 @@ teamsV1.post(
     return c.json(out, 201);
   },
 );
+
+teamsV1.post("/teams/join", requireSession, zodValidator("json", JoinByInviteInput), async (c) => {
+  const body = c.req.valid("json");
+  const db = getDb(c.env.DB);
+  const userId = c.get("session")!.user.id;
+  const teamId = await joinByInvite(db, { inviteCode: body.inviteCode, userId });
+  await syncUserChannels(c.env, userId);
+  return c.json({ teamId } satisfies JoinByInviteOutput, 201);
+});
 
 teamsV1.get("/users/me/teams", requireSession, async (c) => {
   const db = getDb(c.env.DB);
@@ -76,6 +96,16 @@ teamsV1.get("/teams/:teamId", requireSession, requireTeamRole("admin"), async (c
       archivedAt: team.archivedAt,
     },
   };
+  return c.json(out);
+});
+
+teamsV1.get("/teams/:teamId/members", requireSession, requireTeamRole("admin"), async (c) => {
+  const db = getDb(c.env.DB);
+  const rows = await db
+    .select({ userId: teamMembers.userId, roles: teamMembers.roles })
+    .from(teamMembers)
+    .where(eq(teamMembers.teamId, c.req.param("teamId")));
+  const out: TeamMembersOutput = { members: rows };
   return c.json(out);
 });
 
@@ -124,8 +154,12 @@ teamsV1.delete(
   async (c) => {
     const userId = c.req.param("userId");
     const me = c.get("session")!.user.id;
-    if (userId !== me) throw apiError("forbidden", "forbidden", 403);
     const db = getDb(c.env.DB);
+    if (userId !== me) {
+      const member = await getTeamMember(db, c.req.param("teamId"), me);
+      if (!member || !member.roles.split(" ").includes("team_admin"))
+        throw apiError("forbidden", "forbidden", 403);
+    }
     await leaveTeam(db, { teamId: c.req.param("teamId"), userId });
     await syncUserChannels(c.env, userId);
     return c.json({ ok: true });

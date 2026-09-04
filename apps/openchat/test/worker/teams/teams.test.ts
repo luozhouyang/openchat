@@ -320,3 +320,108 @@ test("create team requires create_team permission", async () => {
     await db.update(roles).set({ permissions: orig }).where(eq(roles.name, "system_user"));
   }
 });
+
+test("join team by invite code", async () => {
+  const owner = await signup("invite-owner@test.dev", "team-test-password");
+  const create = await exports.default.fetch("http://localhost/api/v1/teams", {
+    method: "POST",
+    headers: { cookie: owner, "content-type": "application/json" },
+    body: JSON.stringify({ name: "inviteteam", displayName: "Invite Team", type: "invite" }),
+  });
+  const created = (await create.json()) as { id: string; inviteCode: string };
+  expect(created.inviteCode).toBeTruthy();
+
+  const joiner = await signup("invite-joiner@test.dev", "team-test-password");
+  const join = await exports.default.fetch("http://localhost/api/v1/teams/join", {
+    method: "POST",
+    headers: { cookie: joiner, "content-type": "application/json" },
+    body: JSON.stringify({ inviteCode: created.inviteCode }),
+  });
+  expect(join.status).toBe(201);
+  const joined = (await join.json()) as { teamId: string };
+  expect(joined.teamId).toBe(created.id);
+
+  const joinAgain = await exports.default.fetch("http://localhost/api/v1/teams/join", {
+    method: "POST",
+    headers: { cookie: joiner, "content-type": "application/json" },
+    body: JSON.stringify({ inviteCode: created.inviteCode }),
+  });
+  expect(joinAgain.status).toBe(201);
+  expect(((await joinAgain.json()) as { teamId: string }).teamId).toBe(created.id);
+
+  const bad = await exports.default.fetch("http://localhost/api/v1/teams/join", {
+    method: "POST",
+    headers: { cookie: joiner, "content-type": "application/json" },
+    body: JSON.stringify({ inviteCode: "bogus" }),
+  });
+  expect(bad.status).toBe(404);
+});
+
+test("team members list requires team admin and returns members", async () => {
+  const owner = await signup("members-owner@test.dev", "team-test-password");
+  const create = await exports.default.fetch("http://localhost/api/v1/teams", {
+    method: "POST",
+    headers: { cookie: owner, "content-type": "application/json" },
+    body: JSON.stringify({ name: "membersteam", displayName: "Members Team", type: "open" }),
+  });
+  const { id: teamId } = (await create.json()) as { id: string };
+
+  const outsider = await signup("members-outsider@test.dev", "team-test-password");
+  const forbidden = await exports.default.fetch(`http://localhost/api/v1/teams/${teamId}/members`, {
+    headers: { cookie: outsider },
+  });
+  expect(forbidden.status).toBe(403);
+
+  const list = await exports.default.fetch(`http://localhost/api/v1/teams/${teamId}/members`, {
+    headers: { cookie: owner },
+  });
+  expect(list.status).toBe(200);
+  const body = (await list.json()) as {
+    members: { userId: string; roles: string }[];
+  };
+  expect(body.members.length).toBeGreaterThanOrEqual(1);
+  expect(body.members[0].roles).toBe("team_admin");
+});
+
+test("team admin can remove another member", async () => {
+  const owner = await signup("remover-owner@test.dev", "team-test-password");
+  const create = await exports.default.fetch("http://localhost/api/v1/teams", {
+    method: "POST",
+    headers: { cookie: owner, "content-type": "application/json" },
+    body: JSON.stringify({ name: "removerteam", displayName: "Remover Team", type: "open" }),
+  });
+  const { id: teamId } = (await create.json()) as { id: string };
+
+  const member = await signup("remover-member@test.dev", "team-test-password");
+  await exports.default.fetch(`http://localhost/api/v1/teams/${teamId}/members`, {
+    method: "POST",
+    headers: { cookie: member, "content-type": "application/json" },
+    body: JSON.stringify({}),
+  });
+  const me = await exports.default.fetch("http://localhost/api/v1/users/me", {
+    headers: { cookie: member },
+  });
+  const { user } = (await me.json()) as { user: { id: string } };
+
+  const remove = await exports.default.fetch(
+    `http://localhost/api/v1/teams/${teamId}/members/${user.id}`,
+    { method: "DELETE", headers: { cookie: owner } },
+  );
+  expect(remove.status).toBe(200);
+
+  const nonAdmin = await signup("remover-nonadmin@test.dev", "team-test-password");
+  await exports.default.fetch(`http://localhost/api/v1/teams/${teamId}/members`, {
+    method: "POST",
+    headers: { cookie: nonAdmin, "content-type": "application/json" },
+    body: JSON.stringify({}),
+  });
+  const nonAdminMe = await exports.default.fetch("http://localhost/api/v1/users/me", {
+    headers: { cookie: nonAdmin },
+  });
+  await nonAdminMe.json();
+  const forbidden = await exports.default.fetch(
+    `http://localhost/api/v1/teams/${teamId}/members/${user.id}`,
+    { method: "DELETE", headers: { cookie: nonAdmin } },
+  );
+  expect(forbidden.status).toBe(403);
+});

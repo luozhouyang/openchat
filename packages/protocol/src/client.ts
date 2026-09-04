@@ -11,6 +11,7 @@ import type {
   CreateUploadOutput,
   CreatePostInput,
   DeletePostInput,
+  JoinByInviteOutput,
   JoinTeamInput,
   ListMembersQuery,
   ListPostsOutput,
@@ -30,6 +31,7 @@ import type {
   StatusIdsInput,
   StatusesOutput,
   StatusOutput,
+  TeamMembersOutput,
   TeamOutput,
   UploadRequest,
   WorkspaceResponse,
@@ -127,6 +129,9 @@ export function createApi(opts: ApiFetchOptions = {}) {
         f<{ ok: true }>(`/api/v1/teams/${teamId}/patch`, json("PUT", input)),
       join: (teamId: string, input: JoinTeamInput) =>
         f<{ ok: true }>(`/api/v1/teams/${teamId}/members`, json("POST", input)),
+      joinByInvite: (inviteCode: string) =>
+        f<JoinByInviteOutput>("/api/v1/teams/join", json("POST", { inviteCode })),
+      listMembers: (teamId: string) => f<TeamMembersOutput>(`/api/v1/teams/${teamId}/members`),
     },
 
     roles: {

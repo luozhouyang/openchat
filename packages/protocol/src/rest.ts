@@ -41,6 +41,14 @@ export type PatchTeamInput = z.infer<typeof PatchTeamInput>;
 
 export const JoinTeamInput = z.object({ inviteCode: z.string().max(128).optional() });
 export type JoinTeamInput = z.infer<typeof JoinTeamInput>;
+export const JoinByInviteInput = z.object({ inviteCode: z.string().min(1).max(128) });
+export type JoinByInviteInput = z.infer<typeof JoinByInviteInput>;
+export const JoinByInviteOutput = z.object({ teamId: idSchema });
+export type JoinByInviteOutput = z.infer<typeof JoinByInviteOutput>;
+export const TeamMemberOutput = z.object({ userId: idSchema, roles: z.string() });
+export type TeamMemberOutput = z.infer<typeof TeamMemberOutput>;
+export const TeamMembersOutput = z.object({ members: z.array(TeamMemberOutput) });
+export type TeamMembersOutput = z.infer<typeof TeamMembersOutput>;
 
 export const TeamSummary = z.object({
   id: idSchema,
