@@ -67,6 +67,7 @@ export const TeamUpdatePayload = z.object({
   type: TeamTypeSchema,
   archivedAt: z.number().nullable(),
 });
+export type TeamUpdatePayload = z.infer<typeof TeamUpdatePayload>;
 export const teamUpdatedEvent = z.object({
   type: z.literal("team.updated"),
   team: TeamUpdatePayload,

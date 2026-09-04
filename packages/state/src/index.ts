@@ -15,6 +15,7 @@ export { useSidebarStore } from "./stores/sidebar.ts";
 export { useTypingStore } from "./stores/typing.ts";
 export { useConnectionStore } from "./stores/connection.ts";
 export { useStructureStore } from "./stores/structure.ts";
+export { useTeamsStore, type StoreTeam } from "./stores/teams.ts";
 
 export { createDispatcher, type DispatcherDeps } from "./realtime/dispatch.ts";
 export { buildSyncChannels, createSyncGapHandler } from "./realtime/sync.ts";
