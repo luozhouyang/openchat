@@ -22,9 +22,11 @@ import type {
   OpenGroupInput,
   PatchPostInput,
   PatchTeamInput,
+  PermissionsOutput,
   PostOutput,
   PushSubscribeInput,
   PutStatusInput,
+  RoleOutput,
   StatusIdsInput,
   StatusesOutput,
   StatusOutput,
@@ -125,6 +127,12 @@ export function createApi(opts: ApiFetchOptions = {}) {
         f<{ ok: true }>(`/api/v1/teams/${teamId}/patch`, json("PUT", input)),
       join: (teamId: string, input: JoinTeamInput) =>
         f<{ ok: true }>(`/api/v1/teams/${teamId}/members`, json("POST", input)),
+    },
+
+    roles: {
+      listPermissions: () => f<PermissionsOutput>("/api/v1/permissions"),
+      updatePermissions: (roleId: string, permissions: string[]) =>
+        f<{ ok: true; role: RoleOutput }>(`/api/v1/roles/${roleId}`, json("PUT", { permissions })),
     },
 
     channels: {

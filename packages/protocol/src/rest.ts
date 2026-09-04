@@ -306,6 +306,10 @@ export const RoleOutput = z.object({
 export type RoleOutput = z.infer<typeof RoleOutput>;
 export const RolesListOutput = z.object({ roles: z.array(RoleOutput) });
 export type RolesListOutput = z.infer<typeof RolesListOutput>;
+export const RoleUpdateInput = z.object({ permissions: z.array(z.string()) });
+export type RoleUpdateInput = z.infer<typeof RoleUpdateInput>;
+export const PermissionsOutput = z.object({ permissions: z.array(z.string()) });
+export type PermissionsOutput = z.infer<typeof PermissionsOutput>;
 export const SchemesOutput = z.object({ schemes: z.array(z.unknown()) });
 export type SchemesOutput = z.infer<typeof SchemesOutput>;
 

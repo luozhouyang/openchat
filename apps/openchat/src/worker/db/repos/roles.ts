@@ -20,3 +20,16 @@ export async function createRole(db: Db, row: RoleInsert): Promise<Role | null> 
   await db.insert(roles).values({ ...row, createdAt: now, updatedAt: now });
   return getRoleByName(db, row.name);
 }
+
+export async function updateRolePermissions(
+  db: Db,
+  roleId: string,
+  permissions: string[],
+): Promise<Role | null> {
+  await db
+    .update(roles)
+    .set({ permissions: JSON.stringify(permissions), updatedAt: Date.now() })
+    .where(eq(roles.id, roleId));
+  const rows = await db.select().from(roles).where(eq(roles.id, roleId)).limit(1);
+  return rows[0] ?? null;
+}
