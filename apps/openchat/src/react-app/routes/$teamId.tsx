@@ -1,6 +1,6 @@
 import { createFileRoute, redirect, useRouter } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { api } from "@/lib/api";
 import { useSidebarStore, useStructureStore } from "state";
 import { WorkspaceShell } from "@/components/workspace/WorkspaceShell";
@@ -21,6 +21,7 @@ function WorkspaceLayout() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const structureVersion = useStructureStore((s) => s.version);
+  const lastVersion = useRef(0);
 
   const sidebar = useQuery({ queryKey: ["sidebar"], queryFn: api.sidebar });
   useEffect(() => {
@@ -28,10 +29,11 @@ function WorkspaceLayout() {
   }, [sidebar.data]);
 
   useEffect(() => {
-    if (structureVersion === 0) return;
+    if (structureVersion === 0 || structureVersion === lastVersion.current) return;
+    lastVersion.current = structureVersion;
     void router.invalidate();
     void queryClient.invalidateQueries({ queryKey: ["sidebar"] });
-  }, [structureVersion, router, queryClient]);
+  }, [structureVersion]);
 
   if (!team) return <div className="p-8">团队不存在</div>;
 
