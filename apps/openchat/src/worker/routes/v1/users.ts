@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { eq } from "drizzle-orm";
-import { WorkspaceResponse, type ChannelType, type TeamType } from "protocol";
+import { WorkspaceResponse, type ChannelSummary, type ChannelType, type TeamType } from "protocol";
 import { requireSession } from "../../auth/session.ts";
 import { getDb } from "../../db/client.ts";
 import { users } from "../../db/schema-d1.ts";
@@ -33,7 +33,20 @@ usersV1.get("/users/me/workspaces", requireSession, async (c) => {
   const db = getDb(c.env.DB);
   const userId = c.get("session")!.user.id;
   const teamsRows = await listTeamsForUser(db, userId);
-  const myChannels = new Set((await listChannelsForUser(db, userId)).map((r) => r.channel.id));
+  const allChannels = await listChannelsForUser(db, userId);
+  const myChannels = new Set(allChannels.map((r) => r.channel.id));
+  const toSummary = (
+    ch: (typeof allChannels)[number]["channel"],
+    member: boolean,
+  ): ChannelSummary => ({
+    id: ch.id,
+    teamId: ch.teamId,
+    name: ch.name,
+    displayName: ch.displayName,
+    type: ch.type as ChannelType,
+    member,
+    archivedAt: ch.archivedAt,
+  });
   const teams = await Promise.all(
     teamsRows.map(async (t) => {
       const chs = await listChannelsForTeam(db, t.team.id);
@@ -44,19 +57,14 @@ usersV1.get("/users/me/workspaces", requireSession, async (c) => {
         type: t.team.type as TeamType,
         roles: t.roles,
         archivedAt: t.team.archivedAt,
-        channels: chs.map((ch) => ({
-          id: ch.id,
-          teamId: ch.teamId,
-          name: ch.name,
-          displayName: ch.displayName,
-          type: ch.type as ChannelType,
-          member: myChannels.has(ch.id),
-          archivedAt: ch.archivedAt,
-        })),
+        channels: chs.map((ch) => toSummary(ch, myChannels.has(ch.id))),
       };
     }),
   );
+  const directs = allChannels
+    .filter((r) => r.channel.teamId === null)
+    .map((r) => toSummary(r.channel, true));
   await syncUserChannels(c.env, userId);
-  const out: WorkspaceResponse = { teams };
+  const out: WorkspaceResponse = { teams, directs };
   return c.json(out);
 });

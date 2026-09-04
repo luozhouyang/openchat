@@ -344,5 +344,6 @@ export type DeleteSubscriptionInput = z.infer<typeof DeleteSubscriptionInput>;
 // ---- workspaces (kept, now derived from TeamSummary) ----
 export const WorkspaceResponse = z.object({
   teams: z.array(TeamSummary.extend({ channels: z.array(ChannelSummary) })),
+  directs: z.array(ChannelSummary),
 });
 export type WorkspaceResponse = z.infer<typeof WorkspaceResponse>;

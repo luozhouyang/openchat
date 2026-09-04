@@ -4,6 +4,7 @@ import { exports } from "cloudflare:workers";
 import { userDoName } from "protocol";
 import { getDb } from "../../../src/worker/db/client.ts";
 import { createChannel } from "../../../src/worker/db/repos/channels.ts";
+import { openDirect } from "../../../src/worker/services/channel.service.ts";
 
 async function signup(email: string, password: string): Promise<string> {
   const res = await exports.default.fetch("http://localhost/api/auth/sign-up/email", {
@@ -258,4 +259,33 @@ test("workspaces lists channels and membership", async () => {
 test("workspaces requires session", async () => {
   const res = await exports.default.fetch("http://localhost/api/v1/users/me/workspaces");
   expect(res.status).toBe(401);
+});
+
+test("workspaces returns teamless dm channels as directs", async () => {
+  const me = await exports.default.fetch("http://localhost/api/v1/users/me", {
+    headers: { cookie: wsCookie },
+  });
+  const { user } = (await me.json()) as { user: { id: string } };
+
+  const other = await signup("ws-other@test.dev", "ws-guide-password");
+  const otherMe = await exports.default.fetch("http://localhost/api/v1/users/me", {
+    headers: { cookie: other },
+  });
+  const { user: otherUser } = (await otherMe.json()) as { user: { id: string } };
+
+  const db = getDb(env.DB);
+  await openDirect(db, { userId: user.id, withUserId: otherUser.id });
+
+  const res = await exports.default.fetch("http://localhost/api/v1/users/me/workspaces", {
+    headers: { cookie: wsCookie },
+  });
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as {
+    teams: unknown[];
+    directs: { id: string; type: string; teamId: string | null; member: boolean }[];
+  };
+  expect(body.directs).toHaveLength(1);
+  expect(body.directs[0].type).toBe("dm");
+  expect(body.directs[0].teamId).toBeNull();
+  expect(body.directs[0].member).toBe(true);
 });
