@@ -1,11 +1,16 @@
 import { Hono } from "hono";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { WorkspaceResponse, type ChannelSummary, type ChannelType, type TeamType } from "protocol";
 import { requireSession } from "../../auth/session.ts";
 import { getDb } from "../../db/client.ts";
 import { users } from "../../db/schema-d1.ts";
+import type { Db } from "../../db/types.ts";
 import { listTeamsForUser } from "../../db/repos/teams.ts";
-import { listChannelsForTeam, listChannelsForUser } from "../../db/repos/channels.ts";
+import {
+  listChannelsForTeam,
+  listChannelsForUser,
+  listChannelMemberIds,
+} from "../../db/repos/channels.ts";
 import { syncUserChannels } from "../../user-do-sync.ts";
 import { apiError } from "../../lib/errors.ts";
 
@@ -61,10 +66,36 @@ usersV1.get("/users/me/workspaces", requireSession, async (c) => {
       };
     }),
   );
-  const directs = allChannels
-    .filter((r) => r.channel.teamId === null)
-    .map((r) => toSummary(r.channel, true));
+  const directs = await Promise.all(
+    allChannels
+      .filter((r) => r.channel.teamId === null)
+      .map(async (r) => {
+        const summary = toSummary(r.channel, true);
+        const memberIds = (await listChannelMemberIds(db, r.channel.id)).filter(
+          (id) => id !== userId,
+        );
+        summary.displayName = directDisplayName(r.channel.type, await memberNames(db, memberIds));
+        return summary;
+      }),
+  );
   await syncUserChannels(c.env, userId);
   const out: WorkspaceResponse = { teams, directs };
   return c.json(out);
 });
+
+async function memberNames(db: Db, userIds: string[]): Promise<string[]> {
+  if (userIds.length === 0) return [];
+  const rows = await db
+    .select({ nickname: users.nickname, name: users.name, email: users.email })
+    .from(users)
+    .where(inArray(users.id, userIds));
+  return rows.map((u) => u.nickname ?? u.name ?? u.email);
+}
+
+function directDisplayName(type: string, names: string[]): string {
+  if (names.length === 0) return type === "dm" ? "私聊" : "群组";
+  if (type === "dm") return names[0];
+  const head = names.slice(0, 2).join(", ");
+  const rest = names.length - 2;
+  return rest > 0 ? `${head}, +${rest}` : head;
+}

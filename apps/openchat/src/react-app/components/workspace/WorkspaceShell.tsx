@@ -20,7 +20,7 @@ export function WorkspaceShell({
 }: WorkspaceShellProps) {
   return (
     <div className="flex h-screen">
-      {teams.length > 0 && <TeamRail teams={teams} currentTeamId={currentTeamId!} />}
+      {currentTeamId && <TeamRail teams={teams} currentTeamId={currentTeamId} />}
       <Sidebar
         title={title}
         channels={channels}

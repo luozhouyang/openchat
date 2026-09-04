@@ -8,7 +8,7 @@ import { WorkspaceShell } from "@/components/workspace/WorkspaceShell";
 export const Route = createFileRoute("/dm")({
   component: DmLayout,
   loader: async () => {
-    return api.workspaces().catch(() => ({ teams: [], directs: [] }));
+    return api.workspaces();
   },
 });
 

@@ -66,6 +66,29 @@ describe("root redirect", () => {
     renderApp();
     expect(await screen.findByText("尚未加入任何频道")).toBeInTheDocument();
   });
+
+  it("renders the dm home with resolved direct display names", async () => {
+    (api.workspaces as ReturnType<typeof vi.fn>).mockResolvedValue({
+      teams: [],
+      directs: [
+        {
+          id: "d1",
+          teamId: null,
+          name: null,
+          displayName: "Alice",
+          type: "dm",
+          member: true,
+          archivedAt: null,
+        },
+      ],
+    });
+    renderApp();
+    const links = await screen.findAllByRole("link", { name: "Alice" });
+    expect(links).toHaveLength(2);
+    for (const link of links) {
+      expect(link).toHaveAttribute("href", "/dm/d1");
+    }
+  });
 });
 
 describe("channel view hydration", () => {

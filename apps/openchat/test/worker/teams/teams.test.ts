@@ -274,7 +274,7 @@ test("workspaces returns teamless dm channels as directs", async () => {
   const { user: otherUser } = (await otherMe.json()) as { user: { id: string } };
 
   const db = getDb(env.DB);
-  await openDirect(db, { userId: user.id, withUserId: otherUser.id });
+  const opened = await openDirect(db, { userId: user.id, withUserId: otherUser.id });
 
   const res = await exports.default.fetch("http://localhost/api/v1/users/me/workspaces", {
     headers: { cookie: wsCookie },
@@ -282,9 +282,17 @@ test("workspaces returns teamless dm channels as directs", async () => {
   expect(res.status).toBe(200);
   const body = (await res.json()) as {
     teams: unknown[];
-    directs: { id: string; type: string; teamId: string | null; member: boolean }[];
+    directs: {
+      id: string;
+      type: string;
+      teamId: string | null;
+      member: boolean;
+      displayName: string;
+    }[];
   };
   expect(body.directs).toHaveLength(1);
+  expect(body.directs[0].id).toBe(opened.id);
+  expect(body.directs[0].displayName).toBe("ws-other");
   expect(body.directs[0].type).toBe("dm");
   expect(body.directs[0].teamId).toBeNull();
   expect(body.directs[0].member).toBe(true);
