@@ -3,7 +3,7 @@ import { env } from "cloudflare:test";
 import { exports } from "cloudflare:workers";
 import { eq } from "drizzle-orm";
 import { getDb } from "../../../src/worker/db/client.ts";
-import { users } from "../../../src/worker/db/schema-d1.ts";
+import { roles, users } from "../../../src/worker/db/schema-d1.ts";
 
 async function signup(email: string): Promise<{ cookie: string; userId: string }> {
   const res = await exports.default.fetch("http://localhost/api/auth/sign-up/email", {
@@ -37,35 +37,51 @@ test("put role permissions requires admin and validates permissions", async () =
   const systemUser = roleRows.find((r) => r.name === "system_user");
   expect(systemUser).toBeTruthy();
 
-  const nonAdmin = await exports.default.fetch(`http://localhost/api/v1/roles/${systemUser!.id}`, {
-    method: "PUT",
-    headers: { cookie: user.cookie, "content-type": "application/json" },
-    body: JSON.stringify({ permissions: [] }),
-  });
-  expect(nonAdmin.status).toBe(403);
+  const db = getDb(env.DB);
+  const [systemUserRow] = await db
+    .select()
+    .from(roles)
+    .where(eq(roles.name, "system_user"))
+    .limit(1);
+  expect(systemUserRow).toBeTruthy();
+  const orig = systemUserRow!.permissions;
 
-  const unknown = await exports.default.fetch(`http://localhost/api/v1/roles/${systemUser!.id}`, {
-    method: "PUT",
-    headers: { cookie: admin.cookie, "content-type": "application/json" },
-    body: JSON.stringify({ permissions: ["no_such_perm"] }),
-  });
-  expect(unknown.status).toBe(422);
+  try {
+    const nonAdmin = await exports.default.fetch(
+      `http://localhost/api/v1/roles/${systemUser!.id}`,
+      {
+        method: "PUT",
+        headers: { cookie: user.cookie, "content-type": "application/json" },
+        body: JSON.stringify({ permissions: [] }),
+      },
+    );
+    expect(nonAdmin.status).toBe(403);
 
-  const ok = await exports.default.fetch(`http://localhost/api/v1/roles/${systemUser!.id}`, {
-    method: "PUT",
-    headers: { cookie: admin.cookie, "content-type": "application/json" },
-    body: JSON.stringify({ permissions: ["view_team"] }),
-  });
-  expect(ok.status).toBe(200);
-  const saved = (await ok.json()) as { role: { permissions: string[] } };
-  expect(saved.role.permissions).toEqual(["view_team"]);
+    const unknown = await exports.default.fetch(`http://localhost/api/v1/roles/${systemUser!.id}`, {
+      method: "PUT",
+      headers: { cookie: admin.cookie, "content-type": "application/json" },
+      body: JSON.stringify({ permissions: ["no_such_perm"] }),
+    });
+    expect(unknown.status).toBe(422);
 
-  const notFound = await exports.default.fetch("http://localhost/api/v1/roles/nope", {
-    method: "PUT",
-    headers: { cookie: admin.cookie, "content-type": "application/json" },
-    body: JSON.stringify({ permissions: [] }),
-  });
-  expect(notFound.status).toBe(404);
+    const ok = await exports.default.fetch(`http://localhost/api/v1/roles/${systemUser!.id}`, {
+      method: "PUT",
+      headers: { cookie: admin.cookie, "content-type": "application/json" },
+      body: JSON.stringify({ permissions: ["view_team"] }),
+    });
+    expect(ok.status).toBe(200);
+    const saved = (await ok.json()) as { role: { permissions: string[] } };
+    expect(saved.role.permissions).toEqual(["view_team"]);
+
+    const notFound = await exports.default.fetch("http://localhost/api/v1/roles/nope", {
+      method: "PUT",
+      headers: { cookie: admin.cookie, "content-type": "application/json" },
+      body: JSON.stringify({ permissions: [] }),
+    });
+    expect(notFound.status).toBe(404);
+  } finally {
+    await db.update(roles).set({ permissions: orig }).where(eq(roles.name, "system_user"));
+  }
 });
 
 test("permissions endpoint lists the permission catalog", async () => {
@@ -80,7 +96,6 @@ test("permissions endpoint lists the permission catalog", async () => {
 
 test("me returns system permissions including create_team", async () => {
   const user = await signup("roles-me@test.dev");
-  await makeAdmin(user.userId);
   const res = await exports.default.fetch("http://localhost/api/v1/users/me", {
     headers: { cookie: user.cookie },
   });
