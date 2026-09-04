@@ -144,6 +144,7 @@ describe("signup page", () => {
         name: "Alice",
         email: "alice@test.dev",
         password: "alice-password",
+        callbackURL: "/auth/verify-email",
       }),
     );
     expect(await screen.findByText("Verify your email")).toBeInTheDocument();

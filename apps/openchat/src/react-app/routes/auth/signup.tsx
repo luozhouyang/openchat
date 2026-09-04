@@ -42,6 +42,7 @@ function SignupPage() {
           name: value.name,
           email: value.email,
           password: value.password,
+          callbackURL: "/auth/verify-email",
         });
         if (res.error) throw new Error(res.error.message ?? t("auth.signup.failed"));
         void router.navigate({ to: "/auth/check-email", search: { email: value.email } });

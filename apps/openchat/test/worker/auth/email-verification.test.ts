@@ -22,7 +22,7 @@ test("signup with email verification enabled still returns a session", async () 
 
 test("verify-email with an invalid token redirects with an error query", async () => {
   const res = await exports.default.fetch(
-    "http://localhost/api/auth/verify-email?token=bogus&callbackURL=%2Fverify-email",
+    "http://localhost/api/auth/verify-email?token=bogus&callbackURL=%2Fauth%2Fverify-email",
     { headers: { Origin: "http://localhost" }, redirect: "manual" },
   );
   expect(res.status).toBeGreaterThanOrEqual(300);

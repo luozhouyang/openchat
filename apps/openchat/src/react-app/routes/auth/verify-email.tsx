@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { z } from "zod";
@@ -34,20 +34,23 @@ function VerifyEmailPage() {
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
+  const startedRef = useRef(false);
 
   useEffect(() => {
-    if (!search.token) return;
+    if (!search.token || startedRef.current) return;
+    startedRef.current = true;
     authClient
       .verifyEmail({ query: { token: search.token, callbackURL: "/auth/verify-email" } })
       .then((res) => {
         if (res.error) throw new Error(res.error.message ?? t("auth.verifyEmail.failTitle"));
         setState("success");
+        void navigate({ to: "/auth/verify-email", search: {}, replace: true });
       })
       .catch((err) => {
         setVerifyError(err instanceof Error ? err.message : t("auth.verifyEmail.failTitle"));
         setState("error");
       });
-  }, [search.token, t]);
+  }, [search.token, t, navigate]);
 
   async function resend() {
     if (!search.email) return;
