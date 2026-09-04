@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useLoaderData } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { usePermissions } from "@/lib/use-permissions";
+import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/dm/")({
   component: DmHome,
@@ -8,25 +9,20 @@ export const Route = createFileRoute("/dm/")({
 
 function DmHome() {
   const data = useLoaderData({ from: "/dm" });
-  const { t } = useTranslation();
   const permissions = usePermissions();
   const canCreate = permissions.includes("create_team");
+  const { t } = useTranslation();
   if (data.directs.length === 0) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-zinc-500">
+      <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-muted-foreground">
         <p>{t("workspace.noConversations")}</p>
         <div className="flex gap-2">
           {canCreate && (
-            <Link
-              to="/teams/new"
-              className="rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
-            >
-              {t("workspace.createTeam")}
-            </Link>
+            <Button render={<Link to="/teams/new" />}>{t("workspace.createTeam")}</Button>
           )}
-          <Link to="/teams/new" className="rounded border px-3 py-1.5 text-sm hover:bg-zinc-100">
+          <Button variant="outline" render={<Link to="/teams/new" />}>
             {t("workspace.joinTeam")}
-          </Link>
+          </Button>
         </div>
       </div>
     );
