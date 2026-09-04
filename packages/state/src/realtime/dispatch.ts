@@ -1,8 +1,10 @@
 import type { Message, ServerEvent } from "protocol";
+import { serverEventSchema } from "protocol";
 import type { LocalDatabase } from "../db/database.ts";
 import { useMessageStore } from "../stores/messages.ts";
 import { useSidebarStore } from "../stores/sidebar.ts";
 import { useStructureStore } from "../stores/structure.ts";
+import { useTeamsStore } from "../stores/teams.ts";
 import { useTypingStore } from "../stores/typing.ts";
 
 function normalize(m: Message): Message {
@@ -11,6 +13,8 @@ function normalize(m: Message): Message {
 
 export interface DispatcherDeps {
   getDb(): Promise<LocalDatabase>;
+  /** Current user id for self-targeted events (team.member_removed). */
+  selfUserId?: () => string | null;
   /** Fired for every confirmed incoming message (notifications, sidebar extras). */
   onMessageNew?(channelId: string, message: Message): void;
   /** sync.gap: the app refetches history — see createSyncGapHandler. */
@@ -29,7 +33,9 @@ export function createDispatcher(deps: DispatcherDeps) {
     if (raw === "ping" || raw === "pong") return; // keepalive frames, not JSON
     let ev: ServerEvent;
     try {
-      ev = JSON.parse(raw) as ServerEvent;
+      const parsed = serverEventSchema.safeParse(JSON.parse(raw));
+      if (!parsed.success) return;
+      ev = parsed.data;
     } catch {
       return; // malformed frame: never let transport noise crash the app
     }
@@ -88,6 +94,24 @@ export function createDispatcher(deps: DispatcherDeps) {
       case "structure.update":
         useStructureStore.getState().bump(ev.scope);
         deps.onLocal?.(ev);
+        break;
+      case "channel.created":
+        useTeamsStore.getState().addChannel(ev.channel);
+        break;
+      case "channel.updated":
+        useTeamsStore.getState().patchChannel(ev.channel);
+        break;
+      case "channel.deleted":
+        useTeamsStore.getState().removeChannel(ev.channelId);
+        break;
+      case "team.updated":
+        useTeamsStore.getState().patchTeam(ev.team);
+        break;
+      case "team.member_added":
+        useTeamsStore.getState().addTeam({ ...ev.team, channels: [] });
+        break;
+      case "team.member_removed":
+        if (ev.userId === deps.selfUserId?.()) useTeamsStore.getState().dropTeam(ev.teamId);
         break;
       case "ack":
         useMessageStore

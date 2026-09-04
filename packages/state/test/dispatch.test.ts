@@ -4,6 +4,7 @@ import { createMemoryDatabase } from "../src/db/database.ts";
 import { createDispatcher } from "../src/realtime/dispatch.ts";
 import { buildSyncChannels, createSyncGapHandler } from "../src/realtime/sync.ts";
 import { useMessageStore } from "../src/stores/messages.ts";
+import { useTeamsStore } from "../src/stores/teams.ts";
 
 const msg = (seq: number, id = `m${seq}`): Message => ({
   id,
@@ -152,4 +153,111 @@ test("createSyncGapHandler stops quietly when offline", async () => {
     }),
   });
   await expect(handle("c1")).resolves.toBeUndefined();
+});
+
+test("channel.created adds channel to the store team", () => {
+  useTeamsStore.setState({
+    teams: [
+      {
+        id: "t1",
+        name: "a",
+        displayName: "A",
+        type: "open",
+        roles: "team_admin",
+        archivedAt: null,
+        channels: [],
+      },
+    ],
+    directs: [],
+    loaded: true,
+  });
+  const { dispatch } = setup();
+  dispatch(
+    JSON.stringify({
+      type: "channel.created",
+      channel: {
+        id: "c9",
+        teamId: "t1",
+        name: "new",
+        displayName: "New",
+        type: "public",
+        member: true,
+        archivedAt: null,
+      },
+    }),
+  );
+  expect(useTeamsStore.getState().teams[0].channels.map((c) => c.id)).toContain("c9");
+});
+
+test("team.updated patches team fields in place", () => {
+  useTeamsStore.setState({
+    teams: [
+      {
+        id: "t1",
+        name: "a",
+        displayName: "A",
+        type: "open",
+        roles: "team_admin",
+        archivedAt: null,
+        channels: [],
+      },
+    ],
+    directs: [],
+    loaded: true,
+  });
+  const { dispatch } = setup();
+  dispatch(
+    JSON.stringify({
+      type: "team.updated",
+      team: { id: "t1", name: "a", displayName: "Renamed", type: "open", archivedAt: null },
+    }),
+  );
+  expect(useTeamsStore.getState().teams[0].displayName).toBe("Renamed");
+});
+
+test("team.member_added adds unknown team, ignores known", () => {
+  useTeamsStore.setState({ teams: [], directs: [], loaded: true });
+  const { dispatch } = setup();
+  const team = {
+    id: "t5",
+    name: "n",
+    displayName: "N",
+    type: "open",
+    archivedAt: null,
+    roles: "team_user",
+  };
+  dispatch(JSON.stringify({ type: "team.member_added", team, userId: "me" }));
+  expect(useTeamsStore.getState().teams).toHaveLength(1);
+  dispatch(JSON.stringify({ type: "team.member_added", team, userId: "me" }));
+  expect(useTeamsStore.getState().teams).toHaveLength(1);
+});
+
+test("team.member_removed drops team only when self is removed", () => {
+  useTeamsStore.setState({
+    teams: [
+      {
+        id: "t1",
+        name: "a",
+        displayName: "A",
+        type: "open",
+        roles: "team_admin",
+        archivedAt: null,
+        channels: [],
+      },
+    ],
+    directs: [],
+    loaded: true,
+  });
+  const db = createMemoryDatabase();
+  const dispatch = createDispatcher({ getDb: async () => db, selfUserId: () => "me" });
+  dispatch(JSON.stringify({ type: "team.member_removed", teamId: "t1", userId: "someone-else" }));
+  expect(useTeamsStore.getState().teams).toHaveLength(1);
+  dispatch(JSON.stringify({ type: "team.member_removed", teamId: "t1", userId: "me" }));
+  expect(useTeamsStore.getState().teams).toHaveLength(0);
+});
+
+test("malformed event frames are dropped by schema validation", () => {
+  const { dispatch, onLocal } = setup();
+  expect(() => dispatch(JSON.stringify({ type: "channel.created" }))).not.toThrow();
+  expect(onLocal).not.toHaveBeenCalled();
 });
