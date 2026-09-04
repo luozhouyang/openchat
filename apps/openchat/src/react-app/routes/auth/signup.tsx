@@ -22,13 +22,15 @@ function SignupPage() {
 
   const nameValidator = ({ value }: { value: string }) =>
     z.string().min(1).safeParse(value).success ? undefined : t("auth.signup.errors.name");
+  const usernameValidator = ({ value }: { value: string }) =>
+    z.string().min(1).safeParse(value).success ? undefined : t("auth.signup.errors.username");
   const emailValidator = ({ value }: { value: string }) =>
     z.string().email().safeParse(value).success ? undefined : t("auth.signup.errors.email");
   const passwordValidator = ({ value }: { value: string }) =>
     z.string().min(8).safeParse(value).success ? undefined : t("auth.signup.errors.password");
 
   const form = useForm({
-    defaultValues: { name: "", email: "", password: "" },
+    defaultValues: { name: "", username: "", email: "", password: "" },
     onSubmit: async ({ value }) => {
       setError(null);
       try {
@@ -36,8 +38,9 @@ function SignupPage() {
           name: value.name,
           email: value.email,
           password: value.password,
+          username: value.username,
           callbackURL: "/auth/verify-email",
-        });
+        } as Parameters<typeof authClient.signUp.email>[0]);
         if (res.error) throw new Error(res.error.message ?? t("auth.signup.failed"));
         void router.navigate({ to: "/auth/check-email", search: { email: value.email } });
       } catch (err) {
@@ -77,6 +80,27 @@ function SignupPage() {
                       name={f.name}
                       autoComplete="name"
                       placeholder={t("auth.signup.namePlaceholder")}
+                      value={f.state.value}
+                      onChange={(e) => f.handleChange(e.target.value)}
+                      onBlur={f.handleBlur}
+                      aria-invalid={f.state.meta.errors.length > 0}
+                    />
+                  )}
+                </FormField>
+              )}
+            </form.Field>
+            <form.Field
+              name="username"
+              validators={{ onChange: usernameValidator, onSubmit: usernameValidator }}
+            >
+              {(field) => (
+                <FormField field={field} label={t("auth.signup.username")}>
+                  {(f) => (
+                    <Input
+                      id={f.name}
+                      name={f.name}
+                      autoComplete="username"
+                      placeholder={t("auth.signup.usernamePlaceholder")}
                       value={f.state.value}
                       onChange={(e) => f.handleChange(e.target.value)}
                       onBlur={f.handleBlur}

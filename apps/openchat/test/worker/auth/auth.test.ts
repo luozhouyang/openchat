@@ -10,7 +10,7 @@ async function signup(
   const res = await exports.default.fetch("http://localhost/api/auth/sign-up/email", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ email, password, name, ...extra }),
+    body: JSON.stringify({ email, password, name, username: email.split("@")[0], ...extra }),
   });
   return { res, cookie: res.headers.get("set-cookie") ?? "" };
 }

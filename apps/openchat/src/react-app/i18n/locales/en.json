@@ -19,6 +19,8 @@
       "subtitle": "Create an account, verify your email, and start collaborating",
       "name": "Name",
       "namePlaceholder": "Your name",
+      "username": "Username",
+      "usernamePlaceholder": "Your unique username",
       "email": "Email",
       "emailPlaceholder": "you@example.com",
       "password": "Password",
@@ -28,6 +30,7 @@
       "failed": "Sign-up failed",
       "errors": {
         "name": "Name is required",
+        "username": "Username is required",
         "email": "Enter a valid email address",
         "password": "Password must be at least 8 characters"
       },

@@ -19,9 +19,10 @@ export async function signupUser(
   email: string,
   password: string,
 ): Promise<TestUser> {
+  const username = email.split("@")[0];
   const res = await request.post(`${API}/api/auth/sign-up/email`, {
     headers: ORIGIN,
-    data: { email, password, name: email.split("@")[0] },
+    data: { email, password, name: username, username },
   });
   expect(res.ok(), `signup failed: ${res.status()} ${await res.text()}`).toBeTruthy();
   const body = (await res.json()) as { token?: string };

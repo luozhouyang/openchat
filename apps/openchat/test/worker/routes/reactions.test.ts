@@ -17,6 +17,7 @@ async function signup(email: string): Promise<string> {
       email,
       password: "reactions-test-password",
       name: email.split("@")[0],
+      username: email.split("@")[0],
     }),
   });
   return res.headers.get("set-cookie") ?? "";

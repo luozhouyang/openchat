@@ -37,15 +37,14 @@ export function makeAuth(env: Env) {
       additionalFields: {
         nickname: { type: "string", required: false },
         avatarUrl: { type: "string", required: false },
-        username: { type: "string", required: false, unique: true },
+        username: { type: "string", required: true, unique: true },
       },
     },
     databaseHooks: {
       user: {
         create: {
           before: async (user) => {
-            const username = user.username ?? user.email.split("@")[0] + "-" + id("usr").slice(-6);
-            return { data: { ...user, id: id("usr"), username } };
+            return { data: { ...user, id: id("usr") } };
           },
         },
         update: {

@@ -13,6 +13,7 @@ beforeAll(async () => {
       email: "devices@test.dev",
       password: "devices-test-password",
       name: "Devices",
+      username: "devices",
     }),
   });
   sessionCookie = signup.headers.get("set-cookie") ?? "";
@@ -109,6 +110,7 @@ beforeAll(async () => {
       email: "internal@test.dev",
       password: "internal-test-password",
       name: "INT",
+      username: "internal",
     }),
   });
   internalSessionCookie = signup.headers.get("set-cookie") ?? "";

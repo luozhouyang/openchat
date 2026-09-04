@@ -9,7 +9,12 @@ async function signup(email: string): Promise<{ cookie: string; userId: string }
   const res = await exports.default.fetch("http://localhost/api/auth/sign-up/email", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ email, password: "role-test-password", name: email.split("@")[0] }),
+    body: JSON.stringify({
+      email,
+      password: "role-test-password",
+      name: email.split("@")[0],
+      username: email.split("@")[0],
+    }),
   });
   const cookie = res.headers.get("set-cookie") ?? "";
   const me = await exports.default.fetch("http://localhost/api/v1/users/me", {

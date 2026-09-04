@@ -7,6 +7,7 @@ test("signs up via the UI and lands on the check-email page", async ({ page }) =
   const email = `auth-${seq++}@test.dev`;
   await page.goto("/auth/signup");
   await page.getByLabel("Name").fill("Auth Tester");
+  await page.getByLabel("Username").fill(email.split("@")[0]);
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password").fill("Password123!");
   await page.getByRole("button", { name: "Sign up" }).click();

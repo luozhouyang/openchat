@@ -132,6 +132,9 @@ describe("signup page", () => {
   it("submits and navigates to /check-email with the email", async () => {
     await renderRoute("/auth/signup");
     fireEvent.change(screen.getByPlaceholderText("Your name"), { target: { value: "Alice" } });
+    fireEvent.change(screen.getByPlaceholderText("Your unique username"), {
+      target: { value: "alice" },
+    });
     fireEvent.change(screen.getByPlaceholderText("you@example.com"), {
       target: { value: "alice@test.dev" },
     });
@@ -142,6 +145,7 @@ describe("signup page", () => {
     await vi.waitFor(() =>
       expect(auth.signUp.email).toHaveBeenCalledWith({
         name: "Alice",
+        username: "alice",
         email: "alice@test.dev",
         password: "alice-password",
         callbackURL: "/auth/verify-email",

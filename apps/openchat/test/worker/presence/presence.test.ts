@@ -18,6 +18,7 @@ beforeAll(async () => {
       email: "alice@presence.dev",
       password: "presence-test-password",
       name: "Alice",
+      username: "alice",
     }),
   });
   aliceCookie = signupAlice.headers.get("set-cookie") ?? "";
