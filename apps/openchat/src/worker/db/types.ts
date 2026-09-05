@@ -1,7 +1,7 @@
 import type { DrizzleD1Database } from "drizzle-orm/d1";
-import * as d1 from "./schema-d1.ts";
-import * as userDo from "./schema-user-do.ts";
-import * as channelDo from "./schema-channel-do.ts";
+import * as d1 from "@worker/db/schema-d1";
+import * as userDo from "@worker/db/schema-user-do";
+import * as channelDo from "@worker/db/schema-channel-do";
 
 export type Db = DrizzleD1Database<typeof d1>;
 

@@ -1,10 +1,10 @@
 import { eq, inArray } from "drizzle-orm";
 import { id } from "protocol";
-import { getDb } from "../db/client.ts";
-import { getChannelMember } from "../db/repos/channels.ts";
-import { createRole, getRoleByName } from "../db/repos/roles.ts";
-import { getTeamMember } from "../db/repos/teams.ts";
-import { roles, users } from "../db/schema-d1.ts";
+import { getDb } from "@worker/db/client";
+import { getChannelMember } from "@worker/db/repos/channels";
+import { createRole, getRoleByName } from "@worker/db/repos/roles";
+import { getTeamMember } from "@worker/db/repos/teams";
+import { roles, users } from "@worker/db/schema-d1";
 
 type Db = ReturnType<typeof getDb>;
 
@@ -115,7 +115,9 @@ export const SEED_ROLES: Record<string, Permission[]> = {
 
 export async function ensureSeedRoles(db: Db): Promise<void> {
   for (const [name, perms] of Object.entries(SEED_ROLES)) {
-    if (await getRoleByName(db, name)) continue;
+    if (await getRoleByName(db, name)) {
+      continue;
+    }
     await createRole(db, {
       id: id("rol"),
       name,
@@ -145,11 +147,19 @@ export async function resolvePermissions(
 
   if (scope.teamId) {
     const member = await getTeamMember(db, scope.teamId, userId);
-    if (member) for (const name of member.roles.split(" ")) names.add(name);
+    if (member) {
+      for (const name of member.roles.split(" ")) {
+        names.add(name);
+      }
+    }
   }
   if (scope.channelId) {
     const member = await getChannelMember(db, scope.channelId, userId);
-    if (member) for (const name of member.roles.split(" ")) names.add(name);
+    if (member) {
+      for (const name of member.roles.split(" ")) {
+        names.add(name);
+      }
+    }
   }
 
   const roleRows = await db
@@ -161,7 +171,11 @@ export async function resolvePermissions(
     try {
       const arr = JSON.parse(row.permissions) as unknown;
       if (Array.isArray(arr)) {
-        for (const p of arr) if (typeof p === "string") perms.add(p as Permission);
+        for (const p of arr) {
+          if (typeof p === "string") {
+            perms.add(p as Permission);
+          }
+        }
       }
     } catch {
       // invalid permission JSON is ignored

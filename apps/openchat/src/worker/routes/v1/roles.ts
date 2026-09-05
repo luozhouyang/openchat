@@ -8,17 +8,17 @@ import {
   type RoleOutput,
   type SchemesOutput,
 } from "protocol";
-import { requireSession } from "../../auth/session.ts";
-import { requirePermission } from "../../auth/guards.ts";
-import { PERMISSIONS } from "../../auth/rbac.ts";
-import { getDb } from "../../db/client.ts";
-import { users, teamMembers, channelMembers, roles as rolesTable } from "../../db/schema-d1.ts";
-import { listRoles, listSchemes, updateRolePermissions } from "../../db/repos/roles.ts";
-import { getTeamMember } from "../../db/repos/teams.ts";
-import { getChannelMember } from "../../db/repos/channels.ts";
-import { syncChannelMember } from "../../user-do-sync.ts";
-import { apiError } from "../../lib/errors.ts";
-import { zodValidator } from "../../lib/validation.ts";
+import { requireSession } from "@worker/auth/session";
+import { requirePermission } from "@worker/auth/guards";
+import { PERMISSIONS } from "@worker/auth/rbac";
+import { getDb } from "@worker/db/client";
+import { users, teamMembers, channelMembers, roles as rolesTable } from "@worker/db/schema-d1";
+import { listRoles, listSchemes, updateRolePermissions } from "@worker/db/repos/roles";
+import { getTeamMember } from "@worker/db/repos/teams";
+import { getChannelMember } from "@worker/db/repos/channels";
+import { syncChannelMember } from "@worker/user-do-sync";
+import { apiError } from "@worker/lib/errors";
+import { zodValidator } from "@worker/lib/validation";
 
 export const rolesV1 = new Hono<{ Bindings: Env }>();
 
@@ -30,7 +30,9 @@ rolesV1.get("/roles", requireSession, requirePermission(PERMISSIONS.MANAGE_ROLES
       let permissions: string[] = [];
       try {
         const parsed = JSON.parse(r.permissions) as unknown;
-        if (Array.isArray(parsed)) permissions = parsed.filter((p) => typeof p === "string");
+        if (Array.isArray(parsed)) {
+          permissions = parsed.filter((p) => typeof p === "string");
+        }
       } catch {
         // invalid permission JSON is ignored
       }
@@ -77,7 +79,9 @@ rolesV1.put(
     const userId = c.req.param("userId");
     const db = getDb(c.env.DB);
     const member = await getTeamMember(db, teamId, userId);
-    if (!member) throw apiError("not found", "not found", 404);
+    if (!member) {
+      throw apiError("not found", "not found", 404);
+    }
     await db
       .update(teamMembers)
       .set({ roles: body.roles.join(" ") })
@@ -96,7 +100,9 @@ rolesV1.put(
     const userId = c.req.param("userId");
     const db = getDb(c.env.DB);
     const member = await getChannelMember(db, channelId, userId);
-    if (!member) throw apiError("not found", "not found", 404);
+    if (!member) {
+      throw apiError("not found", "not found", 404);
+    }
     const roles = body.roles.join(" ");
     await db
       .update(channelMembers)
@@ -120,17 +126,25 @@ rolesV1.put(
     const db = getDb(c.env.DB);
     const roleId = c.req.param("roleId");
     const rows = await db.select().from(rolesTable).where(eq(rolesTable.id, roleId)).limit(1);
-    if (!rows[0]) throw apiError("not found", "not found", 404);
+    if (!rows[0]) {
+      throw apiError("not found", "not found", 404);
+    }
     const known = new Set<string>(Object.values(PERMISSIONS));
     for (const p of body.permissions) {
-      if (!known.has(p)) throw apiError("invalid", `unknown permission: ${p}`, 422);
+      if (!known.has(p)) {
+        throw apiError("invalid", `unknown permission: ${p}`, 422);
+      }
     }
     const role = await updateRolePermissions(db, roleId, body.permissions);
-    if (!role) throw apiError("not found", "not found", 404);
+    if (!role) {
+      throw apiError("not found", "not found", 404);
+    }
     let permissions: string[] = [];
     try {
       const parsed = JSON.parse(role.permissions) as unknown;
-      if (Array.isArray(parsed)) permissions = parsed.filter((p) => typeof p === "string");
+      if (Array.isArray(parsed)) {
+        permissions = parsed.filter((p) => typeof p === "string");
+      }
     } catch {
       // invalid permission JSON is ignored
     }

@@ -1,10 +1,9 @@
+import { env, exports } from "cloudflare:workers";
 import { expect, test, beforeAll } from "vite-plus/test";
-import { env } from "cloudflare:test";
-import { exports } from "cloudflare:workers";
 import { eq } from "drizzle-orm";
 import { channelDoName } from "protocol";
-import { getDb } from "../../../src/worker/db/client.ts";
-import { users } from "../../../src/worker/db/schema-d1.ts";
+import { getDb } from "@worker/db/client";
+import { users } from "@worker/db/schema-d1";
 
 async function signup(email: string, password: string): Promise<{ cookie: string; id: string }> {
   const res = await exports.default.fetch("http://localhost/api/auth/sign-up/email", {
@@ -87,7 +86,9 @@ let statsChannelId = "";
 
 async function fetchStats(cookie?: string): Promise<Response> {
   const headers: Record<string, string> = {};
-  if (cookie) headers.cookie = cookie;
+  if (cookie) {
+    headers.cookie = cookie;
+  }
   return exports.default.fetch("http://localhost/api/v1/admin/stats", { headers });
 }
 

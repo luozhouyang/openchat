@@ -2,12 +2,12 @@ import { Hono, type Context } from "hono";
 import { eq, inArray } from "drizzle-orm";
 import { userDoName, type UserStatus } from "protocol";
 import { PutStatusInput, StatusIdsInput, StatusOutput, StatusesOutput } from "protocol";
-import type { SessionContext } from "../../auth/session.ts";
-import { requireSession } from "../../auth/session.ts";
-import { zodValidator } from "../../lib/validation.ts";
-import { apiError } from "../../lib/errors.ts";
-import { getDb } from "../../db/client.ts";
-import * as schemaD1 from "../../db/schema-d1.ts";
+import type { SessionContext } from "@worker/auth/session";
+import { requireSession } from "@worker/auth/session";
+import { zodValidator } from "@worker/lib/validation";
+import { apiError } from "@worker/lib/errors";
+import { getDb } from "@worker/db/client";
+import * as schemaD1 from "@worker/db/schema-d1";
 
 type StatusCtx = Context<{ Bindings: Env; Variables: { session: SessionContext } }>;
 
@@ -48,7 +48,9 @@ statusV1.put(
   async (c) => {
     const sessionId = c.get("session")!.user.id;
     const userId = targetUserId(c, c.req.param("userId"));
-    if (userId !== sessionId) throw apiError("forbidden", "forbidden", 403);
+    if (userId !== sessionId) {
+      throw apiError("forbidden", "forbidden", 403);
+    }
     const body = c.req.valid("json");
     await userDoStub(c.env, userId).setStatus(userId, {
       status: body.status,

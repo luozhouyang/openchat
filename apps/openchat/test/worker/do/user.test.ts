@@ -1,9 +1,9 @@
+import { env, exports } from "cloudflare:workers";
 import { expect, test, beforeAll } from "vite-plus/test";
-import { env, runInDurableObject } from "cloudflare:test";
-import { exports } from "cloudflare:workers";
+import { runInDurableObject } from "cloudflare:test";
 import { issueInternalToken, userDoName } from "protocol";
-import { getDb } from "../../../src/worker/db/client.ts";
-import { channels } from "../../../src/worker/db/schema-d1.ts";
+import { getDb } from "@worker/db/client";
+import { channels } from "@worker/db/schema-d1";
 
 interface Category {
   id: string;

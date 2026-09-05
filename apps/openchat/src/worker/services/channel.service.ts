@@ -1,16 +1,16 @@
 import { eq } from "drizzle-orm";
 import { id, type ChannelType } from "protocol";
-import { channels, channelMembers } from "../db/schema-d1.ts";
-import type { Db } from "../db/types.ts";
+import { channels, channelMembers } from "@worker/db/schema-d1";
+import type { Db } from "@worker/db/types";
 import {
   getChannel,
   getChannelByDedupKey,
   getChannelMember,
   addChannelMember,
   removeChannelMember,
-} from "../db/repos/channels.ts";
-import { getTeamMember } from "../db/repos/teams.ts";
-import { apiError } from "../lib/errors.ts";
+} from "@worker/db/repos/channels";
+import { getTeamMember } from "@worker/db/repos/teams";
+import { apiError } from "@worker/lib/errors";
 
 type Channel = typeof channels.$inferSelect;
 
@@ -52,7 +52,9 @@ export async function createChannel(
     })
     .onConflictDoNothing();
   const ch = await getChannel(db, channelId);
-  if (!ch) throw apiError("name_taken", "name taken", 409);
+  if (!ch) {
+    throw apiError("name_taken", "name taken", 409);
+  }
   await addChannelMember(db, { channelId, userId: input.creatorId, roles: "channel_admin" });
   return ch;
 }
@@ -64,7 +66,9 @@ export async function openDirect(
   const ids = [input.userId, input.withUserId];
   const key = await dedupKeyFor("dm", ids);
   const existing = await getChannelByDedupKey(db, key);
-  if (existing) return { id: existing.id, existing: true };
+  if (existing) {
+    return { id: existing.id, existing: true };
+  }
   const channelId = id("chn");
   const now = Date.now();
   const inserts = [
@@ -93,7 +97,9 @@ export async function openGroup(
   const ids = [...new Set([input.userId, ...input.userIds])];
   const key = await dedupKeyFor("gm", ids);
   const existing = await getChannelByDedupKey(db, key);
-  if (existing) return { id: existing.id, existing: true };
+  if (existing) {
+    return { id: existing.id, existing: true };
+  }
   const channelId = id("chn");
   const now = Date.now();
   const inserts = [
@@ -120,11 +126,18 @@ export async function joinChannel(
   input: { channelId: string; userId: string },
 ): Promise<boolean> {
   const ch = await getChannel(db, input.channelId);
-  if (!ch) throw apiError("not found", "not found", 404);
-  if (ch.type !== "public") throw apiError("forbidden", "forbidden", 403);
-  if (ch.teamId && !(await getTeamMember(db, ch.teamId, input.userId)))
+  if (!ch) {
+    throw apiError("not found", "not found", 404);
+  }
+  if (ch.type !== "public") {
     throw apiError("forbidden", "forbidden", 403);
-  if (await getChannelMember(db, input.channelId, input.userId)) return false;
+  }
+  if (ch.teamId && !(await getTeamMember(db, ch.teamId, input.userId))) {
+    throw apiError("forbidden", "forbidden", 403);
+  }
+  if (await getChannelMember(db, input.channelId, input.userId)) {
+    return false;
+  }
   await addChannelMember(db, {
     channelId: input.channelId,
     userId: input.userId,
@@ -137,7 +150,9 @@ export async function leaveChannel(
   db: Db,
   input: { channelId: string; userId: string },
 ): Promise<void> {
-  if (!(await getChannelMember(db, input.channelId, input.userId))) return;
+  if (!(await getChannelMember(db, input.channelId, input.userId))) {
+    return;
+  }
   await removeChannelMember(db, input.channelId, input.userId);
 }
 

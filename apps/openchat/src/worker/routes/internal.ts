@@ -1,16 +1,17 @@
 import { Hono } from "hono";
 import { createMiddleware } from "hono/factory";
 import { channelDoName, userDoName, ThumbnailInput, DeleteSubscriptionInput } from "protocol";
-import { getDb } from "../db/client.ts";
-import { getUploadSession } from "../db/repos/uploads.ts";
-import { apiError } from "../lib/errors.ts";
-import { zodValidator } from "../lib/validation.ts";
+import { getDb } from "@worker/db/client";
+import { getUploadSession } from "@worker/db/repos/uploads";
+import { apiError } from "@worker/lib/errors";
+import { zodValidator } from "@worker/lib/validation";
 
 export const internalRoutes = new Hono<{ Bindings: Env }>();
 
 const requireInternalToken = createMiddleware<{ Bindings: Env }>(async (c, next) => {
-  if (c.req.header("x-internal-token") !== c.env.INTERNAL_TOKEN_KEY)
+  if (c.req.header("x-internal-token") !== c.env.INTERNAL_TOKEN_KEY) {
     throw apiError("forbidden", "forbidden", 403);
+  }
   await next();
 });
 
@@ -22,8 +23,9 @@ internalRoutes.post(
     const body = c.req.valid("json");
     const db = getDb(c.env.DB);
     const session = await getUploadSession(db, body.uploadId);
-    if (!session || session.fileOffset !== session.fileSize)
+    if (!session || session.fileOffset !== session.fileSize) {
       throw apiError("not found", "not found", 404);
+    }
     const id = c.env.CHANNEL_DO.idFromName(channelDoName(body.channelId));
     await c.env.CHANNEL_DO.get(id).updateThumbByUpload({
       uploadId: body.uploadId,

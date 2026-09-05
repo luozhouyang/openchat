@@ -1,6 +1,6 @@
 import { eq, and } from "drizzle-orm";
-import type { Preference, PreferenceInsert, Db } from "../types.ts";
-import { preferences } from "../schema-d1.ts";
+import type { Preference, PreferenceInsert, Db } from "@worker/db/types";
+import { preferences } from "@worker/db/schema-d1";
 
 export async function getPreference(
   db: Db,

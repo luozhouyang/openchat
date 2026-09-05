@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
-import type { Role, RoleInsert, Db } from "../types.ts";
-import { roles, schemes } from "../schema-d1.ts";
+import type { Role, RoleInsert, Db } from "@worker/db/types";
+import { roles, schemes } from "@worker/db/schema-d1";
 
 export async function listRoles(db: Db): Promise<Role[]> {
   return db.select().from(roles);

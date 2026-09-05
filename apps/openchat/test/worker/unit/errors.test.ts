@@ -1,5 +1,5 @@
 import { expect, test } from "vite-plus/test";
-import { apiError, HttpError, isHttpError, toErrorBody } from "../../../src/worker/lib/errors.ts";
+import { apiError, HttpError, isHttpError, toErrorBody } from "@worker/lib/errors";
 
 test("HttpError carries code, message, and status", () => {
   const err = new HttpError("NOT_FOUND", "nope", 404);

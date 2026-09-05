@@ -1,5 +1,5 @@
 import { expect, test } from "vite-plus/test";
-import { parsePage } from "../../../src/worker/lib/pagination.ts";
+import { parsePage } from "@worker/lib/pagination";
 
 test("parsePage defaults to page 0 and perPage 60", () => {
   expect(parsePage(new URLSearchParams())).toEqual({ page: 0, perPage: 60 });

@@ -1,6 +1,12 @@
 import { eq } from "drizzle-orm";
-import type { UploadSession, UploadSessionInsert, FileInfo, FileInfoInsert, Db } from "../types.ts";
-import { uploadsessions, fileinfo } from "../schema-d1.ts";
+import type {
+  UploadSession,
+  UploadSessionInsert,
+  FileInfo,
+  FileInfoInsert,
+  Db,
+} from "@worker/db/types";
+import { uploadsessions, fileinfo } from "@worker/db/schema-d1";
 
 export async function createUploadSession(
   db: Db,

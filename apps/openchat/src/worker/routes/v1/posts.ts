@@ -9,17 +9,17 @@ import {
   type PostOutput,
   type ListPostsOutput,
 } from "protocol";
-import { requireSession } from "../../auth/session.ts";
-import { requireChannelRole } from "../../auth/guards.ts";
-import { getDb } from "../../db/client.ts";
+import { requireSession } from "@worker/auth/session";
+import { requireChannelRole } from "@worker/auth/guards";
+import { getDb } from "@worker/db/client";
 import {
   postMessage,
   editMessage,
   deleteMessage,
   getMessageHistory,
-} from "../../services/message.service.ts";
-import { apiError } from "../../lib/errors.ts";
-import { zodValidator } from "../../lib/validation.ts";
+} from "@worker/services/message.service";
+import { apiError } from "@worker/lib/errors";
+import { zodValidator } from "@worker/lib/validation";
 
 export const postsV1 = new Hono<{ Bindings: Env }>();
 
@@ -123,7 +123,9 @@ postsV1.post(
       messageId: c.req.param("postId"),
       pinned: true,
     });
-    if ("error" in res) throw apiError(res.error, res.error, res.status);
+    if ("error" in res) {
+      throw apiError(res.error, res.error, res.status);
+    }
     return c.json({ ok: true });
   },
 );
@@ -138,7 +140,9 @@ postsV1.post(
       messageId: c.req.param("postId"),
       pinned: false,
     });
-    if ("error" in res) throw apiError(res.error, res.error, res.status);
+    if ("error" in res) {
+      throw apiError(res.error, res.error, res.status);
+    }
     return c.json({ ok: true });
   },
 );

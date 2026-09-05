@@ -24,7 +24,9 @@ export function createReactionBatcher(deps: ReactionBatchDeps) {
   return {
     markDirty(messageSeq: number) {
       dirty.add(messageSeq);
-      if (!timer) timer = setTimeout(() => void flush(), 500);
+      if (!timer) {
+        timer = setTimeout(() => void flush(), 500);
+      }
     },
   };
 }

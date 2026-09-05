@@ -1,11 +1,11 @@
 import { createMiddleware } from "hono/factory";
-import { getDb } from "../db/client.ts";
-import { getTeamMember, getTeam } from "../db/repos/teams.ts";
-import { getChannelMember, getChannel } from "../db/repos/channels.ts";
-import { channelMembers, teamMembers } from "../db/schema-d1.ts";
-import type { SessionContext } from "./session.ts";
-import { PERMISSIONS, resolvePermissions, type Permission } from "./rbac.ts";
-import { apiError } from "../lib/errors.ts";
+import { getDb } from "@worker/db/client";
+import { getTeamMember, getTeam } from "@worker/db/repos/teams";
+import { getChannelMember, getChannel } from "@worker/db/repos/channels";
+import { channelMembers, teamMembers } from "@worker/db/schema-d1";
+import type { SessionContext } from "@worker/auth/session";
+import { PERMISSIONS, resolvePermissions, type Permission } from "@worker/auth/rbac";
+import { apiError } from "@worker/lib/errors";
 
 type TeamMember = typeof teamMembers.$inferSelect;
 type ChannelMember = typeof channelMembers.$inferSelect;
@@ -27,31 +27,43 @@ type ResourceOpts = { kind: "team" | "channel"; notFoundError: string };
 export function requirePermission(perm: Permission, resource?: ResourceOpts) {
   return createMiddleware<GuardEnv>(async (c, next) => {
     const session = c.get("session");
-    if (!session) throw apiError("unauthorized", "unauthorized", 401);
+    if (!session) {
+      throw apiError("unauthorized", "unauthorized", 401);
+    }
     const db = getDb(c.env.DB);
     const teamId = c.req.param("teamId");
     const channelId = c.req.param("channelId");
 
     if (resource) {
       const resourceId = resource.kind === "team" ? teamId : channelId;
-      if (!resourceId) throw apiError("not_found", resource.notFoundError, 404);
+      if (!resourceId) {
+        throw apiError("not_found", resource.notFoundError, 404);
+      }
       if (resource.kind === "team") {
-        if (!(await getTeam(db, resourceId)))
+        if (!(await getTeam(db, resourceId))) {
           throw apiError("not_found", resource.notFoundError, 404);
+        }
         const member = await getTeamMember(db, resourceId, session.user.id);
-        if (!member) throw apiError("forbidden", "forbidden", 403);
+        if (!member) {
+          throw apiError("forbidden", "forbidden", 403);
+        }
         c.set("teamMember", member);
       } else {
-        if (!(await getChannel(db, resourceId)))
+        if (!(await getChannel(db, resourceId))) {
           throw apiError("not_found", resource.notFoundError, 404);
+        }
         const member = await getChannelMember(db, resourceId, session.user.id);
-        if (!member) throw apiError("forbidden", "forbidden", 403);
+        if (!member) {
+          throw apiError("forbidden", "forbidden", 403);
+        }
         c.set("channelMember", member);
       }
     }
 
     const perms = await resolvePermissions(db, session.user.id, { teamId, channelId });
-    if (!perms.has(perm)) throw apiError("forbidden", "forbidden", 403);
+    if (!perms.has(perm)) {
+      throw apiError("forbidden", "forbidden", 403);
+    }
     return next();
   });
 }

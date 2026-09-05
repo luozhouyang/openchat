@@ -1,11 +1,10 @@
+import { env, exports } from "cloudflare:workers";
 import { expect, test, beforeAll } from "vite-plus/test";
-import { env } from "cloudflare:test";
-import { exports } from "cloudflare:workers";
 import { and, eq } from "drizzle-orm";
-import { getDb } from "../../../src/worker/db/client.ts";
-import { teamMembers, users } from "../../../src/worker/db/schema-d1.ts";
-import { listRoles } from "../../../src/worker/db/repos/roles.ts";
-import { PERMISSIONS, resolvePermissions } from "../../../src/worker/auth/rbac.ts";
+import { getDb } from "@worker/db/client";
+import { teamMembers, users } from "@worker/db/schema-d1";
+import { listRoles } from "@worker/db/repos/roles";
+import { PERMISSIONS, resolvePermissions } from "@worker/auth/rbac";
 
 const db = getDb(env.DB);
 
@@ -62,7 +61,9 @@ test("bootstrap seeds the 6 built-in roles idempotently", async () => {
 
   const roles = await listRoles(db);
   const names = new Set(roles.map((r) => r.name));
-  for (const name of SEED_NAMES) expect(names.has(name)).toBe(true);
+  for (const name of SEED_NAMES) {
+    expect(names.has(name)).toBe(true);
+  }
   const builtIn = roles.filter((r) => r.builtIn);
   expect(builtIn).toHaveLength(SEED_NAMES.length);
 });

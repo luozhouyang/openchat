@@ -3,11 +3,11 @@ import { drizzleAdapter } from "@better-auth/drizzle-adapter";
 import { admin, bearer, jwt } from "better-auth/plugins";
 import { eq } from "drizzle-orm";
 import { userDoName, id } from "protocol";
-import { getDb } from "./db/client.ts";
-import * as schema from "./db/schema-d1.ts";
-import { users } from "./db/schema-d1.ts";
-import { auditLog } from "./audit.ts";
-import { sendVerificationMail } from "./email.ts";
+import { getDb } from "@worker/db/client";
+import * as schema from "@worker/db/schema-d1";
+import { users } from "@worker/db/schema-d1";
+import { auditLog } from "@worker/audit";
+import { sendVerificationMail } from "@worker/email";
 
 let currentEnv: Env | null = null;
 
@@ -50,7 +50,9 @@ export function makeAuth(env: Env) {
         update: {
           after: async (user) => {
             const env = currentEnv;
-            if (!env) return;
+            if (!env) {
+              return;
+            }
             try {
               const db = getDb(env.DB);
               const rows = await db

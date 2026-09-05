@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { userDoName } from "protocol";
-import { requireSession } from "../../auth/session.ts";
+import { requireSession } from "@worker/auth/session";
 
 interface SidebarChannel {
   channelId: string;
@@ -21,6 +21,7 @@ export const sidebarV1 = new Hono<{ Bindings: Env }>();
 sidebarV1.get("/users/me/sidebar", requireSession, async (c) => {
   const userId = c.get("session")!.user.id;
   const id = c.env.USER_DO.idFromName(userDoName(userId));
-  const result = (await c.env.USER_DO.get(id).sidebar()) as SidebarResult;
+  const stub = c.env.USER_DO.get(id);
+  const result = (await stub.sidebar()) as SidebarResult;
   return c.json(result);
 });

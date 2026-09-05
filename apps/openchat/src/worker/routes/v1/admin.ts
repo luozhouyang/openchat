@@ -17,23 +17,23 @@ import {
   type ChannelSummary,
   type TeamUpdatePayload,
 } from "protocol";
-import { requireAdmin } from "../../auth/admin-gate.ts";
-import type { SessionContext } from "../../auth/session.ts";
-import { getDb } from "../../db/client.ts";
-import { users, teams, channels, teamMembers, channelMembers } from "../../db/schema-d1.ts";
-import { listChannelsForTeam, listChannelMemberIds, getChannel } from "../../db/repos/channels.ts";
-import { getTeam, getTeamMember, countTeamAdmins } from "../../db/repos/teams.ts";
-import { removeChannelMemberFromDo, syncUserChannels } from "../../user-do-sync.ts";
+import { requireAdmin } from "@worker/auth/admin-gate";
+import type { SessionContext } from "@worker/auth/session";
+import { getDb } from "@worker/db/client";
+import { users, teams, channels, teamMembers, channelMembers } from "@worker/db/schema-d1";
+import { listChannelsForTeam, listChannelMemberIds, getChannel } from "@worker/db/repos/channels";
+import { getTeam, getTeamMember, countTeamAdmins } from "@worker/db/repos/teams";
+import { removeChannelMemberFromDo, syncUserChannels } from "@worker/user-do-sync";
 import {
   createChannelBroadcaster,
   createTeamBroadcaster,
   deliverStructure,
-} from "../../structure-broadcast.ts";
-import { auditLog } from "../../audit.ts";
-import { zodValidator } from "../../lib/validation.ts";
-import { apiError } from "../../lib/errors.ts";
-import { updateTeam } from "../../services/team.service.ts";
-import { createInvite } from "../../services/invite.service.ts";
+} from "@worker/structure-broadcast";
+import { auditLog } from "@worker/audit";
+import { zodValidator } from "@worker/lib/validation";
+import { apiError } from "@worker/lib/errors";
+import { updateTeam } from "@worker/services/team.service";
+import { createInvite } from "@worker/services/invite.service";
 
 export const adminV1 = new Hono<{
   Bindings: Env;
@@ -211,7 +211,9 @@ adminV1.put("/teams/:teamId/members/:userId/roles", zodValidator("json", RolesIn
   const teamId = c.req.param("teamId");
   const userId = c.req.param("userId");
   const member = await getTeamMember(db, teamId, userId);
-  if (!member) throw apiError("not found", "not found", 404);
+  if (!member) {
+    throw apiError("not found", "not found", 404);
+  }
   const roles = body.roles;
   if (
     member.roles.split(" ").includes("team_admin") &&
@@ -246,10 +248,18 @@ adminV1.put("/teams/:teamId/members/:userId/roles", zodValidator("json", RolesIn
 adminV1.post("/teams/:teamId/patch", zodValidator("json", PatchTeamInput), async (c) => {
   const body = c.req.valid("json");
   const patch: { displayName?: string; description?: string; archived?: boolean } = {};
-  if (body.displayName !== undefined) patch.displayName = body.displayName;
-  if (body.description !== undefined) patch.description = body.description;
-  if (body.archived !== undefined) patch.archived = body.archived;
-  if (Object.keys(patch).length === 0) throw apiError("invalid", "invalid", 422);
+  if (body.displayName !== undefined) {
+    patch.displayName = body.displayName;
+  }
+  if (body.description !== undefined) {
+    patch.description = body.description;
+  }
+  if (body.archived !== undefined) {
+    patch.archived = body.archived;
+  }
+  if (Object.keys(patch).length === 0) {
+    throw apiError("invalid", "invalid", 422);
+  }
   const db = getDb(c.env.DB);
   const teamId = c.req.param("teamId");
   await updateTeam(db, { teamId, patch });

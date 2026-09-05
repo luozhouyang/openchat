@@ -1,4 +1,5 @@
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { cloudflareTest, readD1Migrations } from "@cloudflare/vitest-plugin";
 import { defineConfig } from "vite-plus";
 
@@ -19,6 +20,11 @@ export default defineConfig(async () => {
         },
       }),
     ],
+    resolve: {
+      alias: {
+        "@worker": fileURLToPath(new URL("./src/worker", import.meta.url)),
+      },
+    },
     test: {
       include: ["test/worker/**/*.test.ts"],
       setupFiles: ["./test/worker/apply-migrations.ts"],

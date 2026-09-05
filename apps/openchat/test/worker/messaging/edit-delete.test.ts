@@ -1,6 +1,5 @@
+import { env, exports } from "cloudflare:workers";
 import { expect, test, beforeAll } from "vite-plus/test";
-import { env } from "cloudflare:test";
-import { exports } from "cloudflare:workers";
 import { channelDoName } from "protocol";
 
 const stub = env.CHANNEL_DO.get(env.CHANNEL_DO.idFromName(channelDoName("c-ed")));
@@ -12,10 +11,14 @@ beforeAll(async () => {
   await stub.membersAdd({ userId: "bob", role: "member" });
   await stub.membersAdd({ userId: "carol", role: "channel_admin" });
   const post = await stub.postMessage("alice", { content: "original", clientToken: "ed-msg" });
-  if ("error" in post) throw new Error(post.error);
+  if ("error" in post) {
+    throw new Error(post.error);
+  }
   msgId = post.messageId;
   const post2 = await stub.postMessage("bob", { content: "bob's", clientToken: "ed-msg2" });
-  if ("error" in post2) throw new Error(post2.error);
+  if ("error" in post2) {
+    throw new Error(post2.error);
+  }
   adminMsgId = post2.messageId;
 });
 
@@ -134,7 +137,9 @@ beforeAll(async () => {
     content: "original",
     clientToken: "ed-http-1",
   });
-  if ("error" in post) throw new Error(post.error);
+  if ("error" in post) {
+    throw new Error(post.error);
+  }
   messageId = post.messageId;
 });
 

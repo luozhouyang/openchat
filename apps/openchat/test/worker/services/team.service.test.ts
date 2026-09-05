@@ -1,15 +1,10 @@
+import { env } from "cloudflare:workers";
 import { expect, test } from "vite-plus/test";
-import { env } from "cloudflare:test";
 import { eq } from "drizzle-orm";
-import { getDb } from "../../../src/worker/db/client.ts";
-import { teams, teamMembers } from "../../../src/worker/db/schema-d1.ts";
-import {
-  createTeam,
-  joinTeam,
-  leaveTeam,
-  updateTeam,
-} from "../../../src/worker/services/team.service.ts";
-import { HttpError } from "../../../src/worker/lib/errors.ts";
+import { getDb } from "@worker/db/client";
+import { teams, teamMembers } from "@worker/db/schema-d1";
+import { createTeam, joinTeam, leaveTeam, updateTeam } from "@worker/services/team.service";
+import { HttpError } from "@worker/lib/errors";
 
 async function expectHttpError(p: Promise<unknown>, code: string, status: number) {
   try {

@@ -1,6 +1,6 @@
 import { eq, and, gt, isNull } from "drizzle-orm";
-import type { Invite, InviteInsert, Db } from "../types.ts";
-import { invites, teamMembers } from "../schema-d1.ts";
+import type { Invite, InviteInsert, Db } from "@worker/db/types";
+import { invites, teamMembers } from "@worker/db/schema-d1";
 
 export async function createInvite(db: Db, row: InviteInsert) {
   await db.insert(invites).values(row);

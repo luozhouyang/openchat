@@ -1,6 +1,5 @@
+import { env, exports } from "cloudflare:workers";
 import { expect, test, beforeAll } from "vite-plus/test";
-import { env } from "cloudflare:test";
-import { exports } from "cloudflare:workers";
 import { channelDoName } from "protocol";
 
 type ChannelStub = ReturnType<typeof env.CHANNEL_DO.get>;
@@ -79,7 +78,9 @@ beforeAll(async () => {
   stub = env.CHANNEL_DO.get(env.CHANNEL_DO.idFromName(channelDoName(channelId)));
   await stub.membersAdd({ userId: ownerId, role: "channel_admin" });
   const post = await stub.postMessage(ownerId, { content: "root post", clientToken: "td1-root" });
-  if ("error" in post) throw new Error(post.error);
+  if ("error" in post) {
+    throw new Error(post.error);
+  }
   rootId = post.messageId;
   rootSeq = post.seq;
 });
@@ -99,7 +100,9 @@ test("replies build thread row with replyCount and participants", async () => {
   expect(r2).not.toHaveProperty("error");
 
   const res = await stub.getThread(rootId);
-  if ("error" in res) throw new Error(res.error);
+  if ("error" in res) {
+    throw new Error(res.error);
+  }
   expect(res.thread.replyCount).toBe(2);
   expect(res.thread.participants).toEqual([memberAId, memberBId]);
   expect(res.thread.channelId).toBe(channelId);
@@ -169,7 +172,9 @@ test("pinMessage on missing message is 404", async () => {
 
 test("message author can pin own message without admin", async () => {
   const own = await stub.postMessage(memberBId, { content: "own pin", clientToken: "td1-pin" });
-  if ("error" in own) throw new Error(own.error);
+  if ("error" in own) {
+    throw new Error(own.error);
+  }
   const res = await stub.pinMessage(memberBId, { messageId: own.messageId, pinned: true });
   expect(res).toEqual({ ok: true });
 });
@@ -191,7 +196,9 @@ test("channel_admin can edit and delete another member's message", async () => {
     content: "victim message",
     clientToken: "td1-admin-edit",
   });
-  if ("error" in victim) throw new Error(victim.error);
+  if ("error" in victim) {
+    throw new Error(victim.error);
+  }
   await stub.membersAdd({ userId: memberAId, role: "channel_admin" });
   expect(
     await stub.editMessage(memberAId, { messageId: victim.messageId, content: "edited by admin" }),

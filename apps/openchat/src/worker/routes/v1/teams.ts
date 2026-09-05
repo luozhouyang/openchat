@@ -16,30 +16,32 @@ import {
   type TeamType,
   type TeamUpdatePayload,
 } from "protocol";
-import { requireSession } from "../../auth/session.ts";
-import { requireTeamRole, requirePermission } from "../../auth/guards.ts";
-import { PERMISSIONS } from "../../auth/rbac.ts";
-import { getDb } from "../../db/client.ts";
-import { teamMembers } from "../../db/schema-d1.ts";
-import { getTeam, listTeamsForUser, getTeamMember } from "../../db/repos/teams.ts";
+import { requireSession } from "@worker/auth/session";
+import { requireTeamRole, requirePermission } from "@worker/auth/guards";
+import { PERMISSIONS } from "@worker/auth/rbac";
+import { getDb } from "@worker/db/client";
+import { teamMembers } from "@worker/db/schema-d1";
+import { getTeam, listTeamsForUser, getTeamMember } from "@worker/db/repos/teams";
 import {
   createTeam,
   joinTeam,
   leaveTeam,
   updateTeam,
   joinByInvite,
-} from "../../services/team.service.ts";
-import { zodValidator } from "../../lib/validation.ts";
-import { apiError } from "../../lib/errors.ts";
-import { syncUserChannels } from "../../user-do-sync.ts";
-import { createTeamBroadcaster } from "../../structure-broadcast.ts";
-import type { Db } from "../../db/types.ts";
+} from "@worker/services/team.service";
+import { zodValidator } from "@worker/lib/validation";
+import { apiError } from "@worker/lib/errors";
+import { syncUserChannels } from "@worker/user-do-sync";
+import { createTeamBroadcaster } from "@worker/structure-broadcast";
+import type { Db } from "@worker/db/types";
 
 export const teamsV1 = new Hono<{ Bindings: Env }>();
 
 async function teamPayload(db: Db, teamId: string): Promise<TeamUpdatePayload | null> {
   const team = await getTeam(db, teamId);
-  if (!team) return null;
+  if (!team) {
+    return null;
+  }
   return {
     id: team.id,
     name: team.name,
@@ -116,7 +118,9 @@ teamsV1.get("/teams/:teamId", requireSession, requireTeamRole("admin"), async (c
   const db = getDb(c.env.DB);
   const teamId = c.req.param("teamId");
   const team = await getTeam(db, teamId);
-  if (!team) throw apiError("not found", "not found", 404);
+  if (!team) {
+    throw apiError("not found", "not found", 404);
+  }
   const member = await getTeamMember(db, teamId, c.get("session")!.user.id);
   const out: TeamOutput = {
     team: {
@@ -149,19 +153,28 @@ teamsV1.put(
   async (c) => {
     const body = c.req.valid("json");
     const patch: { displayName?: string; description?: string; archived?: boolean } = {};
-    if (body.displayName !== undefined) patch.displayName = body.displayName;
-    if (body.description !== undefined) patch.description = body.description;
-    if (body.archived !== undefined) patch.archived = body.archived;
-    if (Object.keys(patch).length === 0) throw apiError("invalid", "invalid", 422);
+    if (body.displayName !== undefined) {
+      patch.displayName = body.displayName;
+    }
+    if (body.description !== undefined) {
+      patch.description = body.description;
+    }
+    if (body.archived !== undefined) {
+      patch.archived = body.archived;
+    }
+    if (Object.keys(patch).length === 0) {
+      throw apiError("invalid", "invalid", 422);
+    }
     const db = getDb(c.env.DB);
     const teamId = c.req.param("teamId");
     await updateTeam(db, { teamId, patch });
     await syncUserChannels(c.env, c.get("session")!.user.id);
     const payload = await teamPayload(db, teamId);
-    if (payload)
+    if (payload) {
       await createTeamBroadcaster(c.env, teamId).broadcast(
         teamUpdatedEvent.parse({ type: "team.updated", team: payload }),
       );
+    }
     return c.json({ ok: true });
   },
 );
@@ -206,8 +219,9 @@ teamsV1.delete(
     const db = getDb(c.env.DB);
     if (userId !== me) {
       const member = await getTeamMember(db, c.req.param("teamId"), me);
-      if (!member || !member.roles.split(" ").includes("team_admin"))
+      if (!member || !member.roles.split(" ").includes("team_admin")) {
         throw apiError("forbidden", "forbidden", 403);
+      }
     }
     const teamId = c.req.param("teamId");
     const member = await getTeamMember(db, teamId, userId);

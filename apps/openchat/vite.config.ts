@@ -22,6 +22,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src/react-app", import.meta.url)),
+      "@worker": fileURLToPath(new URL("./src/worker", import.meta.url)),
     },
   },
   optimizeDeps: {

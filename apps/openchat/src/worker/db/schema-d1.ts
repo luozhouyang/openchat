@@ -7,7 +7,7 @@ import {
   index,
 } from "drizzle-orm/sqlite-core";
 
-export * from "./schema-auth.ts";
+export * from "@worker/db/schema-auth";
 
 export const teams = sqliteTable("teams", {
   id: text("id").primaryKey(),

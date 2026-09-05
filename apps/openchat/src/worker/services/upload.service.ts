@@ -1,17 +1,17 @@
 import { id } from "protocol";
-import { getChannel, getChannelMember } from "../db/repos/channels.ts";
+import { getChannel, getChannelMember } from "@worker/db/repos/channels";
 import {
   createUploadSession,
   getUploadSession,
   completeUploadSession,
   createFileInfo,
   linkFileToPost,
-} from "../db/repos/uploads.ts";
-import { apiError } from "../lib/errors.ts";
-import { sanitizeFilename, presignPut, headObject, type R2Env } from "../r2.ts";
-import { postFileMessage } from "../user-do-sync.ts";
+} from "@worker/db/repos/uploads";
+import { apiError } from "@worker/lib/errors";
+import { sanitizeFilename, presignPut, headObject, type R2Env } from "@worker/r2";
+import { postFileMessage } from "@worker/user-do-sync";
 
-type Db = import("../db/types.ts").Db;
+type Db = import("@worker/db/types").Db;
 
 const MAX_SIZE = 100 * 1024 * 1024;
 const ALLOWED_TYPES = new Set([
@@ -50,13 +50,23 @@ export async function createUpload(
   },
 ) {
   const channel = await getChannel(db, channelId);
-  if (!channel) throw apiError("channel not found", "channel not found", 404);
-  if (channel.archivedAt !== null) throw apiError("archived", "archived", 403);
+  if (!channel) {
+    throw apiError("channel not found", "channel not found", 404);
+  }
+  if (channel.archivedAt !== null) {
+    throw apiError("archived", "archived", 403);
+  }
   const member = await getChannelMember(db, channelId, userId);
-  if (!member) throw apiError("forbidden", "not a member", 403);
+  if (!member) {
+    throw apiError("forbidden", "not a member", 403);
+  }
 
-  if (size > MAX_SIZE) throw apiError("too large", "too large", 422);
-  if (!ALLOWED_TYPES.has(contentType)) throw apiError("type not allowed", "type not allowed", 422);
+  if (size > MAX_SIZE) {
+    throw apiError("too large", "too large", 422);
+  }
+  if (!ALLOWED_TYPES.has(contentType)) {
+    throw apiError("type not allowed", "type not allowed", 422);
+  }
 
   const uploadId = id("upl");
   const safeName = sanitizeFilename(filename);
@@ -80,16 +90,29 @@ export async function completeUpload(
   { uploadId, userId }: { uploadId: string; userId: string },
 ) {
   const session = await getUploadSession(db, uploadId);
-  if (!session) throw apiError("not found", "not found", 404);
-  if (session.userId !== userId) throw apiError("forbidden", "not your upload", 403);
-  if (session.fileOffset === session.fileSize)
+  if (!session) {
+    throw apiError("not found", "not found", 404);
+  }
+  if (session.userId !== userId) {
+    throw apiError("forbidden", "not your upload", 403);
+  }
+  if (session.fileOffset === session.fileSize) {
     throw apiError("already processed", "already processed", 409);
-  if (!session.path) throw apiError("not found", "not found", 404);
+  }
+  if (!session.path) {
+    throw apiError("not found", "not found", 404);
+  }
 
   const obj = await headObject(env.FILES, session.path);
-  if (!obj) throw apiError("object missing", "object missing", 404);
-  if (obj.size !== session.fileSize) throw apiError("size mismatch", "size mismatch", 422);
-  if (obj.contentType !== session.type) throw apiError("type mismatch", "type mismatch", 422);
+  if (!obj) {
+    throw apiError("object missing", "object missing", 404);
+  }
+  if (obj.size !== session.fileSize) {
+    throw apiError("size mismatch", "size mismatch", 422);
+  }
+  if (obj.contentType !== session.type) {
+    throw apiError("type mismatch", "type mismatch", 422);
+  }
 
   await completeUploadSession(db, { id: session.id, fileOffset: session.fileSize ?? 0 });
   const messageId = await postFileMessage(env, session.channelId!, session.userId!, {

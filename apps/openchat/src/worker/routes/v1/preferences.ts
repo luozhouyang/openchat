@@ -6,18 +6,18 @@ import {
   PreferencesOutput,
   PreferenceValueOutput,
 } from "protocol";
-import type { SessionContext } from "../../auth/session.ts";
-import { requireSession } from "../../auth/session.ts";
-import { getDb } from "../../db/client.ts";
-import { users } from "../../db/schema-d1.ts";
-import { getPreference } from "../../db/repos/preferences.ts";
+import type { SessionContext } from "@worker/auth/session";
+import { requireSession } from "@worker/auth/session";
+import { getDb } from "@worker/db/client";
+import { users } from "@worker/db/schema-d1";
+import { getPreference } from "@worker/db/repos/preferences";
 import {
   getPreferences,
   setPreferences,
   deletePreferences,
-} from "../../services/preference.service.ts";
-import { zodValidator } from "../../lib/validation.ts";
-import { apiError } from "../../lib/errors.ts";
+} from "@worker/services/preference.service";
+import { zodValidator } from "@worker/lib/validation";
+import { apiError } from "@worker/lib/errors";
 
 type PrefCtx = Context<{ Bindings: Env; Variables: { session: SessionContext } }>;
 
@@ -29,7 +29,9 @@ function targetUserId(c: PrefCtx, raw: string): string {
 
 async function canAccess(c: PrefCtx, targetId: string): Promise<boolean> {
   const sessionId = c.get("session")!.user.id;
-  if (targetId === sessionId) return true;
+  if (targetId === sessionId) {
+    return true;
+  }
   const db = getDb(c.env.DB);
   const roleRows = await db
     .select({ role: users.role })
@@ -45,7 +47,9 @@ preferencesV1.get(
   requireSession,
   async (c) => {
     const userId = targetUserId(c, c.req.param("userId"));
-    if (!(await canAccess(c, userId))) throw apiError("forbidden", "forbidden", 403);
+    if (!(await canAccess(c, userId))) {
+      throw apiError("forbidden", "forbidden", 403);
+    }
     const db = getDb(c.env.DB);
     const row = await getPreference(db, {
       userId,
@@ -59,7 +63,9 @@ preferencesV1.get(
 
 preferencesV1.get("/users/:userId/preferences/:category", requireSession, async (c) => {
   const userId = targetUserId(c, c.req.param("userId"));
-  if (!(await canAccess(c, userId))) throw apiError("forbidden", "forbidden", 403);
+  if (!(await canAccess(c, userId))) {
+    throw apiError("forbidden", "forbidden", 403);
+  }
   const db = getDb(c.env.DB);
   const { preferences } = await getPreferences(db, userId);
   const category = c.req.param("category");
@@ -71,7 +77,9 @@ preferencesV1.get("/users/:userId/preferences/:category", requireSession, async 
 
 preferencesV1.get("/users/:userId/preferences", requireSession, async (c) => {
   const userId = targetUserId(c, c.req.param("userId"));
-  if (!(await canAccess(c, userId))) throw apiError("forbidden", "forbidden", 403);
+  if (!(await canAccess(c, userId))) {
+    throw apiError("forbidden", "forbidden", 403);
+  }
   const db = getDb(c.env.DB);
   const out: PreferencesOutput = await getPreferences(db, userId);
   return c.json(out);
@@ -83,7 +91,9 @@ preferencesV1.put(
   zodValidator("json", PutPreferencesInput),
   async (c) => {
     const userId = targetUserId(c, c.req.param("userId"));
-    if (!(await canAccess(c, userId))) throw apiError("forbidden", "forbidden", 403);
+    if (!(await canAccess(c, userId))) {
+      throw apiError("forbidden", "forbidden", 403);
+    }
     const body = c.req.valid("json");
     const db = getDb(c.env.DB);
     await setPreferences(
@@ -101,7 +111,9 @@ preferencesV1.delete(
   zodValidator("json", DeletePreferencesInput),
   async (c) => {
     const userId = targetUserId(c, c.req.param("userId"));
-    if (!(await canAccess(c, userId))) throw apiError("forbidden", "forbidden", 403);
+    if (!(await canAccess(c, userId))) {
+      throw apiError("forbidden", "forbidden", 403);
+    }
     const body = c.req.valid("json");
     const db = getDb(c.env.DB);
     await deletePreferences(

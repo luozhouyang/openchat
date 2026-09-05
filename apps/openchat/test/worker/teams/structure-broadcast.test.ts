@@ -1,10 +1,6 @@
+import { env, exports } from "cloudflare:workers";
 import { expect, test } from "vite-plus/test";
-import { exports } from "cloudflare:workers";
-import {
-  createChannelBroadcaster,
-  createTeamBroadcaster,
-} from "../../../src/worker/structure-broadcast.ts";
-import { env } from "cloudflare:test";
+import { createChannelBroadcaster, createTeamBroadcaster } from "@worker/structure-broadcast";
 
 async function signup(email: string, username: string): Promise<string> {
   const res = await exports.default.fetch("http://localhost/api/auth/sign-up/email", {
@@ -56,8 +52,11 @@ async function upgrade(cookie: string, deviceId: string): Promise<TestSocket> {
     read: () =>
       new Promise<MessageEvent>((resolve) => {
         const buffered = queue.shift();
-        if (buffered) resolve(buffered);
-        else waiter = resolve;
+        if (buffered) {
+          resolve(buffered);
+        } else {
+          waiter = resolve;
+        }
       }),
   };
 }

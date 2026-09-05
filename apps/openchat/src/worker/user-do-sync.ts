@@ -1,6 +1,6 @@
 import { channelDoName, userDoName } from "protocol";
-import { getDb } from "./db/client.ts";
-import { listChannelsForUser } from "./db/repos/channels.ts";
+import { getDb } from "@worker/db/client";
+import { listChannelsForUser } from "@worker/db/repos/channels";
 
 export async function syncUserChannels(env: Env, userId: string) {
   const db = getDb(env.DB);
@@ -38,6 +38,8 @@ export async function postFileMessage(
     clientToken: `file-${attachment.fileId}`,
     attachments: [attachment],
   });
-  if ("error" in res) throw new Error(`post file message failed: ${res.status}`);
+  if ("error" in res) {
+    throw new Error(`post file message failed: ${res.status}`);
+  }
   return res.messageId;
 }

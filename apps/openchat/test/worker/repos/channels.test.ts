@@ -1,7 +1,7 @@
+import { env } from "cloudflare:workers";
 import { expect, test } from "vite-plus/test";
-import { env } from "cloudflare:test";
-import { getDb } from "../../../src/worker/db/client.ts";
-import { createTeam, listChannelIdsForUserInTeam } from "../../../src/worker/db/repos/teams.ts";
+import { getDb } from "@worker/db/client";
+import { createTeam, listChannelIdsForUserInTeam } from "@worker/db/repos/teams";
 import {
   createChannel,
   getChannel,
@@ -13,7 +13,7 @@ import {
   removeChannelMember,
   listChannelMemberIds,
   listChannelsByIds,
-} from "../../../src/worker/db/repos/channels.ts";
+} from "@worker/db/repos/channels";
 
 const db = getDb(env.DB);
 

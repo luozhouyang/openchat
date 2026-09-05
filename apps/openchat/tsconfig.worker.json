@@ -3,7 +3,10 @@
   "compilerOptions": {
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.worker.tsbuildinfo",
     "types": ["@cloudflare/workers-types", "@cloudflare/vitest-plugin/types"],
-    "allowJs": true
+    "allowJs": true,
+    "paths": {
+      "@worker/*": ["./src/worker/*"]
+    }
   },
   "include": ["src/worker", "test/worker", "worker-configuration.d.ts"]
 }

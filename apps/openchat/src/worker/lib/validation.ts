@@ -6,7 +6,9 @@ export function zodValidator<T extends ZodType>(
   schema: T,
 ) {
   return zValidator(target, schema, (result, c) => {
-    if (result.success) return undefined;
+    if (result.success) {
+      return undefined;
+    }
     return c.json(
       {
         error: "invalid input",

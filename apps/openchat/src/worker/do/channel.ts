@@ -4,12 +4,12 @@ import { migrate } from "drizzle-orm/durable-sqlite/migrator";
 import { and, asc, count, desc, eq, gt, inArray, isNull, lt } from "drizzle-orm";
 import { id, userDoName, isAllowedEmoji, type MessageType, type NotifPref } from "protocol";
 import migrations from "../../../migrations/channel-do/migrations";
-import * as schema from "../db/schema-channel-do.ts";
-import * as schemaD1 from "../db/schema-d1.ts";
-import { getDb } from "../db/client.ts";
-import { setThumbnail } from "../db/repos/uploads.ts";
-import { createBroadcaster } from "./broadcast.ts";
-import { createReactionBatcher } from "./reaction-batch.ts";
+import * as schema from "@worker/db/schema-channel-do";
+import * as schemaD1 from "@worker/db/schema-d1";
+import { getDb } from "@worker/db/client";
+import { setThumbnail } from "@worker/db/repos/uploads";
+import { createBroadcaster } from "@worker/do/broadcast";
+import { createReactionBatcher } from "@worker/do/reaction-batch";
 
 interface HistoryMessage {
   id: string;
@@ -85,7 +85,9 @@ export class ChannelDO extends DurableObject<Env> {
     const rows = await this.db
       .select({ userId: schema.memberState.userId })
       .from(schema.memberState);
-    if (rows.length <= SMALL_CHANNEL_THRESHOLD) return rows.map((r) => r.userId);
+    if (rows.length <= SMALL_CHANNEL_THRESHOLD) {
+      return rows.map((r) => r.userId);
+    }
     const online = await this.fetchOnlineMemberIds(rows.map((r) => r.userId));
     return online === null ? rows.map((r) => r.userId) : online;
   }
@@ -96,7 +98,9 @@ export class ChannelDO extends DurableObject<Env> {
       .from(schema.memberState)
       .where(eq(schema.memberState.userId, callerUserId))
       .limit(1);
-    if (member.length === 0) return { error: "not a member", status: 403 };
+    if (member.length === 0) {
+      return { error: "not a member", status: 403 };
+    }
     await this.broadcast({
       type: "typing.start",
       userId: callerUserId,
@@ -112,16 +116,13 @@ export class ChannelDO extends DurableObject<Env> {
   }
 
   async health(): Promise<{ ok: boolean; members: number; online: number }> {
-    const members = (await this.db.select().from(schema.memberState)).length;
-    const online =
-      (
-        await this.fetchOnlineMemberIds(
-          (
-            await this.db.select({ userId: schema.memberState.userId }).from(schema.memberState)
-          ).map((r) => r.userId),
-        )
-      )?.length ?? 0;
-    return { ok: true, members, online };
+    const memberRows = await this.db
+      .select({ userId: schema.memberState.userId })
+      .from(schema.memberState);
+    const memberIds = memberRows.map((r) => r.userId);
+    const onlineIds = await this.fetchOnlineMemberIds(memberIds);
+    const online = onlineIds?.length ?? 0;
+    return { ok: true, members: memberRows.length, online };
   }
 
   async count(): Promise<{ count: number }> {
@@ -139,7 +140,9 @@ export class ChannelDO extends DurableObject<Env> {
       .where(eq(schema.memberState.userId, body.userId))
       .limit(1);
     const member = memberRows[0];
-    if (!member) return { error: "not a member", status: 403 };
+    if (!member) {
+      return { error: "not a member", status: 403 };
+    }
     const newRead = Math.max(member.lastReadSeq, body.seq);
     await this.db
       .update(schema.memberState)
@@ -165,7 +168,9 @@ export class ChannelDO extends DurableObject<Env> {
       .from(schema.memberState)
       .where(eq(schema.memberState.userId, body.userId))
       .limit(1);
-    if (member.length === 0) return { error: "not a member", status: 403 };
+    if (member.length === 0) {
+      return { error: "not a member", status: 403 };
+    }
     await this.db
       .update(schema.memberState)
       .set({ notifPref: body.pref })
@@ -184,7 +189,9 @@ export class ChannelDO extends DurableObject<Env> {
       .where(eq(schema.memberState.userId, userId))
       .limit(1);
     const member = memberRows[0];
-    if (!member) return { error: "not a member", status: 403 };
+    if (!member) {
+      return { error: "not a member", status: 403 };
+    }
     const maxRow = await this.db
       .select({ seq: schema.messages.seq })
       .from(schema.messages)
@@ -207,17 +214,22 @@ export class ChannelDO extends DurableObject<Env> {
     | { messageId: string; seq: number; deduplicated?: boolean }
     | { error: string; status: 403 | 422 | 429 }
   > {
-    if (body.content.length > 16384 || (body.type !== "file" && !body.content))
+    if (body.content.length > 16384 || (body.type !== "file" && !body.content)) {
       return { error: "invalid", status: 422 };
+    }
     const member = await this.db
       .select()
       .from(schema.memberState)
       .where(eq(schema.memberState.userId, senderUserId))
       .limit(1);
-    if (member.length === 0) return { error: "not a member", status: 403 };
+    if (member.length === 0) {
+      return { error: "not a member", status: 403 };
+    }
     const now = Date.now();
     const hits = (this.rates.get(senderUserId) ?? []).filter((t) => now - t < 1000);
-    if (hits.length >= 5) return { error: "rate limited", status: 429 };
+    if (hits.length >= 5) {
+      return { error: "rate limited", status: 429 };
+    }
     hits.push(now);
     this.rates.set(senderUserId, hits);
     const dupRows = await this.db
@@ -254,7 +266,9 @@ export class ChannelDO extends DurableObject<Env> {
     const mentionPattern = /@\[([a-zA-Z0-9]+)\]/g;
     const mentions: string[] = [];
     for (const m of body.content.matchAll(mentionPattern)) {
-      if (!mentions.includes(m[1])) mentions.push(m[1]);
+      if (!mentions.includes(m[1])) {
+        mentions.push(m[1]);
+      }
     }
     const validMentions: string[] = [];
     for (const userId of mentions) {
@@ -263,7 +277,9 @@ export class ChannelDO extends DurableObject<Env> {
         .from(schema.memberState)
         .where(eq(schema.memberState.userId, userId))
         .limit(1);
-      if (member.length > 0) validMentions.push(userId);
+      if (member.length > 0) {
+        validMentions.push(userId);
+      }
     }
     const messageId = id("msg");
     const result = await this.db
@@ -288,7 +304,9 @@ export class ChannelDO extends DurableObject<Env> {
     });
     await this.updateMeta(msg.id, senderUserId, body.content, now);
     for (const userId of validMentions) {
-      if (userId === senderUserId) continue;
+      if (userId === senderUserId) {
+        continue;
+      }
       const memberRows = await this.db
         .select()
         .from(schema.memberState)
@@ -322,7 +340,9 @@ export class ChannelDO extends DurableObject<Env> {
     const existing = existingRows[0];
     if (existing) {
       const participants = JSON.parse(existing.participants ?? "[]") as string[];
-      if (!participants.includes(senderUserId)) participants.push(senderUserId);
+      if (!participants.includes(senderUserId)) {
+        participants.push(senderUserId);
+      }
       await this.db
         .update(schema.threads)
         .set({
@@ -355,9 +375,13 @@ export class ChannelDO extends DurableObject<Env> {
       .from(schema.messages)
       .where(eq(schema.messages.id, body.messageId))
       .limit(1);
-    if (rows.length === 0) return { error: "not found", status: 404 };
+    if (rows.length === 0) {
+      return { error: "not found", status: 404 };
+    }
     const msg = rows[0];
-    if (msg.deletedAt !== null) return { error: "deleted", status: 410 };
+    if (msg.deletedAt !== null) {
+      return { error: "deleted", status: 410 };
+    }
     const callerRows = await this.db
       .select()
       .from(schema.memberState)
@@ -365,8 +389,12 @@ export class ChannelDO extends DurableObject<Env> {
       .limit(1);
     const callerRole = callerRows[0]?.role;
     const isAdmin = this.isChannelAdmin(callerRole);
-    if (msg.userId !== callerUserId && !isAdmin) return { error: "forbidden", status: 403 };
-    if (!body.content || body.content.length > 16384) return { error: "invalid", status: 422 };
+    if (msg.userId !== callerUserId && !isAdmin) {
+      return { error: "forbidden", status: 403 };
+    }
+    if (!body.content || body.content.length > 16384) {
+      return { error: "invalid", status: 422 };
+    }
     const editedAt = Date.now();
     await this.db
       .update(schema.messages)
@@ -390,7 +418,9 @@ export class ChannelDO extends DurableObject<Env> {
       .from(schema.messages)
       .where(eq(schema.messages.id, body.messageId))
       .limit(1);
-    if (rows.length === 0) return { error: "not found", status: 404 };
+    if (rows.length === 0) {
+      return { error: "not found", status: 404 };
+    }
     const row = rows[0];
     await this.db
       .update(schema.messages)
@@ -424,7 +454,9 @@ export class ChannelDO extends DurableObject<Env> {
       })
       .from(schema.messages);
     for (const r of rows) {
-      if (!r.attachments) continue;
+      if (!r.attachments) {
+        continue;
+      }
       const atts = JSON.parse(r.attachments) as { fileId?: string; thumbUrl?: string }[];
       let changed = false;
       for (const a of atts) {
@@ -458,9 +490,13 @@ export class ChannelDO extends DurableObject<Env> {
       .from(schema.messages)
       .where(eq(schema.messages.id, body.messageId))
       .limit(1);
-    if (rows.length === 0) return { error: "not found", status: 404 };
+    if (rows.length === 0) {
+      return { error: "not found", status: 404 };
+    }
     const msg = rows[0];
-    if (msg.deletedAt !== null) return { ok: true };
+    if (msg.deletedAt !== null) {
+      return { ok: true };
+    }
     const callerRows = await this.db
       .select()
       .from(schema.memberState)
@@ -468,7 +504,9 @@ export class ChannelDO extends DurableObject<Env> {
       .limit(1);
     const callerRole = callerRows[0]?.role;
     const isAdmin = this.isChannelAdmin(callerRole);
-    if (msg.userId !== callerUserId && !isAdmin) return { error: "forbidden", status: 403 };
+    if (msg.userId !== callerUserId && !isAdmin) {
+      return { error: "forbidden", status: 403 };
+    }
     await this.db
       .update(schema.messages)
       .set({ deletedAt: Date.now() })
@@ -486,7 +524,9 @@ export class ChannelDO extends DurableObject<Env> {
       .from(schema.messages)
       .where(eq(schema.messages.id, body.messageId))
       .limit(1);
-    if (rows.length === 0) return { error: "not found", status: 404 };
+    if (rows.length === 0) {
+      return { error: "not found", status: 404 };
+    }
     const msg = rows[0];
     const callerRows = await this.db
       .select()
@@ -495,7 +535,9 @@ export class ChannelDO extends DurableObject<Env> {
       .limit(1);
     const callerRole = callerRows[0]?.role;
     const isAdmin = this.isChannelAdmin(callerRole);
-    if (msg.userId !== callerUserId && !isAdmin) return { error: "forbidden", status: 403 };
+    if (msg.userId !== callerUserId && !isAdmin) {
+      return { error: "forbidden", status: 403 };
+    }
     await this.db
       .update(schema.messages)
       .set({ isPinned: body.pinned, updatedAt: Date.now() })
@@ -585,7 +627,9 @@ export class ChannelDO extends DurableObject<Env> {
       .from(schema.messages)
       .where(eq(schema.messages.id, body.messageId))
       .limit(1);
-    if (rows.length === 0) return { error: "message not found", status: 404 };
+    if (rows.length === 0) {
+      return { error: "message not found", status: 404 };
+    }
     const row = rows[0];
     return this.toggleReactionCore(callerUserId, row.seq, body.emoji);
   }
@@ -598,7 +642,9 @@ export class ChannelDO extends DurableObject<Env> {
       .from(schema.messages)
       .where(eq(schema.messages.id, messageId))
       .limit(1);
-    if (rows.length === 0) return { error: "message not found", status: 404 };
+    if (rows.length === 0) {
+      return { error: "message not found", status: 404 };
+    }
     const row = rows[0];
     return this.reactionSnapshot(row.seq);
   }
@@ -608,19 +654,25 @@ export class ChannelDO extends DurableObject<Env> {
     messageSeq: number,
     emoji: string,
   ): Promise<{ error: string; status: 403 | 404 | 422 } | void> {
-    if (!isAllowedEmoji(emoji)) return { error: "invalid emoji", status: 422 };
+    if (!isAllowedEmoji(emoji)) {
+      return { error: "invalid emoji", status: 422 };
+    }
     const member = await this.db
       .select()
       .from(schema.memberState)
       .where(eq(schema.memberState.userId, callerUserId))
       .limit(1);
-    if (member.length === 0) return { error: "not a member", status: 403 };
+    if (member.length === 0) {
+      return { error: "not a member", status: 403 };
+    }
     const msg = await this.db
       .select()
       .from(schema.messages)
       .where(eq(schema.messages.seq, messageSeq))
       .limit(1);
-    if (msg.length === 0) return { error: "message not found", status: 404 };
+    if (msg.length === 0) {
+      return { error: "message not found", status: 404 };
+    }
     const existing = await this.db
       .select()
       .from(schema.reactions)
@@ -671,7 +723,9 @@ export class ChannelDO extends DurableObject<Env> {
       .from(schema.threads)
       .where(eq(schema.threads.postId, postId))
       .limit(1);
-    if (rows.length === 0) return { error: "not found", status: 404 };
+    if (rows.length === 0) {
+      return { error: "not found", status: 404 };
+    }
     const row = rows[0];
     return {
       thread: {
@@ -707,7 +761,9 @@ export class ChannelDO extends DurableObject<Env> {
       .from(schema.memberState)
       .where(eq(schema.memberState.userId, userId))
       .limit(1);
-    if (member.length === 0) return { error: "not a member", status: 403 };
+    if (member.length === 0) {
+      return { error: "not a member", status: 403 };
+    }
     const now = Date.now();
     await this.db
       .insert(schema.threadMemberships)
@@ -728,7 +784,9 @@ export class ChannelDO extends DurableObject<Env> {
       .from(schema.memberState)
       .where(eq(schema.memberState.userId, userId))
       .limit(1);
-    if (member.length === 0) return { error: "not a member", status: 403 };
+    if (member.length === 0) {
+      return { error: "not a member", status: 403 };
+    }
     await this.db
       .insert(schema.threadMemberships)
       .values({ postId: body.postId, userId, following: body.following })
@@ -791,7 +849,9 @@ export class ChannelDO extends DurableObject<Env> {
       })
       .from(schema.memberState);
     const prefs = new Map<string, NotifPref>();
-    for (const row of rows) prefs.set(row.userId, row.notifPref as NotifPref);
+    for (const row of rows) {
+      prefs.set(row.userId, row.notifPref as NotifPref);
+    }
 
     let targets: string[];
     if (rows.length <= SMALL_CHANNEL_THRESHOLD) {
@@ -826,7 +886,9 @@ export class ChannelDO extends DurableObject<Env> {
           .where(
             and(eq(schemaD1.userStatus.online, true), inArray(schemaD1.userStatus.userId, chunk)),
           );
-        for (const r of rows) out.push(r.userId);
+        for (const r of rows) {
+          out.push(r.userId);
+        }
       }
       return out;
     } catch {
@@ -840,7 +902,9 @@ export class ChannelDO extends DurableObject<Env> {
       .from(schema.threadSubscriptions)
       .where(eq(schema.threadSubscriptions.parentId, parentId));
     for (const sub of subs) {
-      if (sub.userId === senderId) continue;
+      if (sub.userId === senderId) {
+        continue;
+      }
       await this.pushToUser(sub.userId, { type: "thread.reply", parentId, message });
     }
   }

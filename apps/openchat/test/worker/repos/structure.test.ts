@@ -1,7 +1,7 @@
+import { env } from "cloudflare:workers";
 import { expect, test } from "vite-plus/test";
-import { env } from "cloudflare:test";
 import { sql } from "drizzle-orm";
-import { getDb } from "../../../src/worker/db/client.ts";
+import { getDb } from "@worker/db/client";
 
 test("structure tables exist after migration", async () => {
   const db = getDb(env.DB);

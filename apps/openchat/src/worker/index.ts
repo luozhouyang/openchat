@@ -1,9 +1,9 @@
-import { createApp } from "./app.ts";
-import { handleWsUpgrade } from "./routes/ws.ts";
-import { ensureSeedRoles } from "./auth/rbac.ts";
-import { getDb } from "./db/client.ts";
-import { UserDO } from "./do/user.ts";
-import { ChannelDO } from "./do/channel.ts";
+import { createApp } from "@worker/app";
+import { handleWsUpgrade } from "@worker/routes/ws";
+import { ensureSeedRoles } from "@worker/auth/rbac";
+import { getDb } from "@worker/db/client";
+import { UserDO } from "@worker/do/user";
+import { ChannelDO } from "@worker/do/channel";
 
 export { UserDO, ChannelDO };
 
@@ -12,7 +12,9 @@ const app = createApp();
 let seeded = false;
 
 async function ensureSeeded(env: Env) {
-  if (seeded) return;
+  if (seeded) {
+    return;
+  }
   seeded = true;
   try {
     await ensureSeedRoles(getDb(env.DB));

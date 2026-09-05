@@ -1,10 +1,10 @@
+import { env } from "cloudflare:workers";
 import { expect, test, beforeAll } from "vite-plus/test";
-import { env } from "cloudflare:test";
 import { channelDoName } from "protocol";
-import { getDb } from "../../../src/worker/db/client.ts";
-import { createChannel } from "../../../src/worker/db/repos/channels.ts";
-import { createTeam } from "../../../src/worker/db/repos/teams.ts";
-import { createUpload, completeUpload } from "../../../src/worker/services/upload.service.ts";
+import { getDb } from "@worker/db/client";
+import { createChannel } from "@worker/db/repos/channels";
+import { createTeam } from "@worker/db/repos/teams";
+import { createUpload, completeUpload } from "@worker/services/upload.service";
 
 const OWNER = "upl-svc-alice";
 const TEAM = "upl-svc-team";

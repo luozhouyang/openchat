@@ -1,8 +1,7 @@
+import { env, exports } from "cloudflare:workers";
 import { expect, test } from "vite-plus/test";
-import { env } from "cloudflare:test";
-import { exports } from "cloudflare:workers";
 import { sql } from "drizzle-orm";
-import { getDb } from "../../src/worker/db/client.ts";
+import { getDb } from "@worker/db/client";
 
 test("GET /health returns ok", async () => {
   const res = await exports.default.fetch("http://localhost/health");

@@ -1,15 +1,15 @@
+import { env } from "cloudflare:workers";
 import { expect, test, beforeAll } from "vite-plus/test";
-import { env } from "cloudflare:test";
 import { channelDoName } from "protocol";
-import { getDb } from "../../../src/worker/db/client.ts";
-import { addChannelMember, createChannel } from "../../../src/worker/db/repos/channels.ts";
-import { createTeam } from "../../../src/worker/db/repos/teams.ts";
+import { getDb } from "@worker/db/client";
+import { addChannelMember, createChannel } from "@worker/db/repos/channels";
+import { createTeam } from "@worker/db/repos/teams";
 import {
   postMessage,
   editMessage,
   deleteMessage,
   getMessageHistory,
-} from "../../../src/worker/services/message.service.ts";
+} from "@worker/services/message.service";
 
 const OWNER = "msg-svc-alice";
 const OUTSIDER = "msg-svc-bob";

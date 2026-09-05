@@ -1,8 +1,8 @@
+import { env } from "cloudflare:workers";
 import { expect, test } from "vite-plus/test";
-import type { Team, ChannelDoMessage } from "../../../src/worker/db/types.ts";
-import { getDb } from "../../../src/worker/db/client.ts";
-import { env } from "cloudflare:test";
-import { teams } from "../../../src/worker/db/schema-d1.ts";
+import type { Team, ChannelDoMessage } from "@worker/db/types";
+import { getDb } from "@worker/db/client";
+import { teams } from "@worker/db/schema-d1";
 import { eq } from "drizzle-orm";
 
 test("db/types exports row types usable with drizzle results", async () => {

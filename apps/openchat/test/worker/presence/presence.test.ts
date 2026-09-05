@@ -1,11 +1,10 @@
+import { env, exports } from "cloudflare:workers";
 import { expect, test, beforeAll } from "vite-plus/test";
-import { env } from "cloudflare:test";
-import { exports } from "cloudflare:workers";
 import { userDoName } from "protocol";
 import type { PresenceStatus } from "protocol";
 import { eq } from "drizzle-orm";
-import { getDb } from "../../../src/worker/db/client.ts";
-import * as schemaD1 from "../../../src/worker/db/schema-d1.ts";
+import { getDb } from "@worker/db/client";
+import * as schemaD1 from "@worker/db/schema-d1";
 
 let aliceCookie = "";
 let aliceId = "";
@@ -68,7 +67,9 @@ async function waitForStatus(userId: string, expected: PresenceStatus, timeoutMs
   let status: PresenceStatus = "offline";
   while (Date.now() < deadline) {
     ({ status } = await stub.presenceStatus());
-    if (status === expected) return;
+    if (status === expected) {
+      return;
+    }
     await new Promise((r) => setTimeout(r, 100));
   }
   expect(status).toBe(expected);
@@ -77,7 +78,9 @@ async function waitForStatus(userId: string, expected: PresenceStatus, timeoutMs
 async function waitFor(predicate: () => Promise<boolean>, timeoutMs = 5000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    if (await predicate()) return;
+    if (await predicate()) {
+      return;
+    }
     await new Promise((r) => setTimeout(r, 100));
   }
   throw new Error("timed out");

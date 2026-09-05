@@ -1,7 +1,8 @@
+import { env } from "cloudflare:workers";
 import { expect, test, beforeAll } from "vite-plus/test";
-import { env, runInDurableObject } from "cloudflare:test";
+import { runInDurableObject } from "cloudflare:test";
 import { channelDoName, issueInternalToken, userDoName } from "protocol";
-import * as schema from "../../../src/worker/db/schema-channel-do.ts";
+import * as schema from "@worker/db/schema-channel-do";
 
 const channelId = "c-ws-actions";
 const channel = env.CHANNEL_DO.get(env.CHANNEL_DO.idFromName(channelDoName(channelId)));
@@ -16,7 +17,9 @@ beforeAll(async () => {
     content: "root",
     clientToken: "ws-actions-root",
   });
-  if ("error" in post) throw new Error(post.error);
+  if ("error" in post) {
+    throw new Error(post.error);
+  }
   rootId = post.messageId;
   msgSeq = post.seq;
 });
@@ -57,7 +60,9 @@ async function collect(ws: WebSocket, n: number): Promise<unknown[]> {
 async function waitFor(predicate: () => Promise<boolean>, timeoutMs = 3000): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    if (await predicate()) return true;
+    if (await predicate()) {
+      return true;
+    }
     await new Promise((r) => setTimeout(r, 20));
   }
   return false;

@@ -1,6 +1,5 @@
+import { env, exports } from "cloudflare:workers";
 import { expect, test, beforeAll } from "vite-plus/test";
-import { env } from "cloudflare:test";
-import { exports } from "cloudflare:workers";
 import { issueInternalToken, userDoName } from "protocol";
 
 let sessionCookie = "";

@@ -1,12 +1,12 @@
+import { env } from "cloudflare:workers";
 import { expect, test } from "vite-plus/test";
-import { env } from "cloudflare:test";
-import { getDb } from "../../../src/worker/db/client.ts";
+import { getDb } from "@worker/db/client";
 import {
   getPreference,
   setPreference,
   listPreferences,
   deletePreference,
-} from "../../../src/worker/db/repos/preferences.ts";
+} from "@worker/db/repos/preferences";
 
 const db = getDb(env.DB);
 

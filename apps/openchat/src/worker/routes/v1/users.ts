@@ -1,19 +1,19 @@
 import { Hono } from "hono";
 import { eq, inArray } from "drizzle-orm";
 import { WorkspaceResponse, type ChannelSummary, type ChannelType, type TeamType } from "protocol";
-import { requireSession } from "../../auth/session.ts";
-import { resolvePermissions } from "../../auth/rbac.ts";
-import { getDb } from "../../db/client.ts";
-import { users } from "../../db/schema-d1.ts";
-import type { Db } from "../../db/types.ts";
-import { listTeamsForUser } from "../../db/repos/teams.ts";
+import { requireSession } from "@worker/auth/session";
+import { resolvePermissions } from "@worker/auth/rbac";
+import { getDb } from "@worker/db/client";
+import { users } from "@worker/db/schema-d1";
+import type { Db } from "@worker/db/types";
+import { listTeamsForUser } from "@worker/db/repos/teams";
 import {
   listChannelsForTeam,
   listChannelsForUser,
   listChannelMemberIds,
-} from "../../db/repos/channels.ts";
-import { syncUserChannels } from "../../user-do-sync.ts";
-import { apiError } from "../../lib/errors.ts";
+} from "@worker/db/repos/channels";
+import { syncUserChannels } from "@worker/user-do-sync";
+import { apiError } from "@worker/lib/errors";
 
 export const usersV1 = new Hono<{ Bindings: Env }>();
 
@@ -22,7 +22,9 @@ usersV1.get("/users/me", requireSession, async (c) => {
   const session = c.get("session")!;
   const rows = await db.select().from(users).where(eq(users.id, session.user.id)).limit(1);
   const row = rows[0];
-  if (!row) throw apiError("not_found", "not found", 404);
+  if (!row) {
+    throw apiError("not_found", "not found", 404);
+  }
   return c.json({
     user: {
       id: row.id,
@@ -73,9 +75,8 @@ usersV1.get("/users/me/workspaces", requireSession, async (c) => {
       .filter((r) => r.channel.teamId === null)
       .map(async (r) => {
         const summary = toSummary(r.channel, true);
-        const memberIds = (await listChannelMemberIds(db, r.channel.id)).filter(
-          (id) => id !== userId,
-        );
+        const allMemberIds = await listChannelMemberIds(db, r.channel.id);
+        const memberIds = allMemberIds.filter((id) => id !== userId);
         summary.displayName = directDisplayName(r.channel.type, await memberNames(db, memberIds));
         return summary;
       }),
@@ -86,7 +87,9 @@ usersV1.get("/users/me/workspaces", requireSession, async (c) => {
 });
 
 export async function memberNames(db: Db, userIds: string[]): Promise<string[]> {
-  if (userIds.length === 0) return [];
+  if (userIds.length === 0) {
+    return [];
+  }
   const rows = await db
     .select({ nickname: users.nickname, name: users.name, email: users.email })
     .from(users)
@@ -95,8 +98,12 @@ export async function memberNames(db: Db, userIds: string[]): Promise<string[]> 
 }
 
 export function directDisplayName(type: string, names: string[]): string {
-  if (names.length === 0) return type === "dm" ? "私聊" : "群组";
-  if (type === "dm") return names[0];
+  if (names.length === 0) {
+    return type === "dm" ? "私聊" : "群组";
+  }
+  if (type === "dm") {
+    return names[0];
+  }
   const head = names.slice(0, 2).join(", ");
   const rest = names.length - 2;
   return rest > 0 ? `${head}, +${rest}` : head;

@@ -1,5 +1,5 @@
 import { userDoName } from "protocol";
-import { UserDO } from "./user.ts";
+import { UserDO } from "@worker/do/user";
 
 export interface BroadcastDeps {
   env: { USER_DO: DurableObjectNamespace<UserDO>; channelId: string };
@@ -49,7 +49,9 @@ export function createBroadcaster(deps: BroadcastDeps) {
         }
         entry.events.push(event);
       }
-      if (!timer) timer = setTimeout(() => void flush(), 100);
+      if (!timer) {
+        timer = setTimeout(() => void flush(), 100);
+      }
     },
   };
 }

@@ -1,6 +1,6 @@
 import { eq, and, like } from "drizzle-orm";
-import type { Team, TeamMember, TeamMemberInsert, Db } from "../types.ts";
-import { teams, teamMembers, channels, channelMembers } from "../schema-d1.ts";
+import type { Team, TeamMember, TeamMemberInsert, Db } from "@worker/db/types";
+import { teams, teamMembers, channels, channelMembers } from "@worker/db/schema-d1";
 
 export async function createTeam(
   db: Db,

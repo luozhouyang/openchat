@@ -1,8 +1,7 @@
+import { env, exports } from "cloudflare:workers";
 import { expect, test, beforeAll } from "vite-plus/test";
-import { env } from "cloudflare:test";
-import { exports } from "cloudflare:workers";
-import { getDb } from "../../../src/worker/db/client.ts";
-import { invites, teamMembers } from "../../../src/worker/db/schema-d1.ts";
+import { getDb } from "@worker/db/client";
+import { invites, teamMembers } from "@worker/db/schema-d1";
 
 let aliceCookie = "";
 let teamId = "";

@@ -8,13 +8,13 @@ import {
   type ThreadOutput,
   type MyThreadsOutput,
 } from "protocol";
-import type { SessionContext } from "../../auth/session.ts";
-import { requireSession } from "../../auth/session.ts";
-import { getDb } from "../../db/client.ts";
-import { getChannel, getChannelMember } from "../../db/repos/channels.ts";
-import { getTeam, getTeamMember, listChannelIdsForUserInTeam } from "../../db/repos/teams.ts";
-import { apiError } from "../../lib/errors.ts";
-import { zodValidator } from "../../lib/validation.ts";
+import type { SessionContext } from "@worker/auth/session";
+import { requireSession } from "@worker/auth/session";
+import { getDb } from "@worker/db/client";
+import { getChannel, getChannelMember } from "@worker/db/repos/channels";
+import { getTeam, getTeamMember, listChannelIdsForUserInTeam } from "@worker/db/repos/teams";
+import { apiError } from "@worker/lib/errors";
+import { zodValidator } from "@worker/lib/validation";
 
 type ThreadsCtx = Context<{ Bindings: Env; Variables: { session: SessionContext } }>;
 
@@ -27,9 +27,13 @@ function channelStub(env: Env, channelId: string) {
 async function requireChannelMember(c: ThreadsCtx, channelId: string) {
   const db = getDb(c.env.DB);
   const channel = await getChannel(db, channelId);
-  if (!channel) throw apiError("not found", "channel not found", 404);
+  if (!channel) {
+    throw apiError("not found", "channel not found", 404);
+  }
   const member = await getChannelMember(db, channelId, c.get("session")!.user.id);
-  if (!member) throw apiError("forbidden", "forbidden", 403);
+  if (!member) {
+    throw apiError("forbidden", "forbidden", 403);
+  }
 }
 
 threadsV1.get(
@@ -40,7 +44,9 @@ threadsV1.get(
     const body = c.req.valid("query");
     await requireChannelMember(c, body.channelId);
     const res = await channelStub(c.env, body.channelId).getThread(c.req.param("postId"));
-    if ("error" in res) throw apiError(res.error, res.error, res.status);
+    if ("error" in res) {
+      throw apiError(res.error, res.error, res.status);
+    }
     return c.json(res as ThreadOutput);
   },
 );
@@ -48,17 +54,25 @@ threadsV1.get("/users/:userId/teams/:teamId/threads", requireSession, async (c) 
   const db = getDb(c.env.DB);
   const me = c.get("session")!.user.id;
   const target = c.req.param("userId") === "me" ? me : c.req.param("userId");
-  if (target !== me) throw apiError("forbidden", "forbidden", 403);
+  if (target !== me) {
+    throw apiError("forbidden", "forbidden", 403);
+  }
   const teamId = c.req.param("teamId");
   const team = await getTeam(db, teamId);
-  if (!team) throw apiError("not found", "team not found", 404);
+  if (!team) {
+    throw apiError("not found", "team not found", 404);
+  }
   const teamMember = await getTeamMember(db, teamId, target);
-  if (!teamMember) throw apiError("forbidden", "forbidden", 403);
+  if (!teamMember) {
+    throw apiError("forbidden", "forbidden", 403);
+  }
   const channelIds = await listChannelIdsForUserInTeam(db, teamId, target);
   const threads: ThreadInfo[] = [];
   for (const channelId of channelIds) {
     const res = await channelStub(c.env, channelId).threadsForUser(target);
-    if ("error" in res) continue;
+    if ("error" in res) {
+      continue;
+    }
     for (const t of res.threads) {
       threads.push({ ...t, channelId });
     }
@@ -76,7 +90,9 @@ threadsV1.post(
     const res = await channelStub(c.env, body.channelId).threadMarkRead(c.get("session")!.user.id, {
       postId: c.req.param("postId"),
     });
-    if ("error" in res) throw apiError(res.error, res.error, res.status);
+    if ("error" in res) {
+      throw apiError(res.error, res.error, res.status);
+    }
     return c.json({ ok: true });
   },
 );
@@ -91,7 +107,9 @@ threadsV1.post(
       postId: c.req.param("postId"),
       following: body.state,
     });
-    if ("error" in res) throw apiError(res.error, res.error, res.status);
+    if ("error" in res) {
+      throw apiError(res.error, res.error, res.status);
+    }
     return c.json({ ok: true });
   },
 );

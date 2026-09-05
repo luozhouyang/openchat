@@ -1,8 +1,8 @@
 import { issueInternalToken, userDoName } from "protocol";
 import { eq } from "drizzle-orm";
-import { getDb } from "../db/client.ts";
-import { users } from "../db/schema-d1.ts";
-import { verifyAuthJwt } from "../jwks.ts";
+import { getDb } from "@worker/db/client";
+import { users } from "@worker/db/schema-d1";
+import { verifyAuthJwt } from "@worker/jwks";
 
 export async function handleWsUpgrade(request: Request, env: Env): Promise<Response> {
   // Browsers cannot set custom headers on WebSocket, so the bearer token is
@@ -12,10 +12,14 @@ export async function handleWsUpgrade(request: Request, env: Env): Promise<Respo
   const token =
     (authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null) ??
     url.searchParams.get("token");
-  if (!token) return new Response("missing token", { status: 401 });
+  if (!token) {
+    return new Response("missing token", { status: 401 });
+  }
 
   const claims = await verifyAuthJwt(token, env);
-  if (!claims) return new Response("invalid token", { status: 401 });
+  if (!claims) {
+    return new Response("invalid token", { status: 401 });
+  }
 
   const db = getDb(env.DB);
   const rows = await db
@@ -24,7 +28,9 @@ export async function handleWsUpgrade(request: Request, env: Env): Promise<Respo
     .where(eq(users.id, claims.sub))
     .limit(1);
   const row = rows[0];
-  if (row?.banned) return new Response("banned", { status: 403 });
+  if (row?.banned) {
+    return new Response("banned", { status: 403 });
+  }
 
   const internal = await issueInternalToken({
     subject: `user:${claims.sub}`,

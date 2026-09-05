@@ -1,6 +1,12 @@
 import { eq, and, inArray } from "drizzle-orm";
-import type { Channel, ChannelInsert, ChannelMember, ChannelMemberInsert, Db } from "../types.ts";
-import { channels, channelMembers } from "../schema-d1.ts";
+import type {
+  Channel,
+  ChannelInsert,
+  ChannelMember,
+  ChannelMemberInsert,
+  Db,
+} from "@worker/db/types";
+import { channels, channelMembers } from "@worker/db/schema-d1";
 
 export async function createChannel(
   db: Db,
@@ -72,6 +78,8 @@ export async function listChannelMemberIds(db: Db, channelId: string): Promise<s
 }
 
 export async function listChannelsByIds(db: Db, ids: string[]): Promise<Channel[]> {
-  if (ids.length === 0) return [];
+  if (ids.length === 0) {
+    return [];
+  }
   return db.select().from(channels).where(inArray(channels.id, ids));
 }

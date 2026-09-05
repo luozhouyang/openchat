@@ -1,6 +1,6 @@
+import { env } from "cloudflare:workers";
 import { expect, test } from "vite-plus/test";
-import { env } from "cloudflare:test";
-import { getDb } from "../../../src/worker/db/client.ts";
+import { getDb } from "@worker/db/client";
 import {
   createTeam,
   getTeam,
@@ -9,7 +9,7 @@ import {
   addTeamMember,
   removeTeamMember,
   countTeamAdmins,
-} from "../../../src/worker/db/repos/teams.ts";
+} from "@worker/db/repos/teams";
 
 const db = getDb(env.DB);
 

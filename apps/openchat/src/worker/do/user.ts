@@ -5,10 +5,10 @@ import { asc, count, eq } from "drizzle-orm";
 import { channelDoName, helloEvent, parseClientFrame, verifyInternalToken } from "protocol";
 import type { PresenceStatus } from "protocol";
 import migrations from "../../../migrations/user-do/migrations";
-import { getDb } from "../db/client.ts";
-import { listChannelsByIds } from "../db/repos/channels.ts";
-import * as schema from "../db/schema-user-do.ts";
-import * as schemaD1 from "../db/schema-d1.ts";
+import { getDb } from "@worker/db/client";
+import { listChannelsByIds } from "@worker/db/repos/channels";
+import * as schema from "@worker/db/schema-user-do";
+import * as schemaD1 from "@worker/db/schema-d1";
 
 interface SidebarEntry {
   channelId: string;
@@ -65,8 +65,12 @@ export class UserDO extends DurableObject<Env> {
   }
 
   private status(): PresenceStatus {
-    if (this.ctx.getWebSockets().length === 0) return "offline";
-    if (Date.now() - this.lastActivity() > 5 * 60_000) return "away";
+    if (this.ctx.getWebSockets().length === 0) {
+      return "offline";
+    }
+    if (Date.now() - this.lastActivity() > 5 * 60_000) {
+      return "away";
+    }
     return "online";
   }
 
@@ -74,14 +78,18 @@ export class UserDO extends DurableObject<Env> {
     let last = this.lastActiveAt;
     for (const ws of this.ctx.getWebSockets()) {
       const att = ws.deserializeAttachment() as { lastActivity?: number } | null;
-      if (att?.lastActivity) last = Math.max(last, att.lastActivity);
+      if (att?.lastActivity) {
+        last = Math.max(last, att.lastActivity);
+      }
     }
     return last;
   }
 
   private armAwayAlarm(base = Date.now()): Promise<void> {
     const awayAt = base + 5 * 60_000;
-    if (this.awayAlarmAt > awayAt) return Promise.resolve();
+    if (this.awayAlarmAt > awayAt) {
+      return Promise.resolve();
+    }
     this.awayAlarmAt = awayAt;
     return this.ctx.storage.setAlarm(awayAt);
   }
@@ -121,8 +129,9 @@ export class UserDO extends DurableObject<Env> {
       existing.status === effective &&
       existing.online === online &&
       existing.lastActivityAt === lastActivityAt
-    )
+    ) {
       return;
+    }
     await db
       .update(schemaD1.userStatus)
       .set({
@@ -173,7 +182,9 @@ export class UserDO extends DurableObject<Env> {
           channelId: readEvent.channelId,
           lastReadSeq: readEvent.lastReadSeq,
         });
-        for (const ws of sockets) ws.send(payload);
+        for (const ws of sockets) {
+          ws.send(payload);
+        }
         continue;
       }
       const payload = JSON.stringify({
@@ -181,7 +192,9 @@ export class UserDO extends DurableObject<Env> {
         channelId: body.channelId,
         event: ev,
       });
-      for (const ws of sockets) ws.send(payload);
+      for (const ws of sockets) {
+        ws.send(payload);
+      }
       if (body.channelId && e.type === "message.new" && e.message) {
         const existingRows = await this.db
           .select()
@@ -227,7 +240,9 @@ export class UserDO extends DurableObject<Env> {
             at: e.message.createdAt ?? Date.now(),
           },
         };
-        for (const ws of sockets) ws.send(JSON.stringify(update));
+        for (const ws of sockets) {
+          ws.send(JSON.stringify(update));
+        }
       }
     }
     for (const ev of body.events) {
@@ -236,31 +251,46 @@ export class UserDO extends DurableObject<Env> {
         message?: { id: string; mentions?: string[] | null; content?: string };
         notifPref?: "all" | "mention" | "none";
       };
-      if (e.type !== "message.new" && e.type !== "thread.reply") continue;
-      if (!e.message) continue;
-      if (!body.channelId) continue;
+      if (e.type !== "message.new" && e.type !== "thread.reply") {
+        continue;
+      }
+      if (!e.message) {
+        continue;
+      }
+      if (!body.channelId) {
+        continue;
+      }
 
       const hasActiveForeground = this.ctx.getWebSockets().some((conn) => {
         const att = conn.deserializeAttachment() as { lastActivity?: number } | null;
         return att?.lastActivity !== undefined && Date.now() - att.lastActivity < 30_000;
       });
-      if (hasActiveForeground) continue;
+      if (hasActiveForeground) {
+        continue;
+      }
 
       const pref = e.notifPref ?? "all";
-      if (pref === "none") continue;
+      if (pref === "none") {
+        continue;
+      }
       const mentions = e.message.mentions ?? [];
       if (
         pref === "mention" &&
         !mentions.includes(this.userId) &&
         !this.isBroadcastMention(e.message)
-      )
+      ) {
         continue;
+      }
 
       const subs = await this.db.select().from(schema.pushSubscriptions);
-      if (subs.length === 0) continue;
+      if (subs.length === 0) {
+        continue;
+      }
 
       const dedupeKey = `${body.channelId}:${e.message.id}`;
-      if ((this.recentPush.get(dedupeKey) ?? 0) > Date.now() - 60_000) continue;
+      if ((this.recentPush.get(dedupeKey) ?? 0) > Date.now() - 60_000) {
+        continue;
+      }
       this.recentPush.set(dedupeKey, Date.now());
 
       const payload = {
@@ -312,7 +342,9 @@ export class UserDO extends DurableObject<Env> {
               this.env.CHANNEL_DO.idFromName(channelDoName(row.channelId)),
             );
             const unreadInfo = await stub.unread(this.userId);
-            if ("error" in unreadInfo) return;
+            if ("error" in unreadInfo) {
+              return;
+            }
             const metaInfo = await stub.meta();
             results.push({
               channelId: row.channelId,
@@ -336,9 +368,13 @@ export class UserDO extends DurableObject<Env> {
     const existing = await this.db.select().from(schema.channelsCache);
     const current = new Set(existing.map((r) => r.channelId));
     const same = channelIds.length === current.size && channelIds.every((id) => current.has(id));
-    if (same) return { changed: false };
+    if (same) {
+      return { changed: false };
+    }
     await this.db.delete(schema.channelsCache);
-    if (channelIds.length === 0) return { changed: true };
+    if (channelIds.length === 0) {
+      return { changed: true };
+    }
     await this.db.insert(schema.channelsCache).values(channelIds.map((id) => ({ channelId: id })));
     await this.ensureDefaultCategories(this.userId);
     return { changed: true };
@@ -347,7 +383,9 @@ export class UserDO extends DurableObject<Env> {
   async pushStructure(event: unknown): Promise<void> {
     const payload = JSON.stringify(event);
     for (const ws of this.ctx.getWebSockets()) {
-      if (ws.readyState === WebSocket.OPEN) ws.send(payload);
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(payload);
+      }
     }
   }
 
@@ -398,14 +436,18 @@ export class UserDO extends DurableObject<Env> {
     }
 
     const cacheRows = await this.db.select().from(schema.channelsCache);
-    if (cacheRows.length === 0) return;
+    if (cacheRows.length === 0) {
+      return;
+    }
     const assigned = await this.db
       .select()
       .from(schema.sidebarchannels)
       .where(eq(schema.sidebarchannels.userId, userId));
     const assignedIds = new Set(assigned.map((r) => r.channelId));
     const unassigned = cacheRows.filter((r) => !assignedIds.has(r.channelId));
-    if (unassigned.length === 0) return;
+    if (unassigned.length === 0) {
+      return;
+    }
 
     let typeByChannel = new Map<string, string>();
     try {
@@ -618,12 +660,16 @@ export class UserDO extends DurableObject<Env> {
   }
 
   async alarm(): Promise<void> {
-    if (this.ctx.getWebSockets().length === 0) return;
+    if (this.ctx.getWebSockets().length === 0) {
+      return;
+    }
     if (this.status() === "online") {
       await this.armAwayAlarm(this.lastActivity());
       return;
     }
-    if (this.awayNotified) return;
+    if (this.awayNotified) {
+      return;
+    }
     this.awayNotified = true;
     await this.persistStatus("away");
   }
@@ -671,7 +717,9 @@ export class UserDO extends DurableObject<Env> {
   async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer) {
     const data = typeof message === "string" ? message : new TextDecoder().decode(message);
     const frame = parseClientFrame(data);
-    if (!frame) return;
+    if (!frame) {
+      return;
+    }
     // Any valid client frame proves the device is alive: refresh the
     // activity clock that drives presence (away) and push suppression
     // (hasActiveForeground). Without this, a client that never sends the
@@ -683,7 +731,9 @@ export class UserDO extends DurableObject<Env> {
     if (frame.type === "mark_read") {
       const attachment = ws.deserializeAttachment() as { userId?: string } | null;
       const userId = attachment?.userId;
-      if (!userId) return;
+      if (!userId) {
+        return;
+      }
       const id = this.env.CHANNEL_DO.idFromName(channelDoName(frame.channelId));
       void this.env.CHANNEL_DO.get(id).readMark({ userId, seq: frame.seq });
     }
@@ -715,9 +765,13 @@ export class UserDO extends DurableObject<Env> {
     if (frame.type === "typing") {
       const attachment = ws.deserializeAttachment() as { userId?: string } | null;
       const userId = attachment?.userId;
-      if (!userId) return;
+      if (!userId) {
+        return;
+      }
       const now = Date.now();
-      if ((this.lastTyping.get(frame.channelId) ?? 0) > now - 3000) return;
+      if ((this.lastTyping.get(frame.channelId) ?? 0) > now - 3000) {
+        return;
+      }
       this.lastTyping.set(frame.channelId, now);
       const id = this.env.CHANNEL_DO.idFromName(channelDoName(frame.channelId));
       void this.env.CHANNEL_DO.get(id).typing(userId);
@@ -725,7 +779,9 @@ export class UserDO extends DurableObject<Env> {
     if (frame.type === "react") {
       const attachment = ws.deserializeAttachment() as { userId?: string } | null;
       const userId = attachment?.userId;
-      if (!userId) return;
+      if (!userId) {
+        return;
+      }
       const stub = this.env.CHANNEL_DO.get(
         this.env.CHANNEL_DO.idFromName(channelDoName(frame.channelId)),
       );
@@ -740,7 +796,9 @@ export class UserDO extends DurableObject<Env> {
     if (frame.type === "subscribe_thread") {
       const attachment = ws.deserializeAttachment() as { userId?: string } | null;
       const userId = attachment?.userId;
-      if (!userId) return;
+      if (!userId) {
+        return;
+      }
       const stub = this.env.CHANNEL_DO.get(
         this.env.CHANNEL_DO.idFromName(channelDoName(frame.channelId)),
       );

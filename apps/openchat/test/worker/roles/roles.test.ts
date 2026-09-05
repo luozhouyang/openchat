@@ -1,9 +1,8 @@
+import { env, exports } from "cloudflare:workers";
 import { expect, test } from "vite-plus/test";
-import { env } from "cloudflare:test";
-import { exports } from "cloudflare:workers";
 import { eq } from "drizzle-orm";
-import { getDb } from "../../../src/worker/db/client.ts";
-import { roles, users } from "../../../src/worker/db/schema-d1.ts";
+import { getDb } from "@worker/db/client";
+import { roles, users } from "@worker/db/schema-d1";
 
 async function signup(email: string): Promise<{ cookie: string; userId: string }> {
   const res = await exports.default.fetch("http://localhost/api/auth/sign-up/email", {

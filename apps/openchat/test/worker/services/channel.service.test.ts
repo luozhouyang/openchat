@@ -1,8 +1,8 @@
+import { env } from "cloudflare:workers";
 import { expect, test } from "vite-plus/test";
-import { env } from "cloudflare:test";
 import { eq } from "drizzle-orm";
-import { getDb } from "../../../src/worker/db/client.ts";
-import { channels, channelMembers } from "../../../src/worker/db/schema-d1.ts";
+import { getDb } from "@worker/db/client";
+import { channels, channelMembers } from "@worker/db/schema-d1";
 import {
   createChannel,
   openDirect,
@@ -11,9 +11,9 @@ import {
   leaveChannel,
   archiveChannel,
   restoreChannel,
-} from "../../../src/worker/services/channel.service.ts";
-import { createTeam, joinTeam } from "../../../src/worker/services/team.service.ts";
-import { HttpError } from "../../../src/worker/lib/errors.ts";
+} from "@worker/services/channel.service";
+import { createTeam, joinTeam } from "@worker/services/team.service";
+import { HttpError } from "@worker/lib/errors";
 
 const db = getDb(env.DB);
 

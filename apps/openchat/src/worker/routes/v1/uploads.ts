@@ -1,9 +1,9 @@
 import { Hono } from "hono";
 import { UploadRequest, type CreateUploadOutput, type CompleteUploadOutput } from "protocol";
-import { requireSession } from "../../auth/session.ts";
-import { getDb } from "../../db/client.ts";
-import { createUpload, completeUpload } from "../../services/upload.service.ts";
-import { zodValidator } from "../../lib/validation.ts";
+import { requireSession } from "@worker/auth/session";
+import { getDb } from "@worker/db/client";
+import { createUpload, completeUpload } from "@worker/services/upload.service";
+import { zodValidator } from "@worker/lib/validation";
 
 export const uploadsV1 = new Hono<{ Bindings: Env }>();
 

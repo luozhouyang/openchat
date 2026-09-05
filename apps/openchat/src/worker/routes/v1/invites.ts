@@ -10,19 +10,19 @@ import {
   type InvitePreviewOutput,
   type AcceptInviteOutput,
 } from "protocol";
-import { requireSession } from "../../auth/session.ts";
-import { requireTeamRole } from "../../auth/guards.ts";
-import { getDb } from "../../db/client.ts";
-import { getTeamMember } from "../../db/repos/teams.ts";
-import * as repo from "../../db/repos/invites.ts";
+import { requireSession } from "@worker/auth/session";
+import { requireTeamRole } from "@worker/auth/guards";
+import { getDb } from "@worker/db/client";
+import { getTeamMember } from "@worker/db/repos/teams";
+import * as repo from "@worker/db/repos/invites";
 import {
   createInvite,
   revokeInvite,
   previewInvite,
   acceptInvite,
-} from "../../services/invite.service.ts";
-import { apiError } from "../../lib/errors.ts";
-import { zodValidator } from "../../lib/validation.ts";
+} from "@worker/services/invite.service";
+import { apiError } from "@worker/lib/errors";
+import { zodValidator } from "@worker/lib/validation";
 
 export const invitesV1 = new Hono<{ Bindings: Env }>();
 
@@ -55,8 +55,9 @@ invitesV1.post(
     const db = getDb(c.env.DB);
     const me = c.get("session")!.user.id;
     const member = await getTeamMember(db, body.teamId, me);
-    if (!member || !member.roles.split(" ").includes("team_admin"))
+    if (!member || !member.roles.split(" ").includes("team_admin")) {
       throw apiError("forbidden", "forbidden", 403);
+    }
     const invite = await createInvite(db, c.env, {
       teamId: body.teamId,
       email: body.email,

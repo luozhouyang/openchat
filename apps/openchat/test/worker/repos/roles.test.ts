@@ -1,7 +1,7 @@
+import { env } from "cloudflare:workers";
 import { expect, test } from "vite-plus/test";
-import { env } from "cloudflare:test";
-import { getDb } from "../../../src/worker/db/client.ts";
-import { listRoles, getRoleByName, createRole } from "../../../src/worker/db/repos/roles.ts";
+import { getDb } from "@worker/db/client";
+import { listRoles, getRoleByName, createRole } from "@worker/db/repos/roles";
 
 const db = getDb(env.DB);
 

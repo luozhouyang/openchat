@@ -1,9 +1,8 @@
+import { env, exports } from "cloudflare:workers";
 import { expect, test } from "vite-plus/test";
-import { env } from "cloudflare:test";
-import { exports } from "cloudflare:workers";
 import { channelDoName } from "protocol";
-import { getDb } from "../../../src/worker/db/client.ts";
-import { uploadsessions } from "../../../src/worker/db/schema-d1.ts";
+import { getDb } from "@worker/db/client";
+import { uploadsessions } from "@worker/db/schema-d1";
 
 function channelStub(channelId: string) {
   return env.CHANNEL_DO.get(env.CHANNEL_DO.idFromName(channelDoName(channelId)));
@@ -22,7 +21,9 @@ async function postFileMessage(
       { fileId, key: `uploads/c-file/${fileId}/a.png`, name: "a.png", size: 10, mime: "image/png" },
     ],
   });
-  if ("error" in res) throw new Error(`post file message failed: ${res.status}`);
+  if ("error" in res) {
+    throw new Error(`post file message failed: ${res.status}`);
+  }
   return res.messageId;
 }
 

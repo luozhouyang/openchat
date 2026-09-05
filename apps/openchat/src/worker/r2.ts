@@ -49,6 +49,8 @@ export async function headObject(
   key: string,
 ): Promise<{ size: number; contentType: string | null } | null> {
   const obj = await files.head(key);
-  if (!obj) return null;
+  if (!obj) {
+    return null;
+  }
   return { size: obj.size, contentType: obj.httpMetadata?.contentType ?? null };
 }

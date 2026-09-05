@@ -1,12 +1,12 @@
 import { eq } from "drizzle-orm";
 import { id } from "protocol";
-import type { Db } from "../db/types.ts";
-import { users } from "../db/schema-d1.ts";
-import * as repo from "../db/repos/invites.ts";
-import { getTeam, getTeamMember } from "../db/repos/teams.ts";
-import { sendInviteEmail } from "../email.ts";
-import { generateInviteToken, hashToken, maskEmail, normalizeEmail } from "../invites.ts";
-import { apiError } from "../lib/errors.ts";
+import type { Db } from "@worker/db/types";
+import { users } from "@worker/db/schema-d1";
+import * as repo from "@worker/db/repos/invites";
+import { getTeam, getTeamMember } from "@worker/db/repos/teams";
+import { sendInviteEmail } from "@worker/email";
+import { generateInviteToken, hashToken, maskEmail, normalizeEmail } from "@worker/invites";
+import { apiError } from "@worker/lib/errors";
 
 const TTL_MS = 48 * 3600_000;
 
@@ -16,10 +16,13 @@ export async function createInvite(
   { teamId, email, createdBy }: { teamId: string; email: string; createdBy: string },
 ) {
   const team = await getTeam(db, teamId);
-  if (!team) throw apiError("not found", "team not found", 404);
+  if (!team) {
+    throw apiError("not found", "team not found", 404);
+  }
   const normalized = normalizeEmail(email);
-  if (await repo.hasPendingInvite(db, team.id, normalized))
+  if (await repo.hasPendingInvite(db, team.id, normalized)) {
     throw apiError("pending invite exists", "pending invite exists", 409);
+  }
   const token = generateInviteToken();
   const inviteId = id("inv");
   const expiresAt = Date.now() + TTL_MS;
@@ -42,7 +45,9 @@ export async function revokeInvite(
   { teamId, inviteId }: { teamId: string; inviteId: string },
 ) {
   const invite = await repo.getInvite(db, inviteId);
-  if (!invite || invite.teamId !== teamId) throw apiError("not found", "invite not found", 404);
+  if (!invite || invite.teamId !== teamId) {
+    throw apiError("not found", "invite not found", 404);
+  }
   await repo.revokeInvite(db, invite.id);
   return { ok: true };
 }
@@ -58,7 +63,9 @@ export async function previewInvite(db: Db, { token }: { token: string }) {
     throw apiError("not found", "not found", 404);
   }
   const team = await getTeam(db, invite.teamId);
-  if (!team || team.archivedAt) throw apiError("not found", "not found", 404);
+  if (!team || team.archivedAt) {
+    throw apiError("not found", "not found", 404);
+  }
   return {
     teamId: team.id,
     teamName: team.displayName,
@@ -74,7 +81,9 @@ export async function acceptInvite(db: Db, { token, userId }: { token: string; u
     .where(eq(users.id, userId))
     .limit(1);
   const user = userRows[0];
-  if (!user) throw apiError("unauthorized", "unauthorized", 401);
+  if (!user) {
+    throw apiError("unauthorized", "unauthorized", 401);
+  }
   const tokenHash = await hashToken(token);
   const invite = await repo.getInviteByTokenHash(db, tokenHash);
   if (
@@ -85,17 +94,24 @@ export async function acceptInvite(db: Db, { token, userId }: { token: string; u
   ) {
     throw apiError("invitation invalid", "invitation invalid", 400);
   }
-  if (normalizeEmail(user.email) !== invite.email)
+  if (normalizeEmail(user.email) !== invite.email) {
     throw apiError("invitation email mismatch", "invitation email mismatch", 403);
+  }
   const team = await getTeam(db, invite.teamId);
-  if (!team || team.archivedAt) throw apiError("invitation invalid", "invitation invalid", 400);
-  if (await getTeamMember(db, invite.teamId, userId)) return { ok: true, teamId: invite.teamId };
+  if (!team || team.archivedAt) {
+    throw apiError("invitation invalid", "invitation invalid", 400);
+  }
+  if (await getTeamMember(db, invite.teamId, userId)) {
+    return { ok: true, teamId: invite.teamId };
+  }
 
   const consumed = await repo.consumeInviteAndAddMember(db, {
     tokenHash,
     userId,
     teamId: invite.teamId,
   });
-  if (!consumed) throw apiError("invitation invalid", "invitation invalid", 400);
+  if (!consumed) {
+    throw apiError("invitation invalid", "invitation invalid", 400);
+  }
   return { ok: true, teamId: invite.teamId };
 }

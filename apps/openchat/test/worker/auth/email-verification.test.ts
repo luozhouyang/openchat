@@ -1,5 +1,5 @@
-import { expect, test } from "vite-plus/test";
 import { exports } from "cloudflare:workers";
+import { expect, test } from "vite-plus/test";
 
 async function signup(email: string, password: string, name: string) {
   const res = await exports.default.fetch("http://localhost/api/auth/sign-up/email", {

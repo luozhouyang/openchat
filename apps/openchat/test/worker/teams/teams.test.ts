@@ -1,12 +1,11 @@
+import { env, exports } from "cloudflare:workers";
 import { expect, test, beforeAll } from "vite-plus/test";
-import { env } from "cloudflare:test";
-import { exports } from "cloudflare:workers";
 import { userDoName } from "protocol";
 import { eq } from "drizzle-orm";
-import { getDb } from "../../../src/worker/db/client.ts";
-import { createChannel } from "../../../src/worker/db/repos/channels.ts";
-import { roles } from "../../../src/worker/db/schema-d1.ts";
-import { openDirect } from "../../../src/worker/services/channel.service.ts";
+import { getDb } from "@worker/db/client";
+import { createChannel } from "@worker/db/repos/channels";
+import { roles } from "@worker/db/schema-d1";
+import { openDirect } from "@worker/services/channel.service";
 
 async function signup(email: string, password: string): Promise<string> {
   const res = await exports.default.fetch("http://localhost/api/auth/sign-up/email", {

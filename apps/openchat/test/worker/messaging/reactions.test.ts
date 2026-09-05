@@ -1,5 +1,5 @@
+import { env } from "cloudflare:workers";
 import { expect, test, beforeAll } from "vite-plus/test";
-import { env } from "cloudflare:test";
 import { channelDoName } from "protocol";
 
 const stub = env.CHANNEL_DO.get(env.CHANNEL_DO.idFromName(channelDoName("c-react")));
@@ -11,7 +11,9 @@ beforeAll(async () => {
     content: "react to me",
     clientToken: "react-msg",
   });
-  if ("error" in post) throw new Error(post.error);
+  if ("error" in post) {
+    throw new Error(post.error);
+  }
   msgSeq = post.seq;
 });
 

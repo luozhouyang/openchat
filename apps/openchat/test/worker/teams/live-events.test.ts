@@ -1,5 +1,5 @@
-import { expect, test } from "vite-plus/test";
 import { exports } from "cloudflare:workers";
+import { expect, test } from "vite-plus/test";
 
 async function signup(email: string, username: string): Promise<string> {
   const res = await exports.default.fetch("http://localhost/api/auth/sign-up/email", {
@@ -49,8 +49,11 @@ async function upgrade(cookie: string, deviceId: string): Promise<TestSocket> {
     read: () =>
       new Promise<MessageEvent>((resolve) => {
         const buffered = queue.shift();
-        if (buffered) resolve(buffered);
-        else waiter = resolve;
+        if (buffered) {
+          resolve(buffered);
+        } else {
+          waiter = resolve;
+        }
       }),
   };
 }
@@ -65,7 +68,9 @@ function collectEventsWithin(sock: TestSocket, windowMs: number): Promise<{ type
     let done = false;
     const drain = () => {
       sock.read().then((event) => {
-        if (done) return;
+        if (done) {
+          return;
+        }
         frames.push(JSON.parse(String(event.data)) as { type: string });
         drain();
       });
@@ -105,7 +110,9 @@ test("workspaces reads broadcast no WS frames", async () => {
 
   // Regression: reads must never broadcast (they used to feed a refetch
   // echo loop of ~40 req/s of workspaces+sidebar).
-  for (let i = 0; i < 5; i++) await getWorkspaces(cookie);
+  for (let i = 0; i < 5; i++) {
+    await getWorkspaces(cookie);
+  }
   expect(await collectEventsWithin(ws, 400)).toHaveLength(0);
   ws.ws.close(1000, "done");
 });

@@ -1,9 +1,9 @@
 import { Hono } from "hono";
 import { userDoName } from "protocol";
 import { PushSubscribeInput } from "protocol";
-import { requireSession } from "../../auth/session.ts";
-import { apiError } from "../../lib/errors.ts";
-import { zodValidator } from "../../lib/validation.ts";
+import { requireSession } from "@worker/auth/session";
+import { apiError } from "@worker/lib/errors";
+import { zodValidator } from "@worker/lib/validation";
 
 export const pushV1 = new Hono<{ Bindings: Env }>();
 
@@ -18,22 +18,27 @@ pushV1.post(
   async (c) => {
     const userId = c.get("session")!.user.id;
     const body = c.req.valid("json");
-    const res = await (await userDoStub(c.env, userId)).pushSubscribe(body);
-    if (!res.ok) throw apiError("failed", "failed", 502);
+    const stub = await userDoStub(c.env, userId);
+    const res = await stub.pushSubscribe(body);
+    if (!res.ok) {
+      throw apiError("failed", "failed", 502);
+    }
     return c.json({ ok: true });
   },
 );
 pushV1.delete("/users/me/push_subscriptions/:deviceId", requireSession, async (c) => {
   const userId = c.get("session")!.user.id;
-  const res = await (
-    await userDoStub(c.env, userId)
-  ).pushUnsubscribe({ deviceId: c.req.param("deviceId") });
-  if (!res.ok) throw apiError("failed", "failed", 502);
+  const stub = await userDoStub(c.env, userId);
+  const res = await stub.pushUnsubscribe({ deviceId: c.req.param("deviceId") });
+  if (!res.ok) {
+    throw apiError("failed", "failed", 502);
+  }
   return c.json({ ok: true });
 });
 pushV1.get("/users/me/push_subscriptions", requireSession, async (c) => {
   const userId = c.get("session")!.user.id;
-  const res = await (await userDoStub(c.env, userId)).listPushSubscriptions();
+  const stub = await userDoStub(c.env, userId);
+  const res = await stub.listPushSubscriptions();
   return c.json(res);
 });
 pushV1.get("/users/me/vapid_public_key", async (c) =>

@@ -1,9 +1,10 @@
+import { env } from "cloudflare:workers";
 import { expect, test } from "vite-plus/test";
-import { env, runInDurableObject } from "cloudflare:test";
+import { runInDurableObject } from "cloudflare:test";
 import { eq } from "drizzle-orm";
 import { channelDoName, issueInternalToken, userDoName } from "protocol";
-import * as schema from "../../../src/worker/db/schema-channel-do.ts";
-import * as userSchema from "../../../src/worker/db/schema-user-do.ts";
+import * as schema from "@worker/db/schema-channel-do";
+import * as userSchema from "@worker/db/schema-user-do";
 
 function channelStub(channelId: string) {
   return env.CHANNEL_DO.get(env.CHANNEL_DO.idFromName(channelDoName(channelId)));

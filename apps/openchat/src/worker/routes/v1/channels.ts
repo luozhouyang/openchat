@@ -18,12 +18,12 @@ import {
   channelMemberRemovedEvent,
   type ChannelSummary,
 } from "protocol";
-import { requireSession } from "../../auth/session.ts";
-import { requireTeamRole, requireChannelRole } from "../../auth/guards.ts";
-import { getDb } from "../../db/client.ts";
-import { channelMembers } from "../../db/schema-d1.ts";
-import { listChannelsForTeam, getChannel, listChannelMemberIds } from "../../db/repos/channels.ts";
-import { getTeamMember } from "../../db/repos/teams.ts";
+import { requireSession } from "@worker/auth/session";
+import { requireTeamRole, requireChannelRole } from "@worker/auth/guards";
+import { getDb } from "@worker/db/client";
+import { channelMembers } from "@worker/db/schema-d1";
+import { listChannelsForTeam, getChannel, listChannelMemberIds } from "@worker/db/repos/channels";
+import { getTeamMember } from "@worker/db/repos/teams";
 import {
   createChannel,
   openDirect,
@@ -32,17 +32,17 @@ import {
   leaveChannel,
   archiveChannel,
   restoreChannel,
-} from "../../services/channel.service.ts";
-import { zodValidator } from "../../lib/validation.ts";
-import { apiError } from "../../lib/errors.ts";
+} from "@worker/services/channel.service";
+import { zodValidator } from "@worker/lib/validation";
+import { apiError } from "@worker/lib/errors";
 import {
   syncChannelMember,
   syncUserChannels,
   removeChannelMemberFromDo,
-} from "../../user-do-sync.ts";
-import { createChannelBroadcaster, deliverStructure } from "../../structure-broadcast.ts";
-import type { Channel, Db } from "../../db/types.ts";
-import { directDisplayName, memberNames } from "./users.ts";
+} from "@worker/user-do-sync";
+import { createChannelBroadcaster, deliverStructure } from "@worker/structure-broadcast";
+import type { Channel, Db } from "@worker/db/types";
+import { directDisplayName, memberNames } from "@worker/routes/v1/users";
 
 export const channelsV1 = new Hono<{ Bindings: Env }>();
 
@@ -91,7 +91,9 @@ channelsV1.post(
     const db = getDb(c.env.DB);
     const me = c.get("session")!.user.id;
     const teamMember = await getTeamMember(db, body.teamId, me);
-    if (!teamMember) throw apiError("forbidden", "forbidden", 403);
+    if (!teamMember) {
+      throw apiError("forbidden", "forbidden", 403);
+    }
     const ch = await createChannel(db, {
       teamId: body.teamId,
       name: body.name,
@@ -179,7 +181,9 @@ channelsV1.delete(
   async (c) => {
     const userId = c.req.param("userId");
     const me = c.get("session")!.user.id;
-    if (userId !== me) throw apiError("forbidden", "forbidden", 403);
+    if (userId !== me) {
+      throw apiError("forbidden", "forbidden", 403);
+    }
     const db = getDb(c.env.DB);
     const channelId = c.req.param("channelId");
     await leaveChannel(db, { channelId, userId });
@@ -203,9 +207,13 @@ channelsV1.post(
   async (c) => {
     const me = c.get("session")!.user.id;
     const body = c.req.valid("json");
-    if (!body.userIds.includes(me)) throw apiError("invalid", "invalid", 422);
+    if (!body.userIds.includes(me)) {
+      throw apiError("invalid", "invalid", 422);
+    }
     const withUserId = body.userIds.find((u) => u !== me);
-    if (!withUserId) throw apiError("invalid", "invalid", 422);
+    if (!withUserId) {
+      throw apiError("invalid", "invalid", 422);
+    }
     const db = getDb(c.env.DB);
     const { id: channelId, existing } = await openDirect(db, { userId: me, withUserId });
     if (!existing) {
@@ -228,7 +236,9 @@ channelsV1.post(
     const me = c.get("session")!.user.id;
     const body = c.req.valid("json");
     const userIds = body.userIds.filter((u) => u !== me);
-    if (userIds.length < 2) throw apiError("invalid", "invalid", 422);
+    if (userIds.length < 2) {
+      throw apiError("invalid", "invalid", 422);
+    }
     const db = getDb(c.env.DB);
     const { id: channelId, existing } = await openGroup(db, { userId: me, userIds });
     if (!existing) {
@@ -253,10 +263,11 @@ channelsV1.delete(
     const channelId = c.req.param("channelId");
     await archiveChannel(db, { channelId });
     const ch = await getChannel(db, channelId);
-    if (ch)
+    if (ch) {
       await createChannelBroadcaster(c.env, channelId).broadcast(
         channelUpdatedEvent.parse({ type: "channel.updated", channel: toSummary(ch, true) }),
       );
+    }
     return c.json({ ok: true });
   },
 );
@@ -270,10 +281,11 @@ channelsV1.post(
     const channelId = c.req.param("channelId");
     await restoreChannel(db, { channelId });
     const ch = await getChannel(db, channelId);
-    if (ch)
+    if (ch) {
       await createChannelBroadcaster(c.env, channelId).broadcast(
         channelUpdatedEvent.parse({ type: "channel.updated", channel: toSummary(ch, true) }),
       );
+    }
     return c.json({ ok: true });
   },
 );
@@ -304,13 +316,17 @@ channelsV1.put(
     const body = c.req.valid("json");
     const userId = c.req.param("userId");
     const me = c.get("session")!.user.id;
-    if (userId !== me && userId !== "me") throw apiError("forbidden", "forbidden", 403);
+    if (userId !== me && userId !== "me") {
+      throw apiError("forbidden", "forbidden", 403);
+    }
     const id = c.env.CHANNEL_DO.idFromName(channelDoName(c.req.param("channelId")));
     const res = await c.env.CHANNEL_DO.get(id).setNotifPref({
       userId: me,
       pref: body.notifyProps.pref,
     });
-    if ("error" in res) throw apiError(res.error, res.error, res.status as 403 | 422);
+    if ("error" in res) {
+      throw apiError(res.error, res.error, res.status as 403 | 422);
+    }
     return c.json({ ok: true });
   },
 );

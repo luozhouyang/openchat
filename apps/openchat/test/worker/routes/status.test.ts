@@ -1,5 +1,5 @@
-import { expect, test, beforeAll } from "vite-plus/test";
 import { exports } from "cloudflare:workers";
+import { expect, test, beforeAll } from "vite-plus/test";
 import { signup, userIdOf } from "../helpers/setup.ts";
 
 let aliceCookie = "";

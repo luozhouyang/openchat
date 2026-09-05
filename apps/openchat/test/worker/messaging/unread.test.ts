@@ -1,5 +1,5 @@
+import { env } from "cloudflare:workers";
 import { expect, test, beforeAll } from "vite-plus/test";
-import { env } from "cloudflare:test";
 import { channelDoName } from "protocol";
 
 const channelId = "c-unread";

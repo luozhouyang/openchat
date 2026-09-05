@@ -1,7 +1,7 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { channelDoName, userDoName, type ServerEvent } from "protocol";
-import { getDb } from "./db/client.ts";
-import { teamMembers, userStatus } from "./db/schema-d1.ts";
+import { getDb } from "@worker/db/client";
+import { teamMembers, userStatus } from "@worker/db/schema-d1";
 
 export async function deliverStructure(env: Env, userId: string, event: ServerEvent) {
   const id = env.USER_DO.idFromName(userDoName(userId));
@@ -27,7 +27,9 @@ export function createTeamBroadcaster(env: Env, teamId: string) {
         .from(teamMembers)
         .where(eq(teamMembers.teamId, teamId));
       const ids = [...new Set([...rows.map((r) => r.userId), ...extraTargets])];
-      if (ids.length === 0) return;
+      if (ids.length === 0) {
+        return;
+      }
       const online = await db
         .select({ userId: userStatus.userId })
         .from(userStatus)

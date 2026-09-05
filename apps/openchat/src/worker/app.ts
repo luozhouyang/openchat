@@ -1,9 +1,9 @@
 import { Hono } from "hono";
-import { health } from "./routes/health.ts";
-import { internalRoutes } from "./routes/internal.ts";
-import { v1Router } from "./routes/v1/index.ts";
-import { makeAuth } from "./auth.ts";
-import { isHttpError, toErrorBody } from "./lib/errors.ts";
+import { health } from "@worker/routes/health";
+import { internalRoutes } from "@worker/routes/internal";
+import { v1Router } from "@worker/routes/v1/index";
+import { makeAuth } from "@worker/auth";
+import { isHttpError, toErrorBody } from "@worker/lib/errors";
 
 export function createApp() {
   const app = new Hono<{ Bindings: Env }>();
@@ -15,8 +15,9 @@ export function createApp() {
     return auth.handler(c.req.raw);
   });
   app.onError((err, c) => {
-    if (isHttpError(err))
+    if (isHttpError(err)) {
       return c.json(toErrorBody(err), err.status as 400 | 403 | 404 | 409 | 422 | 429 | 500);
+    }
     console.error(`[${c.req.method}] ${c.req.path}:`, err);
     return c.json({ error: "internal server error", code: "internal" }, 500);
   });

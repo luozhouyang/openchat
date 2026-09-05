@@ -1,5 +1,6 @@
+import { env } from "cloudflare:workers";
 import { expect, test } from "vite-plus/test";
-import { env, runInDurableObject, evictDurableObject } from "cloudflare:test";
+import { runInDurableObject, evictDurableObject } from "cloudflare:test";
 import userMigrations from "../../../migrations/user-do/migrations";
 import channelMigrations from "../../../migrations/channel-do/migrations";
 

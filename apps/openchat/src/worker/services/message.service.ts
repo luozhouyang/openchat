@@ -1,7 +1,7 @@
 import { channelDoName } from "protocol";
-import type { Db } from "../db/types.ts";
-import { getChannelMember } from "../db/repos/channels.ts";
-import { apiError } from "../lib/errors.ts";
+import type { Db } from "@worker/db/types";
+import { getChannelMember } from "@worker/db/repos/channels";
+import { apiError } from "@worker/lib/errors";
 
 function channelStub(env: Env, channelId: string) {
   return env.CHANNEL_DO.get(env.CHANNEL_DO.idFromName(channelDoName(channelId)));
@@ -9,7 +9,9 @@ function channelStub(env: Env, channelId: string) {
 
 async function requireChannelMember(db: Db, channelId: string, userId: string) {
   const member = await getChannelMember(db, channelId, userId);
-  if (!member) throw apiError("forbidden", "not a member", 403);
+  if (!member) {
+    throw apiError("forbidden", "not a member", 403);
+  }
   return member;
 }
 
@@ -32,7 +34,9 @@ export async function postMessage(
     clientToken: input.clientToken ?? crypto.randomUUID(),
     type: "text",
   });
-  if ("error" in res) throw apiError(res.error, res.error, res.status);
+  if ("error" in res) {
+    throw apiError(res.error, res.error, res.status);
+  }
   return { messageId: res.messageId, seq: res.seq };
 }
 
@@ -47,7 +51,9 @@ export async function editMessage(
     messageId: input.messageId,
     content: input.content,
   });
-  if ("error" in res) throw apiError(res.error, res.error, res.status);
+  if ("error" in res) {
+    throw apiError(res.error, res.error, res.status);
+  }
   return { ok: true };
 }
 
@@ -59,7 +65,9 @@ export async function deleteMessage(
   await requireChannelMember(db, input.channelId, input.callerUserId);
   const stub = channelStub(env, input.channelId);
   const res = await stub.deleteMessage(input.callerUserId, { messageId: input.messageId });
-  if ("error" in res) throw apiError(res.error, res.error, res.status);
+  if ("error" in res) {
+    throw apiError(res.error, res.error, res.status);
+  }
   return { ok: true };
 }
 

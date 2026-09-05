@@ -1,5 +1,5 @@
+import { env } from "cloudflare:workers";
 import { expect, test } from "vite-plus/test";
-import { env } from "cloudflare:test";
 
 test("UserDO health reports devices and channels", async () => {
   const id = env.USER_DO.idFromName("user:anonymous");
