@@ -85,7 +85,7 @@ usersV1.get("/users/me/workspaces", requireSession, async (c) => {
   return c.json(out);
 });
 
-async function memberNames(db: Db, userIds: string[]): Promise<string[]> {
+export async function memberNames(db: Db, userIds: string[]): Promise<string[]> {
   if (userIds.length === 0) return [];
   const rows = await db
     .select({ nickname: users.nickname, name: users.name, email: users.email })
@@ -94,7 +94,7 @@ async function memberNames(db: Db, userIds: string[]): Promise<string[]> {
   return rows.map((u) => u.nickname ?? u.name ?? u.email);
 }
 
-function directDisplayName(type: string, names: string[]): string {
+export function directDisplayName(type: string, names: string[]): string {
   if (names.length === 0) return type === "dm" ? "私聊" : "群组";
   if (type === "dm") return names[0];
   const head = names.slice(0, 2).join(", ");

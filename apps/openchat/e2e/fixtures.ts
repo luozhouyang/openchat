@@ -4,7 +4,7 @@ import { expect, type APIRequestContext, type Page } from "@playwright/test";
 // SPA. Desktop e2e points E2E_API_URL at its own wrangler dev (:8787).
 // better-auth requires an Origin header on POSTs; Playwright's
 // APIRequestContext does not send one, so the fixtures set it explicitly.
-const API = process.env.E2E_API_URL ?? "http://localhost:4173";
+export const API = process.env.E2E_API_URL ?? "http://localhost:4173";
 const ORIGIN = { origin: API };
 
 export interface TestUser {
@@ -55,6 +55,38 @@ export async function createChannel(
   });
   expect(res.ok(), `create channel failed: ${res.status()} ${await res.text()}`).toBeTruthy();
   return (await res.json()) as { id: string };
+}
+
+export async function joinTeam(
+  request: APIRequestContext,
+  token: string,
+  teamId: string,
+): Promise<void> {
+  const res = await request.post(`${API}/api/v1/teams/${teamId}/members`, {
+    headers: { authorization: `Bearer ${token}`, ...ORIGIN },
+    data: {},
+  });
+  expect(res.ok(), `join team failed: ${res.status()} ${await res.text()}`).toBeTruthy();
+}
+
+export async function joinChannel(
+  request: APIRequestContext,
+  token: string,
+  channelId: string,
+): Promise<void> {
+  const res = await request.post(`${API}/api/v1/channels/${channelId}/members`, {
+    headers: { authorization: `Bearer ${token}`, ...ORIGIN },
+    data: {},
+  });
+  expect(res.ok(), `join channel failed: ${res.status()} ${await res.text()}`).toBeTruthy();
+}
+
+export async function userIdOf(request: APIRequestContext, token: string): Promise<string> {
+  const res = await request.get(`${API}/api/v1/users/me`, {
+    headers: { authorization: `Bearer ${token}` },
+  });
+  expect(res.ok(), `users/me failed: ${res.status()} ${await res.text()}`).toBeTruthy();
+  return ((await res.json()) as { user: { id: string } }).user.id;
 }
 
 export async function loginAs(page: Page, email: string, password: string) {

@@ -41,7 +41,8 @@ import {
   removeChannelMemberFromDo,
 } from "../../user-do-sync.ts";
 import { createChannelBroadcaster, deliverStructure } from "../../structure-broadcast.ts";
-import type { Channel } from "../../db/types.ts";
+import type { Channel, Db } from "../../db/types.ts";
+import { directDisplayName, memberNames } from "./users.ts";
 
 export const channelsV1 = new Hono<{ Bindings: Env }>();
 
@@ -55,6 +56,30 @@ function toSummary(ch: Channel, member: boolean): ChannelSummary {
     member,
     archivedAt: ch.archivedAt,
   };
+}
+
+// dm/gm display names are per-recipient (each member sees the OTHER members'
+// names, same rule as the workspaces endpoint), so one shared payload won't
+// do: deliver a personalized channel.created to every member.
+async function deliverDirectCreated(
+  env: Env,
+  db: Db,
+  channelId: string,
+  type: "dm" | "gm",
+  memberIds: string[],
+) {
+  const ch = (await getChannel(db, channelId))!;
+  await Promise.all(
+    memberIds.map(async (uid) => {
+      const others = memberIds.filter((id) => id !== uid);
+      const displayName = directDisplayName(type, await memberNames(db, others));
+      const event = channelCreatedEvent.parse({
+        type: "channel.created",
+        channel: { ...toSummary(ch, true), displayName },
+      });
+      await deliverStructure(env, uid, event);
+    }),
+  );
 }
 
 channelsV1.post(
@@ -188,10 +213,7 @@ channelsV1.post(
       await syncChannelMember(c.env, channelId, withUserId, "channel_user");
       await syncUserChannels(c.env, me);
       await syncUserChannels(c.env, withUserId);
-      const ch = (await getChannel(db, channelId))!;
-      await createChannelBroadcaster(c.env, channelId).broadcast(
-        channelCreatedEvent.parse({ type: "channel.created", channel: toSummary(ch, true) }),
-      );
+      await deliverDirectCreated(c.env, db, channelId, "dm", [me, withUserId]);
     }
     const out: OpenChannelOutput = { id: channelId, existing };
     return c.json(out, existing ? 200 : 201);
@@ -215,10 +237,7 @@ channelsV1.post(
         await syncChannelMember(c.env, channelId, uid, "channel_user");
         await syncUserChannels(c.env, uid);
       }
-      const ch = (await getChannel(db, channelId))!;
-      await createChannelBroadcaster(c.env, channelId).broadcast(
-        channelCreatedEvent.parse({ type: "channel.created", channel: toSummary(ch, true) }),
-      );
+      await deliverDirectCreated(c.env, db, channelId, "gm", ids);
     }
     const out: OpenChannelOutput = { id: channelId, existing };
     return c.json(out, existing ? 200 : 201);

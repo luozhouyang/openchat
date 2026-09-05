@@ -1,5 +1,14 @@
 import { expect, test } from "@playwright/test";
-import { createChannel, createTeam, loginAs, signupUser } from "./fixtures";
+import {
+  API,
+  createChannel,
+  createTeam,
+  joinChannel,
+  joinTeam,
+  loginAs,
+  signupUser,
+  userIdOf,
+} from "./fixtures";
 
 let seq = Date.now();
 
@@ -77,4 +86,68 @@ test("settings back button returns to the channel view", async ({ page, request 
   await expect(page.getByText("Saved")).toBeVisible({ timeout: 10_000 });
   await page.getByRole("button", { name: "Back", exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/${team.id}/c/`), { timeout: 10_000 });
+});
+
+test("a new direct message appears in the other user's sidebar without refresh", async ({
+  browser,
+  request,
+}) => {
+  const emailA = `rt-a-${seq}@test.dev`;
+  const emailB = `rt-b-${seq}@test.dev`;
+  const userA = await signupUser(request, emailA, "Password123!");
+  const userB = await signupUser(request, emailB, "Password123!");
+  const idA = await userIdOf(request, userA.token);
+  const idB = await userIdOf(request, userB.token);
+  seq += 1;
+
+  const ctxB = await browser.newContext();
+  const pageB = await ctxB.newPage();
+  const wsReady = pageB.waitForEvent("websocket").then((ws) => ws.waitForEvent("framereceived"));
+  await loginAs(pageB, emailB, "Password123!");
+  await expect(pageB).toHaveURL(/\/dm/, { timeout: 15_000 });
+  await wsReady;
+
+  const res = await request.post(`${API}/api/v1/channels/direct`, {
+    headers: { authorization: `Bearer ${userA.token}`, origin: API },
+    data: { userIds: [idA, idB] },
+  });
+  expect(res.ok()).toBeTruthy();
+  await expect(pageB.getByText(`rt-a-${seq - 1}`)).toBeVisible({ timeout: 10_000 });
+
+  await pageB.close();
+  await ctxB.close();
+});
+
+test("team rename propagates to other online members without refresh", async ({
+  browser,
+  request,
+}) => {
+  const emailA = `rn-a-${seq}@test.dev`;
+  const emailB = `rn-b-${seq}@test.dev`;
+  const userA = await signupUser(request, emailA, "Password123!");
+  const userB = await signupUser(request, emailB, "Password123!");
+  const team = await createTeam(request, userA.token, `rn-team-${seq}`);
+  const channel = await createChannel(request, userA.token, team.id, `rn-ch-${seq}`);
+  await joinTeam(request, userB.token, team.id);
+  await joinChannel(request, userB.token, channel.id);
+  seq += 1;
+
+  const ctxB = await browser.newContext();
+  const pageB = await ctxB.newPage();
+  const wsReady = pageB.waitForEvent("websocket").then((ws) => ws.waitForEvent("framereceived"));
+  await loginAs(pageB, emailB, "Password123!");
+  await expect(pageB).toHaveURL(new RegExp(`/${team.id}/c/`), { timeout: 15_000 });
+  await wsReady;
+
+  const res = await request.put(`${API}/api/v1/teams/${team.id}/patch`, {
+    headers: { authorization: `Bearer ${userA.token}`, origin: API },
+    data: { displayName: `renamed-${seq}` },
+  });
+  expect(res.ok()).toBeTruthy();
+  await expect(
+    pageB.getByRole("button", { name: new RegExp(`renamed-${seq}`) }).first(),
+  ).toBeVisible({ timeout: 10_000 });
+
+  await pageB.close();
+  await ctxB.close();
 });
