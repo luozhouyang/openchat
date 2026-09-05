@@ -54,13 +54,6 @@
       "new_sqlite_classes": ["UserDO", "ChannelDO"],
     },
   ],
-  "rules": [
-    {
-      "type": "Text",
-      "globs": ["**/*.sql"],
-      "fallthrough": true,
-    },
-  ],
   "vars": {
     "BETTER_AUTH_URL": "http://localhost:8787",
     "BETTER_AUTH_TRUSTED_ORIGINS": "http://localhost:5173,http://localhost:4173",
