@@ -6,7 +6,9 @@ import zh from "./locales/zh.json";
 const STORAGE_KEY = "openchat.lang";
 
 function initialLanguage(): "en" | "zh" {
-  if (typeof localStorage === "undefined") return "en";
+  if (typeof localStorage === "undefined") {
+    return "en";
+  }
   return localStorage.getItem(STORAGE_KEY) === "zh" ? "zh" : "en";
 }
 
@@ -23,7 +25,9 @@ void i18n.use(initReactI18next).init({
 
 export function setLanguage(lang: "en" | "zh"): void {
   void i18n.changeLanguage(lang);
-  if (typeof localStorage !== "undefined") localStorage.setItem(STORAGE_KEY, lang);
+  if (typeof localStorage !== "undefined") {
+    localStorage.setItem(STORAGE_KEY, lang);
+  }
 }
 
 export default i18n;

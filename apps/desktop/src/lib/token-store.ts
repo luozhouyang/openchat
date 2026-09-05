@@ -38,10 +38,14 @@ export function createTokenStore(
   filePath: string,
 ): TokenStore {
   function read(): StoreFile | null {
-    if (!files.exists(filePath)) return null;
+    if (!files.exists(filePath)) {
+      return null;
+    }
     try {
       const parsed = JSON.parse(new TextDecoder().decode(files.readFile(filePath))) as StoreFile;
-      if (parsed?.v !== 1 || typeof parsed.data !== "string") return null;
+      if (parsed?.v !== 1 || typeof parsed.data !== "string") {
+        return null;
+      }
       return parsed;
     } catch {
       return null;
@@ -50,7 +54,9 @@ export function createTokenStore(
 
   function write(store: StoreFile | null) {
     if (!store) {
-      if (files.exists(filePath)) files.unlink(filePath);
+      if (files.exists(filePath)) {
+        files.unlink(filePath);
+      }
       return;
     }
     files.writeFile(filePath, new TextEncoder().encode(JSON.stringify(store)));
@@ -59,7 +65,9 @@ export function createTokenStore(
   return {
     getToken() {
       const store = read();
-      if (!store) return null;
+      if (!store) {
+        return null;
+      }
       const payload = Uint8Array.from(Buffer.from(store.data, "base64"));
       try {
         return store.encrypted && crypto.isEncryptionAvailable()

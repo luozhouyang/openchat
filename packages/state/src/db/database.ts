@@ -32,7 +32,9 @@ export function createSqliteDatabase(driver: SqliteDriver): LocalDatabase {
   let migrated = false;
   return {
     async migrate() {
-      if (migrated) return;
+      if (migrated) {
+        return;
+      }
       await runMigrations(driver, MIGRATIONS);
       migrated = true;
     },

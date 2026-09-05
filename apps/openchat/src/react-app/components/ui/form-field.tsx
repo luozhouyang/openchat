@@ -5,11 +5,17 @@ import { cn } from "@/lib/utils";
 
 function errorsOf(field: AnyFieldApi): string[] {
   return field.state.meta.errors.map((e) => {
-    if (typeof e === "string") return e;
-    if (e instanceof Error) return e.message;
+    if (typeof e === "string") {
+      return e;
+    }
+    if (e instanceof Error) {
+      return e.message;
+    }
     if (e !== null && typeof e === "object" && "message" in e) {
       const message = (e as { message?: unknown }).message;
-      if (typeof message === "string") return message;
+      if (typeof message === "string") {
+        return message;
+      }
     }
     return String(e);
   });

@@ -41,7 +41,9 @@ function SignupPage() {
           username: value.username,
           callbackURL: "/auth/verify-email",
         } as Parameters<typeof authClient.signUp.email>[0]);
-        if (res.error) throw new Error(res.error.message ?? t("auth.signup.failed"));
+        if (res.error) {
+          throw new Error(res.error.message ?? t("auth.signup.failed"));
+        }
         void router.navigate({ to: "/auth/check-email", search: { email: value.email } });
       } catch (err) {
         setError(err instanceof Error ? err.message : t("auth.signup.failed"));

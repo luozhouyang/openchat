@@ -9,7 +9,9 @@ test("creates a team through the UI dialog and lands in the new team", async ({
 }) => {
   page.on("pageerror", (err) => console.log("[pageerror]", err));
   page.on("console", (msg) => {
-    if (msg.type() === "error") console.log("[console.error]", msg.text());
+    if (msg.type() === "error") {
+      console.log("[console.error]", msg.text());
+    }
   });
 
   const email = `tm-create-${seq}@test.dev`;
@@ -38,7 +40,9 @@ test("creates a team through the UI dialog and lands in the new team", async ({
 test("team switcher navigates between teams", async ({ page, request }) => {
   page.on("pageerror", (err) => console.log("[pageerror]", err));
   page.on("console", (msg) => {
-    if (msg.type() === "error") console.log("[console.error]", msg.text());
+    if (msg.type() === "error") {
+      console.log("[console.error]", msg.text());
+    }
   });
 
   const email = `tm-switch-${seq}@test.dev`;
@@ -62,7 +66,9 @@ test("team switcher navigates between teams", async ({ page, request }) => {
 test("settings page saves team name", async ({ page, request }) => {
   page.on("pageerror", (err) => console.log("[pageerror]", err));
   page.on("console", (msg) => {
-    if (msg.type() === "error") console.log("[console.error]", msg.text());
+    if (msg.type() === "error") {
+      console.log("[console.error]", msg.text());
+    }
   });
 
   const email = `tm-settings-${seq}@test.dev`;
@@ -87,7 +93,9 @@ test("settings page saves team name", async ({ page, request }) => {
 test("shows leave team option in the team switcher", async ({ page, request }) => {
   page.on("pageerror", (err) => console.log("[pageerror]", err));
   page.on("console", (msg) => {
-    if (msg.type() === "error") console.log("[console.error]", msg.text());
+    if (msg.type() === "error") {
+      console.log("[console.error]", msg.text());
+    }
   });
 
   const email = `tm-leave-${seq}@test.dev`;

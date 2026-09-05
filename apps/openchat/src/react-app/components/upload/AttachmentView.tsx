@@ -7,7 +7,9 @@ export function AttachmentView({
   message: StoreMessage;
   channelId: string;
 }) {
-  if (!message.attachments || message.attachments.length === 0) return null;
+  if (!message.attachments || message.attachments.length === 0) {
+    return null;
+  }
   return (
     <div className="mt-1 flex gap-2">
       {message.attachments.map((a, i) => {

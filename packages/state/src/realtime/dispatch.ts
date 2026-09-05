@@ -29,11 +29,15 @@ export interface DispatcherDeps {
  */
 export function createDispatcher(deps: DispatcherDeps) {
   return function dispatch(raw: string): void {
-    if (raw === "ping" || raw === "pong") return; // keepalive frames, not JSON
+    if (raw === "ping" || raw === "pong") {
+      return;
+    } // keepalive frames, not JSON
     let ev: ServerEvent;
     try {
       const parsed = serverEventSchema.safeParse(JSON.parse(raw));
-      if (!parsed.success) return;
+      if (!parsed.success) {
+        return;
+      }
       ev = parsed.data;
     } catch {
       return; // malformed frame: never let transport noise crash the app
@@ -44,7 +48,9 @@ export function createDispatcher(deps: DispatcherDeps) {
         if (inner.type === "message.new") {
           const message = inner.message as Message;
           useMessageStore.getState().ingest(ev.channelId, message);
-          if (message.parentId) useMessageStore.getState().ingestThread(ev.channelId, message);
+          if (message.parentId) {
+            useMessageStore.getState().ingestThread(ev.channelId, message);
+          }
           // Instant badge; the authoritative sidebar.update follows right after.
           useSidebarStore.getState().bump(ev.channelId);
           void deps
@@ -104,7 +110,9 @@ export function createDispatcher(deps: DispatcherDeps) {
         // (matches the pre-alignment behavior where router.invalidate refetched
         // and the sidebar lost the channel). Other members' removal is inert —
         // membership lists aren't held in the store.
-        if (ev.userId === deps.selfUserId?.()) useTeamsStore.getState().removeChannel(ev.channelId);
+        if (ev.userId === deps.selfUserId?.()) {
+          useTeamsStore.getState().removeChannel(ev.channelId);
+        }
         break;
       case "team.updated":
         useTeamsStore.getState().patchTeam(ev.team);
@@ -113,7 +121,9 @@ export function createDispatcher(deps: DispatcherDeps) {
         useTeamsStore.getState().addTeam({ ...ev.team, channels: [] });
         break;
       case "team.member_removed":
-        if (ev.userId === deps.selfUserId?.()) useTeamsStore.getState().dropTeam(ev.teamId);
+        if (ev.userId === deps.selfUserId?.()) {
+          useTeamsStore.getState().dropTeam(ev.teamId);
+        }
         break;
       case "ack":
         useMessageStore

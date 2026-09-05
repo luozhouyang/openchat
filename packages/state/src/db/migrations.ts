@@ -69,11 +69,17 @@ export async function runMigrations(d: SqliteDriver, list: Migration[]): Promise
   }
 
   for (const m of list) {
-    if (m.version <= current) continue;
+    if (m.version <= current) {
+      continue;
+    }
     await d.exec("BEGIN");
     try {
-      for (const sql of m.statements) await d.exec(sql);
-      if (m.up) await m.up(d);
+      for (const sql of m.statements) {
+        await d.exec(sql);
+      }
+      if (m.up) {
+        await m.up(d);
+      }
       await d.run(`INSERT INTO ${MIGRATIONS_TABLE} (version, name, applied_at) VALUES (?, ?, ?)`, [
         m.version,
         m.name,

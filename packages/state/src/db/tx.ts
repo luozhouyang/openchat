@@ -19,7 +19,9 @@ export class SqliteTxRunner {
   }
 
   async run<T>(fn: () => Promise<T>): Promise<T> {
-    if (this.depth > 0) return fn(); // join the outer transaction
+    if (this.depth > 0) {
+      return fn();
+    } // join the outer transaction
     this.depth++;
     await this.d.exec("BEGIN");
     try {

@@ -85,7 +85,9 @@ function TeamsNewPage() {
     <Dialog
       open={open}
       onOpenChange={(next) => {
-        if (!next) handleClose();
+        if (!next) {
+          handleClose();
+        }
       }}
     >
       <DialogContent className="sm:max-w-md">

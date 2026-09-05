@@ -15,7 +15,9 @@ export function openLocalDatabase(): Promise<LocalDatabase> {
 
 async function create(): Promise<LocalDatabase> {
   try {
-    if (typeof Worker === "undefined") throw new Error("workers unavailable");
+    if (typeof Worker === "undefined") {
+      throw new Error("workers unavailable");
+    }
     const { SqliteWasmDriver } = await import("../lib/sqlite-wasm-driver");
     const driver = new SqliteWasmDriver();
     await driver.ready();

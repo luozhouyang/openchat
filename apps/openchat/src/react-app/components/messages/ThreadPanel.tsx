@@ -14,7 +14,9 @@ export function ThreadPanel({ channelId, parentId }: { channelId: string; parent
     queryKey: ["thread", parentId],
     queryFn: async () => {
       const res = await api.posts.list(channelId, { parentId, order: "asc", limit: 100 });
-      for (const m of res.messages) useMessageStore.getState().ingestThread(channelId, m);
+      for (const m of res.messages) {
+        useMessageStore.getState().ingestThread(channelId, m);
+      }
       return res;
     },
   });
@@ -44,7 +46,9 @@ function ThreadComposer({ channelId, parentId }: { channelId: string; parentId: 
 
   function send() {
     const content = text.trim();
-    if (!content) return;
+    if (!content) {
+      return;
+    }
     const clientToken = crypto.randomUUID();
     wsClient.send({
       type: "post_message",

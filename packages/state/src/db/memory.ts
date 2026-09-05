@@ -17,7 +17,9 @@ function ensure(map: Map<string, ChannelState>, channelId: string): ChannelState
 
 function applyUpsert(ch: ChannelState, message: Message) {
   const existing = ch.byId.get(message.id);
-  if (existing) ch.bySeq.delete(existing.seq);
+  if (existing) {
+    ch.bySeq.delete(existing.seq);
+  }
   ch.byId.set(message.id, message);
   ch.bySeq.set(message.seq, message.id);
 }
@@ -37,12 +39,16 @@ export class MemoryMessageRepository implements MessageRepository {
 
   async applyGap(channelId: string, messages: Message[]) {
     const ch = ensure(this.channels, channelId);
-    for (const m of messages) applyUpsert(ch, m);
+    for (const m of messages) {
+      applyUpsert(ch, m);
+    }
   }
 
   async query(channelId: string, opts: ChannelQuery): Promise<MessagePage> {
     const ch = this.channels.get(channelId);
-    if (!ch) return { rows: [], hasMore: false };
+    if (!ch) {
+      return { rows: [], hasMore: false };
+    }
     const seqs = [...ch.bySeq.keys()]
       .filter((s) => opts.beforeSeq === undefined || s < opts.beforeSeq)
       .sort((a, b) => a - b);
@@ -55,9 +61,15 @@ export class MemoryMessageRepository implements MessageRepository {
 
   async maxSeq(channelId: string): Promise<number> {
     const ch = this.channels.get(channelId);
-    if (!ch) return 0;
+    if (!ch) {
+      return 0;
+    }
     let max = 0;
-    for (const s of ch.bySeq.keys()) if (s > max) max = s;
+    for (const s of ch.bySeq.keys()) {
+      if (s > max) {
+        max = s;
+      }
+    }
     return max;
   }
 
@@ -77,7 +89,9 @@ export class MemoryMessageRepository implements MessageRepository {
   async remove(channelId: string, messageId: string) {
     const ch = this.channels.get(channelId);
     const m = ch?.byId.get(messageId);
-    if (m) m.deletedAt = Date.now();
+    if (m) {
+      m.deletedAt = Date.now();
+    }
   }
 
   clear() {

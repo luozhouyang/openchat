@@ -33,7 +33,9 @@ export async function persistMessages(
   messages: readonly MessageLike[],
   db?: LocalDatabase,
 ) {
-  if (messages.length === 0) return;
+  if (messages.length === 0) {
+    return;
+  }
   const d = db ?? (await getMessageDB());
   await d.messages.applyGap(channelId, messages.map(toMessage));
 }

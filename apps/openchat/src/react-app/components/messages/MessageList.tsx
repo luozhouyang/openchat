@@ -30,7 +30,9 @@ export function MessageList({ channelId }: { channelId: string }) {
   }, [maxSeq, list.length, virtualizer]);
 
   const loadOlder = useCallback(async () => {
-    if (loadingOlder.current || list.length === 0) return;
+    if (loadingOlder.current || list.length === 0) {
+      return;
+    }
     loadingOlder.current = true;
     const anchorSeq = list[0].seq;
     const scrollTop = parentRef.current?.scrollTop ?? 0;
@@ -59,7 +61,9 @@ export function MessageList({ channelId }: { channelId: string }) {
       ref={parentRef}
       className="flex-1 overflow-y-auto"
       onScroll={(e) => {
-        if (e.currentTarget.scrollTop < 100) void loadOlder();
+        if (e.currentTarget.scrollTop < 100) {
+          void loadOlder();
+        }
         autoScroll.current =
           e.currentTarget.scrollHeight - e.currentTarget.scrollTop - e.currentTarget.clientHeight <
           80;

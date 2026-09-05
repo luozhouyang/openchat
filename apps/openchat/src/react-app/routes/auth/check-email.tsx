@@ -21,7 +21,9 @@ function CheckEmailPage() {
   const [error, setError] = useState<string | null>(null);
 
   async function resend() {
-    if (!email) return;
+    if (!email) {
+      return;
+    }
     setSending(true);
     setError(null);
     setSent(false);
@@ -30,7 +32,9 @@ function CheckEmailPage() {
         email,
         callbackURL: "/auth/verify-email",
       });
-      if (res.error) throw new Error(res.error.message ?? t("auth.checkEmail.sendFailed"));
+      if (res.error) {
+        throw new Error(res.error.message ?? t("auth.checkEmail.sendFailed"));
+      }
       setSent(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("auth.checkEmail.sendFailed"));

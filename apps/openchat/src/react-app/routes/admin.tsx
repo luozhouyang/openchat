@@ -13,7 +13,9 @@ export const Route = createFileRoute("/admin")({
   component: AdminPage,
   beforeLoad: async () => {
     const session = await authClient.getSession();
-    if (session.data?.user.role !== "admin") throw redirect({ to: "/" });
+    if (session.data?.user.role !== "admin") {
+      throw redirect({ to: "/" });
+    }
   },
 });
 

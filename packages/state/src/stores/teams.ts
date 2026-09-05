@@ -26,7 +26,9 @@ export const useTeamsStore = create<{
   addChannel(ch) {
     set((s) => {
       if (ch.teamId === null) {
-        if (s.directs.some((d) => d.id === ch.id)) return s;
+        if (s.directs.some((d) => d.id === ch.id)) {
+          return s;
+        }
         return { directs: [...s.directs, ch] };
       }
       return {

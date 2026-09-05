@@ -76,7 +76,9 @@ export const useSidebarStore = create<{
   markRead(channelId, lastReadSeq) {
     set((s) => {
       const e = s.entries[channelId];
-      if (!e) return s;
+      if (!e) {
+        return s;
+      }
       const seq = Math.max(lastReadSeq ?? 0, e.lastReadSeq);
       return {
         entries: { ...s.entries, [channelId]: { ...e, unread: 0, mentions: 0, lastReadSeq: seq } },
@@ -86,7 +88,9 @@ export const useSidebarStore = create<{
   readSync(channelId, lastReadSeq) {
     set((s) => {
       const e = s.entries[channelId];
-      if (e && lastReadSeq < e.lastReadSeq) return s; // stale echo from a lagging device
+      if (e && lastReadSeq < e.lastReadSeq) {
+        return s;
+      } // stale echo from a lagging device
       const base = e ?? {
         unread: 0,
         mentions: 0,

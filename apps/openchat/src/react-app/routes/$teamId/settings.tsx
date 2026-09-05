@@ -47,7 +47,9 @@ function TeamSettingsPage() {
     }
   }
 
-  if (!team) return <div className="p-8">{t("teams.notFound")}</div>;
+  if (!team) {
+    return <div className="p-8">{t("teams.notFound")}</div>;
+  }
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 p-8">

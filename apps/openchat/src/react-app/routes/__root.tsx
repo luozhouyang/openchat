@@ -11,7 +11,9 @@ let sessionProbedAt = 0;
 let sessionProbedOk = false;
 
 export async function guardSession(): Promise<boolean> {
-  if (sessionProbedOk && Date.now() - sessionProbedAt < 60_000) return true;
+  if (sessionProbedOk && Date.now() - sessionProbedAt < 60_000) {
+    return true;
+  }
   const ok = await appClient.auth.hasSession();
   if (ok) {
     sessionProbedAt = Date.now();
@@ -33,12 +35,16 @@ function ConnectionManager() {
   const authed = !PUBLIC_PATHS.some((p) => pathname.startsWith(p));
 
   useEffect(() => {
-    if (!authed) return;
+    if (!authed) {
+      return;
+    }
     void wsClient.ensureConnected();
     let lastSent = 0;
     const activity = () => {
       const now = Date.now();
-      if (now - lastSent < 30_000) return;
+      if (now - lastSent < 30_000) {
+        return;
+      }
       lastSent = now;
       wsClient.sendActivity();
     };
@@ -62,7 +68,9 @@ export const Route = createRootRoute({
     </>
   ),
   beforeLoad: async ({ location }) => {
-    if (PUBLIC_PATHS.some((p) => location.pathname.startsWith(p))) return;
+    if (PUBLIC_PATHS.some((p) => location.pathname.startsWith(p))) {
+      return;
+    }
     if (!(await guardSession())) {
       throw redirect({ to: "/auth/login" });
     }

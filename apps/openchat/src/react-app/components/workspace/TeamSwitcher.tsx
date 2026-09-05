@@ -32,7 +32,9 @@ export function TeamSwitcher({
   const current = teams.find((tm) => tm.id === currentTeamId);
 
   async function leaveTeam() {
-    if (!currentTeamId) return;
+    if (!currentTeamId) {
+      return;
+    }
     setError(null);
     try {
       await api.teams.leave(currentTeamId);

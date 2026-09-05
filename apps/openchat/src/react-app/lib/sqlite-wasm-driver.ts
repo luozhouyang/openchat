@@ -30,14 +30,21 @@ export class SqliteWasmDriver implements SqliteDriver {
       const w = new Worker(new URL("./sqlite-worker.ts", import.meta.url), { type: "module" });
       w.onmessage = (ev: MessageEvent<SqliteWorkerResponse>) => {
         const p = this.pending.get(ev.data.id);
-        if (!p) return;
+        if (!p) {
+          return;
+        }
         this.pending.delete(ev.data.id);
-        if (ev.data.ok) p.resolve(ev.data);
-        else p.reject(new Error(ev.data.error));
+        if (ev.data.ok) {
+          p.resolve(ev.data);
+        } else {
+          p.reject(new Error(ev.data.error));
+        }
       };
       w.onerror = (ev) => {
         const err = new Error(ev.message || "sqlite worker crashed");
-        for (const p of this.pending.values()) p.reject(err);
+        for (const p of this.pending.values()) {
+          p.reject(err);
+        }
         this.pending.clear();
       };
       this.worker = w;
@@ -72,7 +79,9 @@ export class SqliteWasmDriver implements SqliteDriver {
     return rows[0];
   }
   async close() {
-    if (!this.worker) return;
+    if (!this.worker) {
+      return;
+    }
     await this.request({ kind: "close" }).catch(() => {});
     this.worker.terminate();
     this.worker = null;

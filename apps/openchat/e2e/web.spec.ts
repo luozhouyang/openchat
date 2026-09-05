@@ -6,7 +6,9 @@ let seq = Date.now();
 test("user signs up, logs in, and lands in a channel view", async ({ page, request }) => {
   page.on("pageerror", (err) => console.log("[pageerror]", err));
   page.on("console", (msg) => {
-    if (msg.type() === "error") console.log("[console.error]", msg.text());
+    if (msg.type() === "error") {
+      console.log("[console.error]", msg.text());
+    }
   });
 
   const email = `u-${seq}@test.dev`;

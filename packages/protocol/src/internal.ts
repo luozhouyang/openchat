@@ -12,7 +12,9 @@ async function hmacKey(secret: string): Promise<CryptoKey> {
 
 function b64url(data: Uint8Array): string {
   let s = "";
-  for (const b of data) s += String.fromCharCode(b);
+  for (const b of data) {
+    s += String.fromCharCode(b);
+  }
   return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
@@ -47,7 +49,9 @@ export async function verifyInternalToken(
   secret: string,
 ): Promise<{ subject: string } | null> {
   const parts = token.split(".");
-  if (parts.length !== 3) return null;
+  if (parts.length !== 3) {
+    return null;
+  }
   const [header, payload, sig] = parts;
   const key = await hmacKey(secret);
   const ok = await crypto.subtle.verify(
@@ -56,11 +60,17 @@ export async function verifyInternalToken(
     fromB64url(sig),
     enc.encode(`${header}.${payload}`),
   );
-  if (!ok) return null;
+  if (!ok) {
+    return null;
+  }
   try {
     const claims = JSON.parse(new TextDecoder().decode(fromB64url(payload)));
-    if (typeof claims.exp !== "number" || claims.exp < Math.floor(Date.now() / 1000)) return null;
-    if (typeof claims.sub !== "string") return null;
+    if (typeof claims.exp !== "number" || claims.exp < Math.floor(Date.now() / 1000)) {
+      return null;
+    }
+    if (typeof claims.sub !== "string") {
+      return null;
+    }
     return { subject: claims.sub };
   } catch {
     return null;

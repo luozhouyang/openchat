@@ -8,6 +8,8 @@ export function TypingIndicator({ channelId }: { channelId: string }) {
     return () => clearInterval(t);
   }, []);
   const users = useTypingStore.getState().list(channelId);
-  if (users.length === 0) return <div className="h-5 px-4" />;
+  if (users.length === 0) {
+    return <div className="h-5 px-4" />;
+  }
   return <div className="h-5 px-4 text-xs text-zinc-500">{users.join("、")} 正在输入…</div>;
 }

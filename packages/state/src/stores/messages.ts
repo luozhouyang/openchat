@@ -50,7 +50,9 @@ function ensure(state: MessageState, channelId: string): ChannelState {
 function drain(ch: ChannelState) {
   for (;;) {
     const next = ch.buffered.get(ch.maxSeq + 1);
-    if (!next) break;
+    if (!next) {
+      break;
+    }
     ch.buffered.delete(next.seq);
     ch.bySeq.set(next.seq, next);
     ch.maxSeq = next.seq;
@@ -60,7 +62,9 @@ function drain(ch: ChannelState) {
 function insertConfirmed(ch: ChannelState, message: StoreMessage) {
   if (message.seq <= ch.maxSeq) {
     // Echo of something we already hold at this seq — ignore.
-    if (!ch.bySeq.has(message.seq)) ch.bySeq.set(message.seq, message);
+    if (!ch.bySeq.has(message.seq)) {
+      ch.bySeq.set(message.seq, message);
+    }
   } else if (message.seq === ch.maxSeq + 1) {
     ch.bySeq.set(message.seq, message);
     ch.maxSeq = message.seq;
@@ -87,7 +91,9 @@ export const useMessageStore = create<MessageState>((set, get) => ({
   ingest(channelId, message) {
     set((s) => {
       const ch = ensure(s, channelId);
-      if (message.seq <= ch.maxSeq || ch.bySeq.has(message.seq)) return s;
+      if (message.seq <= ch.maxSeq || ch.bySeq.has(message.seq)) {
+        return s;
+      }
       insertConfirmed(ch, message);
       return { channels: { ...s.channels } };
     });
@@ -107,7 +113,9 @@ export const useMessageStore = create<MessageState>((set, get) => ({
       for (const m of messages) {
         if (m.seq > ch.maxSeq && !ch.bySeq.has(m.seq)) {
           ch.bySeq.set(m.seq, m);
-          if (m.seq > ch.maxSeq) ch.maxSeq = m.seq;
+          if (m.seq > ch.maxSeq) {
+            ch.maxSeq = m.seq;
+          }
         }
       }
       drain(ch);
@@ -118,7 +126,9 @@ export const useMessageStore = create<MessageState>((set, get) => ({
     // Derives a fresh array: components should not subscribe with this
     // selector (unstable snapshot); read it on demand or select maxSeq.
     const ch = get().channels[channelId];
-    if (!ch) return [];
+    if (!ch) {
+      return [];
+    }
     return [...ch.bySeq.values()].sort((a, b) => a.seq - b.seq).concat([...ch.pending.values()]);
   },
   maxSeq(channelId) {
@@ -128,7 +138,9 @@ export const useMessageStore = create<MessageState>((set, get) => ({
     set((s) => {
       const ch = ensure(s, channelId);
       const old = ch.pending.get(clientToken);
-      if (!old) return s;
+      if (!old) {
+        return s;
+      }
       ch.pending.delete(clientToken);
       insertConfirmed(ch, { ...old, id: real.id, seq: real.seq });
       return { channels: { ...s.channels } };
@@ -155,14 +167,20 @@ export const useMessageStore = create<MessageState>((set, get) => ({
       const prefix = `${channelId}:`;
       const threads = { ...s.threads };
       for (const [key, arr] of Object.entries(threads)) {
-        if (!key.startsWith(prefix)) continue;
+        if (!key.startsWith(prefix)) {
+          continue;
+        }
         let changed = false;
         const next = arr.map((m) => {
-          if (m.id !== messageId) return m;
+          if (m.id !== messageId) {
+            return m;
+          }
           changed = true;
           return { ...m, content, editedAt: editedAt ?? Date.now() };
         });
-        if (changed) threads[key] = next;
+        if (changed) {
+          threads[key] = next;
+        }
       }
       return { channels: { ...s.channels }, threads };
     });
@@ -171,19 +189,27 @@ export const useMessageStore = create<MessageState>((set, get) => ({
     set((s) => {
       const ch = ensure(s, channelId);
       for (const m of ch.bySeq.values()) {
-        if (m.id === messageId) m.deletedAt = Date.now();
+        if (m.id === messageId) {
+          m.deletedAt = Date.now();
+        }
       }
       const prefix = `${channelId}:`;
       const threads = { ...s.threads };
       for (const [key, arr] of Object.entries(threads)) {
-        if (!key.startsWith(prefix)) continue;
+        if (!key.startsWith(prefix)) {
+          continue;
+        }
         let changed = false;
         const next = arr.map((m) => {
-          if (m.id !== messageId) return m;
+          if (m.id !== messageId) {
+            return m;
+          }
           changed = true;
           return { ...m, deletedAt: Date.now() };
         });
-        if (changed) threads[key] = next;
+        if (changed) {
+          threads[key] = next;
+        }
       }
       return { channels: { ...s.channels }, threads };
     });
@@ -193,14 +219,20 @@ export const useMessageStore = create<MessageState>((set, get) => ({
       const ch = s.channels[channelId];
       if (ch) {
         const m = ch.bySeq.get(messageSeq);
-        if (m) m.reactions = reactions;
+        if (m) {
+          m.reactions = reactions;
+        }
       }
       const threads = { ...s.threads };
       const prefix = `${channelId}:`;
       for (const [key, arr] of Object.entries(threads)) {
-        if (!key.startsWith(prefix)) continue;
+        if (!key.startsWith(prefix)) {
+          continue;
+        }
         const idx = arr.findIndex((x) => x.seq === messageSeq);
-        if (idx === -1) continue;
+        if (idx === -1) {
+          continue;
+        }
         const next = [...arr];
         next[idx] = { ...next[idx], reactions };
         threads[key] = next;
@@ -210,10 +242,14 @@ export const useMessageStore = create<MessageState>((set, get) => ({
   },
   ingestThread(channelId, message) {
     set((s) => {
-      if (!message.parentId) return s;
+      if (!message.parentId) {
+        return s;
+      }
       const key = `${channelId}:${message.parentId}`;
       const arr = s.threads[key] ?? [];
-      if (arr.some((m) => m.id === message.id)) return s;
+      if (arr.some((m) => m.id === message.id)) {
+        return s;
+      }
       const next = [...arr, { ...message }].sort((a, b) => a.seq - b.seq);
       return { threads: { ...s.threads, [key]: next } };
     });

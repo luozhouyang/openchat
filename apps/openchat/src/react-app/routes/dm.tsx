@@ -22,7 +22,9 @@ function DmLayout() {
   const { t } = useTranslation();
   const sidebar = useQuery({ queryKey: ["sidebar"], queryFn: api.sidebar, staleTime: 30_000 });
   useEffect(() => {
-    if (sidebar.data) useSidebarStore.getState().loadAll(sidebar.data.channels);
+    if (sidebar.data) {
+      useSidebarStore.getState().loadAll(sidebar.data.channels);
+    }
   }, [sidebar.data]);
 
   return (

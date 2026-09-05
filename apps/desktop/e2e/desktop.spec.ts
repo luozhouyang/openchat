@@ -39,7 +39,9 @@ test.describe("openchat desktop shell", () => {
       test.skip(true, `no display available for Electron: ${error.message}`);
       return null as unknown as ElectronApplication;
     });
-    if (!probe) return;
+    if (!probe) {
+      return;
+    }
     app = probe;
     page = await app.firstWindow();
     await page.waitForLoadState("domcontentloaded");
@@ -126,7 +128,9 @@ test.describe("openchat desktop shell", () => {
         .toBe(0);
       expect(app.process().pid).toBeTruthy();
       await app.evaluate(({ BrowserWindow }) => {
-        for (const w of BrowserWindow.getAllWindows()) w.show();
+        for (const w of BrowserWindow.getAllWindows()) {
+          w.show();
+        }
       });
       const wins = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length);
       expect(wins).toBeGreaterThan(0);

@@ -27,11 +27,15 @@ const cache = new Map<string, string>();
 let hydrated = false;
 
 export async function hydrateSecureCache(): Promise<void> {
-  if (hydrated) return;
+  if (hydrated) {
+    return;
+  }
   hydrated = true;
   for (const key of KEYS) {
     const value = await SecureStore.getItemAsync(key);
-    if (value !== null) cache.set(key, value);
+    if (value !== null) {
+      cache.set(key, value);
+    }
   }
 }
 
@@ -48,7 +52,9 @@ export const secureStorage: StorageAdapter = {
 };
 
 function randomUUID(): string {
-  if ("randomUUID" in crypto) return crypto.randomUUID();
+  if ("randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
   return `${Date.now()}-xxxx-4xxx-yxxx`.replace(/[xy]/g, (c) => {
     const r = (Math.random() * 16) | 0;
     return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
@@ -57,7 +63,9 @@ function randomUUID(): string {
 
 export async function getDeviceId(): Promise<string> {
   const existing = await SecureStore.getItemAsync(DEVICE_KEY);
-  if (existing) return existing;
+  if (existing) {
+    return existing;
+  }
   const id = randomUUID();
   await SecureStore.setItemAsync(DEVICE_KEY, id);
   return id;

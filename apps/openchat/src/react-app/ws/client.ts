@@ -50,8 +50,12 @@ class WsClient {
   }
 
   private notifyBackground(channelId: string, message: { userId: string; content: string }) {
-    if (!document.hidden) return;
-    if (this.selfUserId && message.userId === this.selfUserId) return;
+    if (!document.hidden) {
+      return;
+    }
+    if (this.selfUserId && message.userId === this.selfUserId) {
+      return;
+    }
     platform.notify({
       title: "openchat",
       body: message.content.slice(0, 100),

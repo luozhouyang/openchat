@@ -10,10 +10,14 @@ export function Composer({ channelId }: { channelId: string }) {
 
   async function send() {
     const content = text.trim();
-    if (!content) return;
+    if (!content) {
+      return;
+    }
     setText("");
     const ok = await appClient.messages.send(channelId, content, crypto.randomUUID());
-    if (!ok) setText(content); // failed send restores the draft
+    if (!ok) {
+      setText(content);
+    } // failed send restores the draft
   }
 
   return (

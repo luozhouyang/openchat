@@ -32,7 +32,9 @@ export function createChannelsService(deps: ChannelsServiceDeps): ChannelsServic
   const pageSize = deps.pageSize ?? 30;
 
   async function applyHistory(channelId: string, messages: MessageLike[]): Promise<void> {
-    if (messages.length === 0) return;
+    if (messages.length === 0) {
+      return;
+    }
     useMessageStore.getState().applySync(channelId, messages);
     const db = await deps.getDb();
     await db.messages.applyGap(channelId, messages.map(normalizeMessage));
@@ -42,7 +44,9 @@ export function createChannelsService(deps: ChannelsServiceDeps): ChannelsServic
     async hydrate(channelId) {
       const db = await deps.getDb();
       const { rows } = await db.messages.query(channelId, { limit: 100 });
-      if (rows.length > 0) useMessageStore.getState().applySync(channelId, rows);
+      if (rows.length > 0) {
+        useMessageStore.getState().applySync(channelId, rows);
+      }
       return rows.length;
     },
 
@@ -53,7 +57,9 @@ export function createChannelsService(deps: ChannelsServiceDeps): ChannelsServic
         .getState()
         .list(channelId)
         .find((m) => m.seq > 0)?.seq;
-      if (oldest === undefined || oldest <= 1) return false;
+      if (oldest === undefined || oldest <= 1) {
+        return false;
+      }
       const page = await deps.fetchHistory(channelId, oldest);
       await applyHistory(channelId, page);
       return page.length >= pageSize;

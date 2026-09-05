@@ -81,14 +81,18 @@ async function sendExpo(sub: Subscription, payload: string): Promise<void> {
       },
     ]),
   });
-  if (!res.ok) console.error("expo push failed", res.status);
+  if (!res.ok) {
+    console.error("expo push failed", res.status);
+  }
 }
 
 async function fetchSubscriptions(env: PushEnv, userId: string): Promise<Subscription[]> {
   const res = await fetch(`${env.API_BASE}/internal/push-user/${userId}/subscriptions`, {
     headers: { "x-internal-token": env.INTERNAL_TOKEN_KEY },
   });
-  if (!res.ok) return [];
+  if (!res.ok) {
+    return [];
+  }
   const body = (await res.json()) as { subscriptions: Subscription[] };
   return body.subscriptions;
 }

@@ -28,11 +28,15 @@ export default function App() {
   const [hasSession, setHasSession] = useState<boolean | null>(null);
 
   useEffect(() => {
-    if (hasSession !== true) return;
+    if (hasSession !== true) {
+      return;
+    }
     // Notification tap deep link (openchat://c/<channelId>) → jump to channel.
     const link = consumeDeepLink();
     const channelId = link?.match(/^openchat:\/\/c\/(.+)$/)?.[1];
-    if (channelId) setRoute({ screen: "channel", teamId: "", channelId, title: "# 频道" });
+    if (channelId) {
+      setRoute({ screen: "channel", teamId: "", channelId, title: "# 频道" });
+    }
   }, [hasSession]);
 
   useEffect(() => {
@@ -47,15 +51,18 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!hasSession) return;
+    if (!hasSession) {
+      return;
+    }
     void connectRealtime();
     void registerPush();
     sendActivity(); // foregrounding is an interaction signal
     const mobilePlatform = createMobilePlatform();
     // Background closes the socket; foreground reconnects + re-syncs (spec §4.1).
     const offApp = mobilePlatform.onAppStateChange((state) => {
-      if (state === "background") closeRealtime();
-      else {
+      if (state === "background") {
+        closeRealtime();
+      } else {
         void connectRealtime();
         sendActivity();
       }
@@ -73,7 +80,9 @@ export default function App() {
       </View>
     );
   }
-  if (!hasSession) return <LoginScreen onLoggedIn={() => setHasSession(true)} />;
+  if (!hasSession) {
+    return <LoginScreen onLoggedIn={() => setHasSession(true)} />;
+  }
 
   return (
     <View style={styles.app}>
@@ -291,12 +300,16 @@ function ChannelScreen({
     })();
     // 3) re-render on every store change for this channel
     return useMessages.subscribe((state) => {
-      if (state.channels[channelId]) refresh();
+      if (state.channels[channelId]) {
+        refresh();
+      }
     });
   }, [channelId, refresh]);
 
   const loadOlder = useCallback(async () => {
-    if (loadingOlder || !hasOlder) return;
+    if (loadingOlder || !hasOlder) {
+      return;
+    }
     const oldest = useMessages
       .getState()
       .list(channelId)
@@ -309,7 +322,9 @@ function ChannelScreen({
     try {
       const mayHaveMore = await appClient.channels.loadOlder(channelId);
       refresh();
-      if (!mayHaveMore) setHasOlder(false);
+      if (!mayHaveMore) {
+        setHasOlder(false);
+      }
     } catch {
       // offline: keep what we have
     } finally {
@@ -327,13 +342,17 @@ function ChannelScreen({
 
   const send = useCallback(async () => {
     const content = draft.trim();
-    if (!content) return;
+    if (!content) {
+      return;
+    }
     const clientToken = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     setDraft("");
     refresh();
     sendActivity(); // sending is an interaction signal
     const ok = await appClient.messages.send(channelId, content, clientToken);
-    if (!ok) setDraft(content); // failed send restores the draft
+    if (!ok) {
+      setDraft(content);
+    } // failed send restores the draft
     refresh();
   }, [channelId, draft, refresh]);
 

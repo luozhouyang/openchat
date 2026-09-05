@@ -13,7 +13,9 @@ function SettingsPage() {
   async function enablePush() {
     const permission = await Notification.requestPermission();
     setStatus(permission);
-    if (permission !== "granted") return;
+    if (permission !== "granted") {
+      return;
+    }
     const { publicKey } = await api.push.vapidPublicKey();
     const registration = await navigator.serviceWorker.ready;
     const sub = await registration.pushManager.subscribe({

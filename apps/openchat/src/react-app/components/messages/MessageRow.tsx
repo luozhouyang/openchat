@@ -14,7 +14,9 @@ export function MessageRow({ message, channelId }: { message: StoreMessage; chan
   async function submitEdit() {
     const content = draft.trim();
     setEditing(false);
-    if (!content || content === message.content) return;
+    if (!content || content === message.content) {
+      return;
+    }
     await api.posts.patch(message.id, { message: content, channelId });
   }
 

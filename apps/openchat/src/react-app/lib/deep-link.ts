@@ -11,7 +11,9 @@ export async function handleOpenchatLink(
 ): Promise<void> {
   const match = /\/c\/([^/?#]+)/.exec(link) ?? /openchat:\/\/c\/([^/?#]+)/.exec(link);
   const channelId = match?.[1];
-  if (!channelId) return;
+  if (!channelId) {
+    return;
+  }
   try {
     const workspaces = await api.workspaces();
     for (const team of workspaces.teams) {
@@ -31,7 +33,9 @@ export function listenForOpenchatLinks(
 ): () => void {
   const handler = (event: Event) => {
     const link = (event as CustomEvent<string>).detail;
-    if (typeof link === "string") void handleOpenchatLink(navigate, link);
+    if (typeof link === "string") {
+      void handleOpenchatLink(navigate, link);
+    }
   };
   window.addEventListener("openchat:navigate", handler);
   return () => window.removeEventListener("openchat:navigate", handler);

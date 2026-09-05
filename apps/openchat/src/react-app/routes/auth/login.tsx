@@ -31,7 +31,9 @@ function LoginPage() {
       setError(null);
       try {
         const res = await authClient.signIn.email({ email: value.email, password: value.password });
-        if (res.error) throw new Error(res.error.message ?? t("auth.login.failed"));
+        if (res.error) {
+          throw new Error(res.error.message ?? t("auth.login.failed"));
+        }
         void router.navigate({ to: "/" });
       } catch (err) {
         setError(err instanceof Error ? err.message : t("auth.login.failed"));

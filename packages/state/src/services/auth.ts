@@ -47,7 +47,9 @@ export function createAuthService(deps: AuthServiceDeps): AuthService {
         const headers = new Headers(init?.headers);
         if (!cookieMode) {
           const session = await deps.getSessionToken();
-          if (session) headers.set("authorization", `Bearer ${session}`);
+          if (session) {
+            headers.set("authorization", `Bearer ${session}`);
+          }
         }
         // Same-origin mode rewrites the absolute placeholder URL to a
         // relative path (served by the app:// /api proxy or the browser's
@@ -68,7 +70,9 @@ export function createAuthService(deps: AuthServiceDeps): AuthService {
     // The server-side bearer plugin puts the session token in the response
     // body; the client type does not know about it.
     const token = (data as { token?: string } | null | undefined)?.token;
-    if (!token) throw new Error("auth response did not carry a bearer token");
+    if (!token) {
+      throw new Error("auth response did not carry a bearer token");
+    }
     await deps.setSessionToken?.(token);
     wsJwt = null;
   }
@@ -76,8 +80,12 @@ export function createAuthService(deps: AuthServiceDeps): AuthService {
   return {
     async signIn(email, password) {
       const res = await authClient.signIn.email({ email, password });
-      if (res.error) throw new Error(res.error.message ?? "sign-in failed");
-      if (!cookieMode) await persistBearerToken(res.data);
+      if (res.error) {
+        throw new Error(res.error.message ?? "sign-in failed");
+      }
+      if (!cookieMode) {
+        await persistBearerToken(res.data);
+      }
     },
 
     async signUp(email, password) {
@@ -86,8 +94,12 @@ export function createAuthService(deps: AuthServiceDeps): AuthService {
         password,
         name: email.split("@")[0],
       });
-      if (res.error) throw new Error(res.error.message ?? "sign-up failed");
-      if (!cookieMode) await persistBearerToken(res.data);
+      if (res.error) {
+        throw new Error(res.error.message ?? "sign-up failed");
+      }
+      if (!cookieMode) {
+        await persistBearerToken(res.data);
+      }
     },
 
     async signOut() {
@@ -96,7 +108,9 @@ export function createAuthService(deps: AuthServiceDeps): AuthService {
       } catch {
         // best effort — local state is cleared regardless
       }
-      if (!cookieMode) await deps.setSessionToken?.(null);
+      if (!cookieMode) {
+        await deps.setSessionToken?.(null);
+      }
       wsJwt = null;
     },
 
@@ -119,13 +133,17 @@ export function createAuthService(deps: AuthServiceDeps): AuthService {
         }
       }
       const session = await deps.getSessionToken();
-      if (!session) return null;
+      if (!session) {
+        return null;
+      }
       if (wsJwt && wsJwt.session === session && Date.now() - wsJwt.fetchedAt < WS_JWT_TTL_MS) {
         return wsJwt.token;
       }
       try {
         const { data } = await authClient.token();
-        if (!data?.token) return null;
+        if (!data?.token) {
+          return null;
+        }
         wsJwt = { session, token: data.token, fetchedAt: Date.now() };
         return data.token;
       } catch {

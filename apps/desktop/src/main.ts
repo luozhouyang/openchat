@@ -35,7 +35,9 @@ const PACKAGED_RENDERER_URL = process.env.OPENCHAT_DESKTOP_URL || "https://chat.
 // API origin for the bundled renderer (REST/WS target). Derived from the
 // remote renderer URL unless overridden via OPENCHAT_API_URL.
 function resolveApiUrl(): string {
-  if (process.env.OPENCHAT_API_URL) return process.env.OPENCHAT_API_URL;
+  if (process.env.OPENCHAT_API_URL) {
+    return process.env.OPENCHAT_API_URL;
+  }
   try {
     return new URL(app.isPackaged ? PACKAGED_RENDERER_URL : DEV_RENDERER_URL).origin;
   } catch {
@@ -96,7 +98,9 @@ function registerAppProtocol(): void {
     for (const relPath of candidates) {
       const filePath = path.join(webDist, relPath);
       const fromRoot = path.relative(webDist, filePath);
-      if (fromRoot.startsWith("..") || path.isAbsolute(fromRoot)) continue;
+      if (fromRoot.startsWith("..") || path.isAbsolute(fromRoot)) {
+        continue;
+      }
       const body = await fs.promises.readFile(filePath).catch(() => null);
       if (body) {
         const ext = path.extname(relPath).toLowerCase();
@@ -133,7 +137,9 @@ const pendingLinks: string[] = [];
 let rendererReady = false;
 
 function resolveRendererTarget(): { url: string } {
-  if (process.env.OPENCHAT_DESKTOP_URL) return { url: process.env.OPENCHAT_DESKTOP_URL };
+  if (process.env.OPENCHAT_DESKTOP_URL) {
+    return { url: process.env.OPENCHAT_DESKTOP_URL };
+  }
   // Bundled renderer whenever packaging guarantees web-dist, or explicitly
   // requested (tests/dev). Dev default stays the remote renderer.
   if (app.isPackaged || process.env.OPENCHAT_DESKTOP_APP === "1") {
@@ -158,10 +164,16 @@ function dispatchLinkToRenderer(win: BrowserWindow, link: string) {
 
 function navigateToLink(link: string) {
   const parsed = parseOpenchatLink(link);
-  if (!parsed) return;
+  if (!parsed) {
+    return;
+  }
   const win = BrowserWindow.getAllWindows()[0];
-  if (!win) return;
-  if (win.isMinimized()) win.restore();
+  if (!win) {
+    return;
+  }
+  if (win.isMinimized()) {
+    win.restore();
+  }
   win.show();
   if (rendererReady) {
     dispatchLinkToRenderer(win, link);
@@ -172,8 +184,12 @@ function navigateToLink(link: string) {
 
 function showWindow() {
   const win = BrowserWindow.getAllWindows()[0];
-  if (!win) return;
-  if (win.isMinimized()) win.restore();
+  if (!win) {
+    return;
+  }
+  if (win.isMinimized()) {
+    win.restore();
+  }
   win.show();
   win.focus();
 }
@@ -231,7 +247,9 @@ function createWindow() {
     rendererReady = true;
     while (pendingLinks.length > 0) {
       const link = pendingLinks.shift();
-      if (link) dispatchLinkToRenderer(win, link);
+      if (link) {
+        dispatchLinkToRenderer(win, link);
+      }
     }
   });
 
@@ -246,7 +264,9 @@ if (!gotLock) {
 } else {
   app.on("second-instance", (_event, argv) => {
     const link = argv.find((arg) => arg.startsWith("openchat://"));
-    if (link) navigateToLink(link);
+    if (link) {
+      navigateToLink(link);
+    }
     showWindow();
   });
 
@@ -266,11 +286,15 @@ if (!gotLock) {
     app.setAsDefaultProtocolClient("openchat");
 
     ipcMain.on("notify", (_event, payload: { title: string; body: string; link?: string }) => {
-      if (!Notification.isSupported()) return;
+      if (!Notification.isSupported()) {
+        return;
+      }
       const notification = new Notification({ title: payload.title, body: payload.body });
       notification.on("click", () => {
         showWindow();
-        if (payload.link) navigateToLink(payload.link);
+        if (payload.link) {
+          navigateToLink(payload.link);
+        }
       });
       notification.show();
     });
@@ -292,12 +316,17 @@ if (!gotLock) {
 
   app.on("window-all-closed", () => {
     // Tray-resident shell: keep running on all platforms until Quit.
-    if (!tray) app.quit();
+    if (!tray) {
+      app.quit();
+    }
   });
 
   app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
-    else showWindow();
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createWindow();
+    } else {
+      showWindow();
+    }
   });
 }
 

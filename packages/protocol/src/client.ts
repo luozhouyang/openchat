@@ -74,7 +74,9 @@ export function createApiFetch(opts: ApiFetchOptions = {}) {
     const headers = new Headers(init?.headers);
     if (opts.getToken) {
       const token = await opts.getToken();
-      if (token) headers.set("authorization", `Bearer ${token}`);
+      if (token) {
+        headers.set("authorization", `Bearer ${token}`);
+      }
     }
     const res = await fetch(`${opts.baseUrl ?? ""}${path}`, {
       credentials: opts.credentials ?? "include",

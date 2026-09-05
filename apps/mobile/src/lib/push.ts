@@ -25,10 +25,14 @@ export async function registerPush(): Promise<void> {
     if (!granted && settings.canAskAgain) {
       granted = (await Notifications.requestPermissionsAsync()).granted;
     }
-    if (!granted) return;
+    if (!granted) {
+      return;
+    }
 
     const { data: expoToken } = await Notifications.getExpoPushTokenAsync();
-    if (typeof expoToken !== "string" || expoToken.length === 0) return;
+    if (typeof expoToken !== "string" || expoToken.length === 0) {
+      return;
+    }
     // endpoint must be a URL (protocol PushSubscribeInput); the Expo push
     // service send endpoint carries the token in the device query param.
     const endpoint = `https://exp.host/--/api/v2/push/send?device=${encodeURIComponent(expoToken)}`;
@@ -48,7 +52,9 @@ export async function registerPush(): Promise<void> {
     // Notification tap → in-app deep link (openchat://c/<channelId>).
     Notifications.addNotificationResponseReceivedListener((response) => {
       const url = response.notification.request.content.data?.url;
-      if (typeof url === "string") pendingDeepLink = url;
+      if (typeof url === "string") {
+        pendingDeepLink = url;
+      }
     });
   } catch {
     // Push is best-effort; chat must work without it.

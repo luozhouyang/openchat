@@ -12,7 +12,9 @@ export async function buildSyncChannels(
   maxChannels = 500,
 ): Promise<{ channelId: string; lastSeq: number }[]> {
   const ids = new Set(await db.messages.listChannels());
-  for (const id of Object.keys(useMessageStore.getState().channels)) ids.add(id);
+  for (const id of Object.keys(useMessageStore.getState().channels)) {
+    ids.add(id);
+  }
   const out: { channelId: string; lastSeq: number }[] = [];
   for (const channelId of ids) {
     const lastSeq = Math.max(
@@ -50,14 +52,18 @@ export function createSyncGapHandler(deps: {
       } catch {
         return; // offline: the next reconnect sync retries
       }
-      if (messages.length === 0) return;
+      if (messages.length === 0) {
+        return;
+      }
       useMessageStore.getState().applySync(channelId, messages);
       await db.messages.applyGap(
         channelId,
         messages.map((m) => ({ ...m, attachments: m.attachments ?? null })),
       );
       const minSeq = Math.min(...messages.map((m) => m.seq));
-      if (minSeq <= localMax + 1) return; // overlapped local history
+      if (minSeq <= localMax + 1) {
+        return;
+      } // overlapped local history
       beforeSeq = minSeq;
     }
   };

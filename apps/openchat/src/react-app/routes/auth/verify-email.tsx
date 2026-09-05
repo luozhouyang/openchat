@@ -31,12 +31,16 @@ function VerifyEmailPage() {
   const startedRef = useRef(false);
 
   useEffect(() => {
-    if (!search.token || startedRef.current) return;
+    if (!search.token || startedRef.current) {
+      return;
+    }
     startedRef.current = true;
     authClient
       .verifyEmail({ query: { token: search.token, callbackURL: "/auth/verify-email" } })
       .then((res) => {
-        if (res.error) throw new Error(res.error.message ?? t("auth.verifyEmail.failTitle"));
+        if (res.error) {
+          throw new Error(res.error.message ?? t("auth.verifyEmail.failTitle"));
+        }
         setState("success");
         void navigate({ to: "/auth/verify-email", search: {}, replace: true });
       })
@@ -47,7 +51,9 @@ function VerifyEmailPage() {
   }, [search.token, t, navigate]);
 
   async function resend() {
-    if (!search.email) return;
+    if (!search.email) {
+      return;
+    }
     setSending(true);
     setSendError(null);
     setSent(false);
@@ -56,7 +62,9 @@ function VerifyEmailPage() {
         email: search.email,
         callbackURL: "/auth/verify-email",
       });
-      if (res.error) throw new Error(res.error.message ?? t("auth.verifyEmail.sendFailed"));
+      if (res.error) {
+        throw new Error(res.error.message ?? t("auth.verifyEmail.sendFailed"));
+      }
       setSent(true);
     } catch (err) {
       setSendError(err instanceof Error ? err.message : t("auth.verifyEmail.sendFailed"));

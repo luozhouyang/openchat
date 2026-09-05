@@ -67,11 +67,15 @@ export class SqliteMessageRepository implements MessageRepository {
   }
 
   async applyGap(channelId: string, messages: Message[]) {
-    if (messages.length === 0) return;
+    if (messages.length === 0) {
+      return;
+    }
     // One transaction per gap (joins an outer transaction when the caller
     // wrapped it): a 500-message refill is a single commit, not 500.
     await this.tx.run(async () => {
-      for (const m of messages) await this.d.run(UPSERT, this.params(channelId, m));
+      for (const m of messages) {
+        await this.d.run(UPSERT, this.params(channelId, m));
+      }
     });
   }
 

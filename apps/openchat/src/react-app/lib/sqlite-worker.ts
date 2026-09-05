@@ -44,7 +44,9 @@ async function handle(call: SqliteWorkerCall): Promise<{ rows?: Record<string, u
 // bind([]) on a statement with zero placeholders throws ("no bindable
 // parameters"), e.g. SELECT DISTINCT channel_id — skip binding instead.
 function bindParams(stmt: { bind(spec: BindingSpec): void }, params: unknown[]) {
-  if (params.length > 0) stmt.bind(params as BindingSpec);
+  if (params.length > 0) {
+    stmt.bind(params as BindingSpec);
+  }
 }
 
 function run(db: Database, sql: string, params: unknown[]) {
@@ -62,7 +64,9 @@ function all(db: Database, sql: string, params: unknown[]): Record<string, unkno
   try {
     bindParams(stmt, params);
     const rows: Record<string, unknown>[] = [];
-    while (stmt.step()) rows.push(stmt.get({}) as Record<string, unknown>);
+    while (stmt.step()) {
+      rows.push(stmt.get({}) as Record<string, unknown>);
+    }
     return rows;
   } finally {
     stmt.finalize();

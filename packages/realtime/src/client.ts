@@ -26,8 +26,12 @@ export class RealtimeClient {
 
   /** Idempotent: no-ops when a connection is already open or being opened. */
   async connect(deviceId: string) {
-    if (this.opening) return;
-    if (this.ws && this.ws.readyState === OPEN) return;
+    if (this.opening) {
+      return;
+    }
+    if (this.ws && this.ws.readyState === OPEN) {
+      return;
+    }
     this.closedByUser = false;
     this.opening = true;
     try {
@@ -42,7 +46,9 @@ export class RealtimeClient {
     const gen = ++this.generation;
     this.setState("connecting");
     const token = await this.opts.getToken();
-    if (gen !== this.generation) return; // superseded while awaiting the token
+    if (gen !== this.generation) {
+      return;
+    } // superseded while awaiting the token
     if (!token) {
       this.setState("closed");
       this.opts.onAuthMissing();
@@ -54,7 +60,9 @@ export class RealtimeClient {
     );
     this.ws = ws;
     ws.onopen = () => {
-      if (gen !== this.generation) return;
+      if (gen !== this.generation) {
+        return;
+      }
       this.setState("open");
       this.reconnectDelay = this.opts.reconnectBaseMs ?? 1000;
       this.startHeartbeat();
@@ -62,11 +70,17 @@ export class RealtimeClient {
       this.opts.handlers.onOpen();
     };
     ws.onmessage = (ev) => {
-      if (gen !== this.generation) return;
-      if (typeof ev.data === "string") this.opts.handlers.onMessage(ev.data);
+      if (gen !== this.generation) {
+        return;
+      }
+      if (typeof ev.data === "string") {
+        this.opts.handlers.onMessage(ev.data);
+      }
     };
     ws.onclose = () => {
-      if (gen !== this.generation) return;
+      if (gen !== this.generation) {
+        return;
+      }
       this.stopHeartbeat();
       this.tokenTimer = null;
       this.setState(this.closedByUser ? "idle" : "reconnecting");
@@ -75,7 +89,9 @@ export class RealtimeClient {
         this.reconnectDelay = Math.min(this.reconnectDelay * 2, this.opts.reconnectMaxMs ?? 30_000);
         this.reconnectTimer = setTimeout(() => {
           this.reconnectTimer = null;
-          if (!this.closedByUser) void this.open(deviceId);
+          if (!this.closedByUser) {
+            void this.open(deviceId);
+          }
         }, delay);
       }
     };
@@ -99,10 +115,14 @@ export class RealtimeClient {
   }
 
   private scheduleTokenRefresh() {
-    if (this.tokenTimer) clearTimeout(this.tokenTimer);
+    if (this.tokenTimer) {
+      clearTimeout(this.tokenTimer);
+    }
     this.tokenTimer = setTimeout(
       () => {
-        if (this.ws?.readyState === OPEN) this.ws.close(4100, "token-refresh");
+        if (this.ws?.readyState === OPEN) {
+          this.ws.close(4100, "token-refresh");
+        }
       },
       this.opts.tokenTtlMs ?? 14 * 60_000,
     );
@@ -116,21 +136,31 @@ export class RealtimeClient {
   private startHeartbeat() {
     this.stopHeartbeat();
     const interval = this.opts.heartbeatIntervalMs ?? 30_000;
-    if (interval <= 0) return;
+    if (interval <= 0) {
+      return;
+    }
     this.heartbeatTimer = setInterval(() => {
-      if (this.ws?.readyState === OPEN) this.ws.send("ping");
+      if (this.ws?.readyState === OPEN) {
+        this.ws.send("ping");
+      }
     }, interval);
   }
 
   private stopHeartbeat() {
-    if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
+    if (this.heartbeatTimer) {
+      clearInterval(this.heartbeatTimer);
+    }
     this.heartbeatTimer = null;
   }
 
   private clearTimers() {
-    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+    }
     this.reconnectTimer = null;
-    if (this.tokenTimer) clearTimeout(this.tokenTimer);
+    if (this.tokenTimer) {
+      clearTimeout(this.tokenTimer);
+    }
     this.tokenTimer = null;
     this.stopHeartbeat();
   }
