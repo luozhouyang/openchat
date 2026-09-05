@@ -256,6 +256,42 @@ test("team.member_removed drops team only when self is removed", () => {
   expect(useTeamsStore.getState().teams).toHaveLength(0);
 });
 
+test("channel.member_removed drops the channel from view only when self is removed", () => {
+  useTeamsStore.setState({
+    teams: [
+      {
+        id: "t1",
+        name: "a",
+        displayName: "A",
+        type: "open",
+        roles: "team_admin",
+        archivedAt: null,
+        channels: [
+          {
+            id: "c1",
+            teamId: "t1",
+            name: "general",
+            displayName: "General",
+            type: "public",
+            member: true,
+            archivedAt: null,
+          },
+        ],
+      },
+    ],
+    directs: [],
+    loaded: true,
+  });
+  const db = createMemoryDatabase();
+  const dispatch = createDispatcher({ getDb: async () => db, selfUserId: () => "me" });
+  dispatch(
+    JSON.stringify({ type: "channel.member_removed", channelId: "c1", userId: "someone-else" }),
+  );
+  expect(useTeamsStore.getState().teams[0].channels).toHaveLength(1);
+  dispatch(JSON.stringify({ type: "channel.member_removed", channelId: "c1", userId: "me" }));
+  expect(useTeamsStore.getState().teams[0].channels).toHaveLength(0);
+});
+
 test("malformed event frames are dropped by schema validation", () => {
   const { dispatch, onLocal } = setup();
   expect(() => dispatch(JSON.stringify({ type: "channel.created" }))).not.toThrow();

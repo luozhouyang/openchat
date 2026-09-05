@@ -99,6 +99,13 @@ export function createDispatcher(deps: DispatcherDeps) {
       case "channel.deleted":
         useTeamsStore.getState().removeChannel(ev.channelId);
         break;
+      case "channel.member_removed":
+        // Self-removal drops the channel from this device's view immediately
+        // (matches the pre-alignment behavior where router.invalidate refetched
+        // and the sidebar lost the channel). Other members' removal is inert —
+        // membership lists aren't held in the store.
+        if (ev.userId === deps.selfUserId?.()) useTeamsStore.getState().removeChannel(ev.channelId);
+        break;
       case "team.updated":
         useTeamsStore.getState().patchTeam(ev.team);
         break;
