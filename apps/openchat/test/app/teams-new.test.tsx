@@ -69,6 +69,31 @@ describe("/teams/new", () => {
     expect(trigger).toHaveTextContent("Open (anyone can join)");
   });
 
+  it("defaults to the join tab when entered via ?tab=join", async () => {
+    (api.me as ReturnType<typeof vi.fn>).mockResolvedValue({
+      user: { id: "u1", email: "a@b.c", permissions: ["create_team"] },
+    });
+    renderAt("/teams/new?tab=join");
+    // Create tab only renders once permissions resolve (canCreate), which also
+    // settles the Tabs remount — assert after that point.
+    await screen.findByText("Create team");
+    expect(screen.getByLabelText("Invite code")).toBeInTheDocument();
+    expect(
+      screen.queryByLabelText("Identifier (lowercase letters and digits)"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("defaults to the create tab when entered via ?tab=create", async () => {
+    (api.me as ReturnType<typeof vi.fn>).mockResolvedValue({
+      user: { id: "u1", email: "a@b.c", permissions: ["create_team"] },
+    });
+    renderAt("/teams/new?tab=create");
+    expect(
+      await screen.findByLabelText("Identifier (lowercase letters and digits)"),
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText("Invite code")).not.toBeInTheDocument();
+  });
+
   it("navigates to /dm when the dialog is closed without history to go back to", async () => {
     (api.me as ReturnType<typeof vi.fn>).mockResolvedValue({
       user: { id: "u1", email: "a@b.c", permissions: ["create_team"] },

@@ -18,9 +18,11 @@ function DmHome() {
         <p>{t("workspace.noConversations")}</p>
         <div className="flex gap-2">
           {canCreate && (
-            <Button render={<Link to="/teams/new" />}>{t("workspace.createTeam")}</Button>
+            <Button render={<Link to="/teams/new" search={{ tab: "create" }} />}>
+              {t("workspace.createTeam")}
+            </Button>
           )}
-          <Button variant="outline" render={<Link to="/teams/new" />}>
+          <Button variant="outline" render={<Link to="/teams/new" search={{ tab: "join" }} />}>
             {t("workspace.joinTeam")}
           </Button>
         </div>

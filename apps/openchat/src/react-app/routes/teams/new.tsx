@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
+import { z } from "zod";
 import { api } from "@/lib/api";
 import { usePermissions } from "@/lib/use-permissions";
 import { Button } from "@/components/ui/button";
@@ -24,11 +25,13 @@ import {
 
 export const Route = createFileRoute("/teams/new")({
   component: TeamsNewPage,
+  validateSearch: z.object({ tab: z.enum(["create", "join"]).optional() }),
 });
 
 function TeamsNewPage() {
   const permissions = usePermissions();
   const canCreate = permissions.includes("create_team");
+  const { tab } = Route.useSearch();
   const navigate = useNavigate();
   const router = useRouter();
   const { t } = useTranslation();
@@ -89,7 +92,10 @@ function TeamsNewPage() {
         <DialogHeader>
           <DialogTitle>{t("teams.title")}</DialogTitle>
         </DialogHeader>
-        <Tabs key={canCreate ? "create" : "join"} defaultValue={canCreate ? "create" : "join"}>
+        <Tabs
+          key={`${canCreate}-${tab ?? ""}`}
+          defaultValue={tab === "join" || !canCreate ? "join" : "create"}
+        >
           <TabsList>
             {canCreate && <TabsTrigger value="create">{t("teams.createTab")}</TabsTrigger>}
             <TabsTrigger value="join">{t("teams.joinTab")}</TabsTrigger>

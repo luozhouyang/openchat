@@ -88,7 +88,7 @@ export function TeamSwitcher({
               <DropdownMenuItem
                 onClick={() => {
                   setOpen(false);
-                  void navigate({ to: "/teams/new" });
+                  void navigate({ to: "/teams/new", search: { tab: "create" } });
                 }}
               >
                 {t("workspace.createTeam")}
@@ -107,7 +107,7 @@ export function TeamSwitcher({
             <DropdownMenuItem
               onClick={() => {
                 setOpen(false);
-                void navigate({ to: "/teams/new" });
+                void navigate({ to: "/teams/new", search: { tab: "join" } });
               }}
             >
               {t("workspace.joinTeam")}
