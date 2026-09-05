@@ -7,7 +7,10 @@ export function UserTable() {
   const qc = useQueryClient();
   const users = useQuery({
     queryKey: ["admin-users"],
-    queryFn: async () => (await authClient.admin.listUsers({ query: { limit: 100 } })).data,
+    queryFn: async () => {
+      const res = await authClient.admin.listUsers({ query: { limit: 100 } });
+      return res.data;
+    },
   });
   const ban = useMutation({
     mutationFn: (userId: string) => authClient.admin.banUser({ userId, banReason: "管理员操作" }),
