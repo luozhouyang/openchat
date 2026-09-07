@@ -37,7 +37,9 @@ export function WorkspaceShell({
         <Sidebar collapsible="icon">
           <TeamSwitcher teams={teams} currentTeamId={currentTeamId} />
           <WorkspaceMenu teamId={currentTeamId} channels={channels} directs={directs} />
-          <SidebarSeparator />
+          <div className="mx-2">
+            <SidebarSeparator className="mx-0" />
+          </div>
           <SidebarFooter>
             <UserMenu />
           </SidebarFooter>
