@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/sidebar";
 import { HashIcon, MessagesSquareIcon, PlusIcon } from "lucide-react";
 import { NewChannelDialog } from "./NewChannelDialog";
+import { NewDmDialog } from "./NewDmDialog";
 
 export function WorkspaceMenu({
   teamId,
@@ -29,6 +30,7 @@ export function WorkspaceMenu({
   const entries = useSidebarStore((s) => s.entries);
   const match = useMatchRoute();
   const [channelOpen, setChannelOpen] = useState(false);
+  const [dmOpen, setDmOpen] = useState(false);
   return (
     <SidebarContent>
       {teamId && (
@@ -74,8 +76,15 @@ export function WorkspaceMenu({
           </SidebarMenu>
         </SidebarGroup>
       )}
-      <SidebarGroup>
+      <SidebarGroup className="group/section">
         <SidebarGroupLabel>{t("workspace.directs")}</SidebarGroupLabel>
+        <SidebarGroupAction
+          aria-label={t("workspace.newDm")}
+          onClick={() => setDmOpen(true)}
+          className="opacity-0 transition-opacity focus-visible:opacity-100 group-hover/section:opacity-100 group-focus-within/section:opacity-100"
+        >
+          <PlusIcon />
+        </SidebarGroupAction>
         <SidebarMenu>
           {directs.map((c) => {
             const active = !!match({ to: "/dm/$channelId", params: { channelId: c.id } });
@@ -95,6 +104,7 @@ export function WorkspaceMenu({
         </SidebarMenu>
       </SidebarGroup>
       {channelOpen && <NewChannelDialog teamId={teamId!} open onOpenChange={setChannelOpen} />}
+      {dmOpen && <NewDmDialog open onOpenChange={setDmOpen} />}
     </SidebarContent>
   );
 }

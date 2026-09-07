@@ -97,4 +97,10 @@ describe("WorkspaceMenu", () => {
     fireEvent.click(screen.getByRole("button", { name: "New channel" }));
     expect(screen.getByText("Channel name")).toBeInTheDocument();
   });
+
+  it("opens the new-dm dialog from the Direct messages group action", async () => {
+    await renderMenu({ teamId: null, channels: [], directs: [] });
+    fireEvent.click(screen.getByRole("button", { name: "New direct message" }));
+    expect(screen.getByPlaceholderText("Search people by name or username")).toBeInTheDocument();
+  });
 });
