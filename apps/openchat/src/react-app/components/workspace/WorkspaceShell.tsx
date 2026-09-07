@@ -4,12 +4,15 @@ import { useTranslation } from "react-i18next";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import {
   Sidebar,
+  SidebarFooter,
   SidebarInset,
   SidebarProvider,
   SidebarRail,
+  SidebarSeparator,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { TeamSwitcher } from "./TeamSwitcher";
+import { UserMenu } from "./UserMenu";
 import { WorkspaceMenu } from "./WorkspaceMenu";
 
 interface WorkspaceShellProps {
@@ -34,6 +37,10 @@ export function WorkspaceShell({
         <Sidebar collapsible="icon">
           <TeamSwitcher teams={teams} currentTeamId={currentTeamId} />
           <WorkspaceMenu teamId={currentTeamId} channels={channels} directs={directs} />
+          <SidebarSeparator />
+          <SidebarFooter>
+            <UserMenu />
+          </SidebarFooter>
           <SidebarRail />
         </Sidebar>
         <SidebarInset>
