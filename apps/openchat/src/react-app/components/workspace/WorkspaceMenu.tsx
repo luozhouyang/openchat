@@ -34,12 +34,11 @@ export function WorkspaceMenu({
   return (
     <SidebarContent>
       {teamId && (
-        <SidebarGroup className="group/section">
+        <SidebarGroup>
           <SidebarGroupLabel>{t("workspace.channels")}</SidebarGroupLabel>
           <SidebarGroupAction
             aria-label={t("workspace.newChannel")}
             onClick={() => setChannelOpen(true)}
-            className="opacity-0 transition-opacity focus-visible:opacity-100 group-hover/section:opacity-100 group-focus-within/section:opacity-100"
           >
             <PlusIcon />
           </SidebarGroupAction>
@@ -76,13 +75,9 @@ export function WorkspaceMenu({
           </SidebarMenu>
         </SidebarGroup>
       )}
-      <SidebarGroup className="group/section">
+      <SidebarGroup>
         <SidebarGroupLabel>{t("workspace.directs")}</SidebarGroupLabel>
-        <SidebarGroupAction
-          aria-label={t("workspace.newDm")}
-          onClick={() => setDmOpen(true)}
-          className="opacity-0 transition-opacity focus-visible:opacity-100 group-hover/section:opacity-100 group-focus-within/section:opacity-100"
-        >
+        <SidebarGroupAction aria-label={t("workspace.newDm")} onClick={() => setDmOpen(true)}>
           <PlusIcon />
         </SidebarGroupAction>
         <SidebarMenu>
