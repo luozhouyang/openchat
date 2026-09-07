@@ -1,12 +1,20 @@
 import { Hono } from "hono";
 import { eq, inArray } from "drizzle-orm";
-import { WorkspaceResponse, type ChannelSummary, type ChannelType, type TeamType } from "protocol";
+import {
+  WorkspaceResponse,
+  type ChannelSummary,
+  type ChannelType,
+  type TeamType,
+  UserAutocompleteOutput,
+  UserAutocompleteQuery,
+} from "protocol";
 import { requireSession } from "@worker/auth/session";
 import { resolvePermissions } from "@worker/auth/rbac";
 import { getDb } from "@worker/db/client";
 import { users } from "@worker/db/schema-d1";
 import type { Db } from "@worker/db/types";
 import { listTeamsForUser } from "@worker/db/repos/teams";
+import { searchUsers } from "@worker/db/repos/user-search";
 import {
   listChannelsForTeam,
   listChannelsForUser,
@@ -14,6 +22,7 @@ import {
 } from "@worker/db/repos/channels";
 import { syncUserChannels } from "@worker/user-do-sync";
 import { apiError } from "@worker/lib/errors";
+import { zodValidator } from "@worker/lib/validation";
 
 export const usersV1 = new Hono<{ Bindings: Env }>();
 
@@ -85,6 +94,22 @@ usersV1.get("/users/me/workspaces", requireSession, async (c) => {
   const out: WorkspaceResponse = { teams, directs };
   return c.json(out);
 });
+
+usersV1.get(
+  "/users/autocomplete",
+  requireSession,
+  zodValidator("query", UserAutocompleteQuery),
+  async (c) => {
+    const { term, limit } = c.req.valid("query");
+    if (!term?.trim()) {
+      return c.json({ users: [] } satisfies UserAutocompleteOutput);
+    }
+    const db = getDb(c.env.DB);
+    const me = c.get("session")!.user.id;
+    const users = await searchUsers(db, term, { limit: limit ?? 20, excludeUserId: me });
+    return c.json({ users } satisfies UserAutocompleteOutput);
+  },
+);
 
 export async function memberNames(db: Db, userIds: string[]): Promise<string[]> {
   if (userIds.length === 0) {
