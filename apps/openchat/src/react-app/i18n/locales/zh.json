@@ -73,7 +73,19 @@
     "joinTeam": "加入团队",
     "teamSettings": "团队设置",
     "leaveTeam": "退出团队",
-    "leaveFailed": "退出失败"
+    "leaveFailed": "退出失败",
+    "signOut": "退出登录",
+    "newChannel": "新建频道",
+    "channelName": "频道名称",
+    "channelType": "频道类型",
+    "channelTypePublic": "公开",
+    "channelTypePrivate": "私密",
+    "createChannel": "创建频道",
+    "createChannelFailed": "创建频道失败",
+    "newDm": "新建直聊",
+    "dmSearchPlaceholder": "按姓名或用户名搜索成员",
+    "dmSearchEmpty": "未找到匹配的人",
+    "dmSearchFailed": "搜索失败"
   },
   "teams": {
     "title": "团队",

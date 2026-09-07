@@ -73,7 +73,19 @@
     "joinTeam": "Join team",
     "teamSettings": "Team settings",
     "leaveTeam": "Leave team",
-    "leaveFailed": "Failed to leave team"
+    "leaveFailed": "Failed to leave team",
+    "signOut": "Sign out",
+    "newChannel": "New channel",
+    "channelName": "Channel name",
+    "channelType": "Channel type",
+    "channelTypePublic": "Public",
+    "channelTypePrivate": "Private",
+    "createChannel": "Create channel",
+    "createChannelFailed": "Failed to create channel",
+    "newDm": "New direct message",
+    "dmSearchPlaceholder": "Search people by name or username",
+    "dmSearchEmpty": "No people found",
+    "dmSearchFailed": "Search failed"
   },
   "teams": {
     "title": "Teams",
