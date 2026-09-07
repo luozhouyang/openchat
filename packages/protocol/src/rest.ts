@@ -353,6 +353,23 @@ export type ThumbnailInput = z.infer<typeof ThumbnailInput>;
 export const DeleteSubscriptionInput = z.object({ deviceId: idSchema });
 export type DeleteSubscriptionInput = z.infer<typeof DeleteSubscriptionInput>;
 
+// ---- users (global search) ----
+export const UserAutocompleteItem = z.object({
+  id: idSchema,
+  username: z.string().nullable(),
+  nickname: z.string().nullable(),
+  name: z.string().nullable(),
+  avatarUrl: z.string().nullable(),
+});
+export type UserAutocompleteItem = z.infer<typeof UserAutocompleteItem>;
+export const UserAutocompleteOutput = z.object({ users: z.array(UserAutocompleteItem) });
+export type UserAutocompleteOutput = z.infer<typeof UserAutocompleteOutput>;
+export const UserAutocompleteQuery = z.object({
+  term: z.string().max(64).optional(),
+  limit: z.coerce.number().int().min(1).max(50).optional(),
+});
+export type UserAutocompleteQuery = z.infer<typeof UserAutocompleteQuery>;
+
 // ---- workspaces (kept, now derived from TeamSummary) ----
 export const WorkspaceResponse = z.object({
   teams: z.array(TeamSummary.extend({ channels: z.array(ChannelSummary) })),
