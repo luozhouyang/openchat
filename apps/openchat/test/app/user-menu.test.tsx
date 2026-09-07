@@ -8,11 +8,11 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { UserMenu } from "@/components/workspace/UserMenu";
 import { api } from "@/lib/api";
-import { appClient } from "@/app-client";
 import "@/i18n";
 
+const mockSignOut = vi.hoisted(() => vi.fn(async () => {}));
 vi.mock("@/app-client", () => ({
-  appClient: { auth: { hasSession: async () => true, signOut: vi.fn(async () => {}) } },
+  appClient: { auth: { hasSession: async () => true, signOut: mockSignOut } },
 }));
 vi.mock("@/ws/client", () => ({
   wsClient: { ensureConnected: async () => {}, sendActivity: () => {}, send: () => {} },
@@ -67,6 +67,6 @@ describe("UserMenu", () => {
     fireEvent.click(await screen.findByText("Me Nick"));
     const signOut = await screen.findByText("Sign out");
     fireEvent.click(signOut);
-    await vi.waitFor(() => expect(appClient.auth.signOut).toHaveBeenCalled());
+    await vi.waitFor(() => expect(mockSignOut).toHaveBeenCalled());
   });
 });

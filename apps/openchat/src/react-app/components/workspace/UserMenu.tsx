@@ -43,11 +43,16 @@ export function UserMenu() {
   );
 
   async function signOut() {
-    await appClient.auth.signOut();
-    resetSessionProbe();
-    queryClient.clear();
     setOpen(false);
-    await navigate({ to: "/auth/login" });
+    try {
+      await appClient.auth.signOut();
+      resetSessionProbe();
+      queryClient.clear();
+      await navigate({ to: "/auth/login" });
+    } catch {
+      resetSessionProbe();
+      queryClient.clear();
+    }
   }
 
   return (
@@ -59,6 +64,7 @@ export function UserMenu() {
               render={
                 <SidebarMenuButton
                   size="lg"
+                  aria-label={displayName}
                   className="data-open:bg-sidebar-accent data-open:text-sidebar-accent-foreground"
                 >
                   {avatar}

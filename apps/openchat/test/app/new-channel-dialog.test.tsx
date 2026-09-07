@@ -63,7 +63,16 @@ describe("NewChannelDialog", () => {
     );
     await vi.waitFor(() => {
       const team = useTeamsStore.getState().teams.find((tm) => tm.id === "t1");
-      expect(team?.channels.some((c) => c.id === "new-c1")).toBe(true);
+      const added = team?.channels.find((c) => c.id === "new-c1");
+      expect(added).toEqual({
+        id: "new-c1",
+        teamId: "t1",
+        name: null,
+        displayName: "Random",
+        type: "public",
+        member: true,
+        archivedAt: null,
+      });
     });
   });
 });

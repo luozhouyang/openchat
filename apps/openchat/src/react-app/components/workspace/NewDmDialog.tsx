@@ -90,7 +90,7 @@ export function NewDmDialog({
         </div>
         <div className="flex max-h-72 flex-col gap-0.5 overflow-auto">
           {loading && <p className="px-1 py-2 text-sm text-muted-foreground">…</p>}
-          {!loading && results.length === 0 && term.trim() !== "" && (
+          {!loading && !error && results.length === 0 && term.trim() !== "" && (
             <p className="px-1 py-2 text-sm text-muted-foreground">
               {t("workspace.dmSearchEmpty")}
             </p>
