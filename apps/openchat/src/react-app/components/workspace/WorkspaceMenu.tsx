@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link, useMatchRoute } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import type { ChannelSummary } from "protocol";
@@ -5,13 +6,15 @@ import { useSidebarStore } from "@/stores/sidebar";
 import {
   SidebarContent,
   SidebarGroup,
+  SidebarGroupAction,
   SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { HashIcon, MessagesSquareIcon } from "lucide-react";
+import { HashIcon, MessagesSquareIcon, PlusIcon } from "lucide-react";
+import { NewChannelDialog } from "./NewChannelDialog";
 
 export function WorkspaceMenu({
   teamId,
@@ -25,11 +28,19 @@ export function WorkspaceMenu({
   const { t } = useTranslation();
   const entries = useSidebarStore((s) => s.entries);
   const match = useMatchRoute();
+  const [channelOpen, setChannelOpen] = useState(false);
   return (
     <SidebarContent>
       {teamId && (
-        <SidebarGroup>
+        <SidebarGroup className="group/section">
           <SidebarGroupLabel>{t("workspace.channels")}</SidebarGroupLabel>
+          <SidebarGroupAction
+            aria-label={t("workspace.newChannel")}
+            onClick={() => setChannelOpen(true)}
+            className="opacity-0 transition-opacity focus-visible:opacity-100 group-hover/section:opacity-100 group-focus-within/section:opacity-100"
+          >
+            <PlusIcon />
+          </SidebarGroupAction>
           <SidebarMenu>
             {channels.map((c) => {
               const e = entries[c.id];
@@ -83,6 +94,7 @@ export function WorkspaceMenu({
           })}
         </SidebarMenu>
       </SidebarGroup>
+      {channelOpen && <NewChannelDialog teamId={teamId!} open onOpenChange={setChannelOpen} />}
     </SidebarContent>
   );
 }
