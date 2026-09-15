@@ -22,6 +22,12 @@ export default defineConfig({
   //   apps/mobile               — jest-expo standalone workspace           → `cd apps/mobile && corepack pnpm test`
   //   */e2e                     — Playwright / Maestro                     → `vp run openchat#e2e` / `vp run desktop#e2e`
   test: {
+    // Same setup the openchat app runner uses (vitest.config.app.ts): jest-dom
+    // matchers, i18n init, and the window.matchMedia polyfill jsdom lacks.
+    // `globals` is what @testing-library/react's auto-cleanup hooks into; without
+    // it DOM from earlier tests leaks into the next one.
+    globals: true,
+    setupFiles: ["./apps/openchat/test/app/setup.ts"],
     exclude: [
       "**/node_modules/**",
       "apps/openchat/test/worker/**",
