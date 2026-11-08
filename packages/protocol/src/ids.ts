@@ -11,6 +11,7 @@ export type IdKind =
   | "emo"
   | "rol"
   | "sch"
+  | "ntf"
   | "int";
 
 export function id(kind: IdKind): string {

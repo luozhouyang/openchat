@@ -577,7 +577,83 @@ export class ChannelDO extends DurableObject<Env> {
     if (outcome.msg.parentId) {
       await this.notifyThreadSubscribers(outcome.msg.parentId, senderUserId, fullMessage);
     }
+    await this.recordNotifications({
+      messageId: outcome.msg.id,
+      seq: outcome.msg.seq,
+      actorId: senderUserId,
+      content: fullMessage.content,
+      mentions: validMentions,
+      parentId: fullMessage.parentId,
+    });
     return { messageId: outcome.msg.id, seq: outcome.msg.seq };
+  }
+
+  /**
+   * Best-effort in-app inbox rows (D1): mentions win over reply notifications
+   * for the same recipient, duplicates are ignored, and a failure never fails
+   * the post (the message is already committed and broadcast).
+   */
+  private async recordNotifications(input: {
+    messageId: string;
+    seq: number;
+    actorId: string;
+    content: string;
+    mentions: string[];
+    parentId: string | null;
+  }): Promise<void> {
+    const recipients = new Map<string, "mention" | "reply">();
+    for (const userId of input.mentions) {
+      if (userId !== input.actorId) {
+        recipients.set(userId, "mention");
+      }
+    }
+    if (input.parentId) {
+      const subscribers = await this.db
+        .select({ userId: schema.threadSubscriptions.userId })
+        .from(schema.threadSubscriptions)
+        .where(eq(schema.threadSubscriptions.parentId, input.parentId));
+      const parent = await this.db
+        .select({ userId: schema.messages.userId })
+        .from(schema.messages)
+        .where(eq(schema.messages.id, input.parentId))
+        .limit(1);
+      const candidates = new Set(subscribers.map((row) => row.userId));
+      if (parent[0]) {
+        candidates.add(parent[0].userId);
+      }
+      for (const userId of candidates) {
+        if (userId !== input.actorId && !recipients.has(userId)) {
+          recipients.set(userId, "reply");
+        }
+      }
+    }
+    if (recipients.size === 0) {
+      return;
+    }
+    const preview = input.content.trim().slice(0, 120) || "[file]";
+    const createdAt = Date.now();
+    try {
+      const db = getDb(this.env.DB);
+      for (const [userId, kind] of recipients) {
+        await db
+          .insert(schemaD1.notifications)
+          .values({
+            id: id("ntf"),
+            userId,
+            kind,
+            channelId: this.channelId,
+            messageId: input.messageId,
+            seq: input.seq,
+            actorId: input.actorId,
+            preview,
+            createdAt,
+            readAt: null,
+          })
+          .onConflictDoNothing();
+      }
+    } catch {
+      // Inbox delivery is best-effort; push/WS already carried the message.
+    }
   }
 
   /** Meta rows that describe the latest message for sidebar previews. */

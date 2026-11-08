@@ -1,0 +1,1 @@
+ALTER TABLE `notifications` ADD `seq` integer NOT NULL;

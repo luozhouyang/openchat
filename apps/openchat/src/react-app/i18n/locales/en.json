@@ -246,5 +246,13 @@
     "save": "Save",
     "saved": "Saved",
     "saveFailed": "Failed to save"
+  },
+  "notifications": {
+    "title": "Notifications",
+    "empty": "No notifications yet",
+    "markAllRead": "Mark all read",
+    "unread": "{{count}} unread",
+    "mention": "Mention",
+    "reply": "Thread reply"
   }
 }

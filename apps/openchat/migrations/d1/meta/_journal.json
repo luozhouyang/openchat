@@ -120,6 +120,20 @@
       "when": 1794059792000,
       "tag": "0016_user_fts_no_email",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1794142971990,
+      "tag": "0017_tan_vanisher",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "6",
+      "when": 1794143396893,
+      "tag": "0018_sparkling_ghost_rider",
+      "breakpoints": true
     }
   ]
 }

@@ -14,6 +14,7 @@ import { adminV1 } from "@worker/routes/v1/admin";
 import { pushV1 } from "@worker/routes/v1/push";
 import { sidebarV1 } from "@worker/routes/v1/sidebar";
 import { rolesV1 } from "@worker/routes/v1/roles";
+import { notificationsV1 } from "@worker/routes/v1/notifications";
 
 export const v1Router = new Hono<{ Bindings: Env }>();
 v1Router.route("/", usersV1);
@@ -31,3 +32,4 @@ v1Router.route("/admin", adminV1);
 v1Router.route("/", pushV1);
 v1Router.route("/", sidebarV1);
 v1Router.route("/", rolesV1);
+v1Router.route("/", notificationsV1);

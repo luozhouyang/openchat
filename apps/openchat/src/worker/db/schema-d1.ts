@@ -235,3 +235,27 @@ export const userStatus = sqliteTable(
   },
   (t) => [index("idx_user_status_online").on(t.online)],
 );
+
+/**
+ * In-app notification inbox. One row per (recipient, message) for mentions and
+ * thread replies; the source of truth for the bell badge, independent of push.
+ */
+export const notifications = sqliteTable(
+  "notifications",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull(),
+    kind: text("kind").notNull(), // mention | reply
+    channelId: text("channel_id").notNull(),
+    messageId: text("message_id").notNull(),
+    seq: integer("seq").notNull(),
+    actorId: text("actor_id").notNull(),
+    preview: text("preview").notNull(),
+    createdAt: integer("created_at").notNull(),
+    readAt: integer("read_at"),
+  },
+  (t) => [
+    index("idx_notifications_user").on(t.userId, t.createdAt),
+    uniqueIndex("notifications_user_message_uidx").on(t.userId, t.messageId),
+  ],
+);

@@ -246,5 +246,13 @@
     "save": "保存",
     "saved": "已保存",
     "saveFailed": "保存失败"
+  },
+  "notifications": {
+    "title": "通知",
+    "empty": "暂无通知",
+    "markAllRead": "全部已读",
+    "unread": "{{count}} 条未读",
+    "mention": "@提及",
+    "reply": "线程回复"
   }
 }

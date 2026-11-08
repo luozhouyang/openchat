@@ -102,6 +102,7 @@ export type ChannelsForTeamOutput = z.infer<typeof ChannelsForTeamOutput>;
 
 export const ChannelDetail = z.object({
   id: idSchema,
+  teamId: z.string().nullable(),
   displayName: z.string(),
   type: ChannelTypeSchema,
   purpose: z.string().nullable(),
@@ -293,6 +294,35 @@ export const StatusOutput = z.object({
 export type StatusOutput = z.infer<typeof StatusOutput>;
 export const StatusesOutput = z.object({ statuses: z.record(z.string(), z.string()) });
 export type StatusesOutput = z.infer<typeof StatusesOutput>;
+
+// ---- notifications ----
+export const NotificationKindSchema = z.enum(["mention", "reply"]);
+export type NotificationKind = z.infer<typeof NotificationKindSchema>;
+export const NotificationItem = z.object({
+  id: idSchema,
+  kind: NotificationKindSchema,
+  channelId: idSchema,
+  messageId: idSchema,
+  seq: z.number(),
+  actorId: idSchema,
+  preview: z.string(),
+  createdAt: z.number(),
+  readAt: z.number().nullable(),
+});
+export type NotificationItem = z.infer<typeof NotificationItem>;
+export const NotificationsQuery = z.object({
+  limit: z.coerce.number().int().positive().max(100).optional(),
+});
+export type NotificationsQuery = z.infer<typeof NotificationsQuery>;
+export const NotificationsOutput = z.object({
+  notifications: z.array(NotificationItem),
+  unread: z.number(),
+});
+export type NotificationsOutput = z.infer<typeof NotificationsOutput>;
+export const MarkNotificationsReadInput = z.object({
+  ids: z.array(idSchema).max(200).optional(),
+});
+export type MarkNotificationsReadInput = z.infer<typeof MarkNotificationsReadInput>;
 
 // ---- uploads ----
 export const UploadRequest = z.object({

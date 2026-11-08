@@ -46,6 +46,7 @@ export function MessageList({
   const autoScroll = useRef(true);
   const prevMaxSeq = useRef(0);
   const [highlightSeq, setHighlightSeq] = useState<number | null>(null);
+  const pendingJumpSeq = useRef<number | null>(null);
   // Snapshot the read marker before ChannelView marks the channel read.
   const initialLastRead = useRef<number | null>(null);
   if (initialLastRead.current === null) {
@@ -152,6 +153,31 @@ export function MessageList({
       });
     });
   }
+
+  // A notification click stores the target seq before navigating; pick it up
+  // once the first history page has rendered.
+  useEffect(() => {
+    const key = `openchat:jump:${channelId}`;
+    const raw = sessionStorage.getItem(key);
+    if (!raw) {
+      return;
+    }
+    sessionStorage.removeItem(key);
+    const seq = Number(raw);
+    if (Number.isFinite(seq)) {
+      pendingJumpSeq.current = seq;
+    }
+  }, [channelId]);
+
+  useEffect(() => {
+    if (pendingJumpSeq.current === null || items.length === 0) {
+      return;
+    }
+    const seq = pendingJumpSeq.current;
+    pendingJumpSeq.current = null;
+    void jumpTo(seq);
+    // items.length drives the first render after history arrives.
+  }, [items.length]);
 
   const loadOlder = useCallback(async () => {
     if (loadingOlder.current || firstMessageSeq === null) {

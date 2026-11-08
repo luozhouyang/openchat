@@ -164,6 +164,7 @@ channelsV1.get("/channels/:channelId", requireSession, requireChannelRole("membe
   const out: ChannelDetailOutput = {
     channel: {
       id: ch.id,
+      teamId: ch.teamId,
       displayName: ch.displayName,
       type: ch.type as ChannelType,
       purpose: ch.purpose,

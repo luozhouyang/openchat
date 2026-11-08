@@ -12,6 +12,7 @@ import {
   SidebarSeparator,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
+import { NotificationsBell } from "./NotificationsBell";
 import { TeamSwitcher } from "./TeamSwitcher";
 import { UserMenu } from "./UserMenu";
 import { WorkspaceMenu } from "./WorkspaceMenu";
@@ -51,6 +52,9 @@ export function WorkspaceShell({
           <header className="flex h-12 items-center gap-2 border-b px-4">
             <SidebarTrigger aria-label={t("workspace.directs")} />
             <span className="font-semibold">{title}</span>
+            <div className="ml-auto">
+              <NotificationsBell />
+            </div>
           </header>
           <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
             <Outlet />

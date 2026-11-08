@@ -34,6 +34,7 @@ import type {
   PushSubscribeInput,
   SearchPostsOutput,
   MyThreadsOutput,
+  NotificationsOutput,
   PutStatusInput,
   RoleOutput,
   RolesListOutput,
@@ -236,6 +237,15 @@ export function createApi(opts: ApiFetchOptions = {}) {
 
     threads: {
       mine: (teamId: string) => f<MyThreadsOutput>(`/api/v1/users/me/teams/${teamId}/threads`),
+    },
+
+    notifications: {
+      list: (limit = 50) => f<NotificationsOutput>(`/api/v1/users/me/notifications?limit=${limit}`),
+      markRead: (ids?: string[]) =>
+        f<{ ok: true }>(
+          "/api/v1/users/me/notifications/read",
+          json("POST", ids && ids.length > 0 ? { ids } : {}),
+        ),
     },
 
     push: {
