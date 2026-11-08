@@ -13,7 +13,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import type { NotificationItem, PostOutput } from "protocol";
+import type { NotificationItem, PostOutput, UserAutocompleteItem } from "protocol";
 import type { StoreMessage } from "state";
 import { useSidebarStore, useTeamsStore } from "state";
 import { appClient } from "./src/app-client";
@@ -22,6 +22,7 @@ import { getDeviceId } from "./src/lib/secure";
 
 import { createMobilePlatform } from "./src/platform";
 import { notificationLabel } from "./src/lib/notifications";
+import { personLabel, presenceColor } from "./src/lib/people";
 import { useMessages } from "./src/stores/messages";
 import { closeRealtime, connectRealtime, sendActivity, sendFrame } from "./src/ws/client";
 
@@ -400,6 +401,8 @@ function ChannelScreen({
   const [searchTerm, setSearchTerm] = useState("");
   const [searchResults, setSearchResults] = useState<PostOutput[]>([]);
   const [searching, setSearching] = useState(false);
+  const [people, setPeople] = useState<Record<string, UserAutocompleteItem>>({});
+  const [statuses, setStatuses] = useState<Record<string, string>>({});
   const maxSeq = useMessages((s) => s.maxSeq(channelId));
 
   const refresh = useCallback(() => {
@@ -459,6 +462,34 @@ function ChannelScreen({
       setLoadingOlder(false);
     }
   }, [channelId, hasOlder, loadingOlder, refresh]);
+
+  const authorIds = [...new Set(messages.map((m) => m.userId))].filter(Boolean).slice(0, 100);
+  const authorKey = authorIds.join(",");
+
+  useEffect(() => {
+    if (authorIds.length === 0) {
+      return;
+    }
+    let active = true;
+    void (async () => {
+      try {
+        const [profiles, presence] = await Promise.all([
+          appClient.api.users.list(authorIds),
+          appClient.api.status.getMany({ userIds: authorIds }),
+        ]);
+        if (!active) {
+          return;
+        }
+        setPeople(Object.fromEntries(profiles.users.map((user) => [user.id, user])));
+        setStatuses(presence.statuses);
+      } catch {
+        // offline: keep the id fallback
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [authorKey]);
 
   useEffect(() => {
     const query = searchTerm.trim();
@@ -539,7 +570,17 @@ function ChannelScreen({
         }
         renderItem={({ item }) => (
           <View style={styles.message} testID={`message-${item.id}`}>
-            <Text style={styles.messageUser}>{item.userId || "me"}</Text>
+            <View style={styles.messageUserRow}>
+              <View
+                style={[
+                  styles.statusDot,
+                  { backgroundColor: presenceColor(statuses[item.userId]) },
+                ]}
+              />
+              <Text style={styles.messageUser}>
+                {personLabel(people[item.userId], item.userId)}
+              </Text>
+            </View>
             <Text>{item.content}</Text>
           </View>
         )}
@@ -643,6 +684,8 @@ const styles = StyleSheet.create({
   error: { color: "#c0392b", paddingHorizontal: 12 },
   empty: { color: "#888", padding: 12 },
   message: { paddingHorizontal: 12, paddingVertical: 6 },
+  messageUserRow: { flexDirection: "row", alignItems: "center", gap: 4 },
+  statusDot: { width: 6, height: 6, borderRadius: 3 },
   messageUser: { fontSize: 12, color: "#666" },
   composer: { flexDirection: "row", gap: 8, padding: 8 },
   searchInput: { marginHorizontal: 12, marginVertical: 8 },
