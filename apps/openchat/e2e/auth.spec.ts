@@ -34,7 +34,7 @@ test("logs in and lands in the workspace channel view", async ({ page, request }
   const channel = await createChannel(request, user.token, team.id, `general-${seq}`);
   await loginAs(page, email, "Password123!");
   await expect(page).toHaveURL(new RegExp(`/${team.id}/c/${channel.id}`), { timeout: 15_000 });
-  await expect(page.getByPlaceholder("输入消息…")).toBeVisible();
+  await expect(page.getByPlaceholder(/Enter to send/)).toBeVisible();
 });
 
 test("verify-email page shows the success state", async ({ page }) => {

@@ -1,5 +1,6 @@
 import type { ClientFrame, ServerEvent } from "protocol";
 import { appClient } from "@/app-client";
+import { queryClient } from "@/lib/query-client";
 import { platform } from "@/lib/platform";
 
 /**
@@ -13,7 +14,14 @@ class WsClient {
   /** Subscribers for server `error` frames (reaction rate limits, …). */
   private errorListeners = new Set<(ev: Extract<ServerEvent, { type: "error" }>) => void>();
   private connection = appClient.createRealtime({
-    onMessageNew: (channelId, message) => this.notifyBackground(channelId, message),
+    onMessageNew: (channelId, message) => {
+      this.notifyBackground(channelId, message);
+      // Mentions land in the in-app inbox; refresh the bell without waiting
+      // for its polling interval.
+      if (this.selfUserId && message.mentions?.includes(this.selfUserId)) {
+        void queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      }
+    },
     onAuthMissing: () => {
       window.location.href = "/auth/login";
     },
@@ -73,7 +81,10 @@ class WsClient {
     this.connection.close();
   }
 
-  private notifyBackground(channelId: string, message: { userId: string; content: string }) {
+  private notifyBackground(
+    channelId: string,
+    message: { userId: string; content: string; mentions?: string[] | null },
+  ) {
     if (!document.hidden) {
       return;
     }

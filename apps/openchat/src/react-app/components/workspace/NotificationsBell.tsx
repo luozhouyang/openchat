@@ -6,6 +6,7 @@ import type { NotificationItem } from "protocol";
 import { api } from "@/lib/api";
 import { BellIcon } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { MentionText } from "@/components/messages/MentionText";
 
 const timeFormatter = new Intl.DateTimeFormat(undefined, {
   dateStyle: "medium",
@@ -112,9 +113,10 @@ export function NotificationsBell() {
                       {timeFormatter.format(new Date(item.createdAt))}
                     </time>
                   </div>
-                  <div className="line-clamp-2 whitespace-pre-wrap break-words text-sm">
-                    {item.preview}
-                  </div>
+                  <MentionText
+                    content={item.preview}
+                    className="line-clamp-2 whitespace-pre-wrap break-words text-sm"
+                  />
                 </button>
               ))
             )}

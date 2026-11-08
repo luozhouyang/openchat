@@ -32,6 +32,9 @@ dist-ssr
 *.sln
 *.sw?
 
+# sandbox-local HOME used by e2e (wrangler dev registry)
+apps/openchat/.home/
+
 # AI agent worktrees
 .claude/worktrees/
 !.vscode/

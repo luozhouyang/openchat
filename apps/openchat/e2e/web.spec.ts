@@ -21,10 +21,10 @@ test("user signs up, logs in, and lands in a channel view", async ({ page, reque
 
   // Authenticated workspace route resolves to the first channel of the first team.
   await expect(page).toHaveURL(new RegExp(`/${team.id}/c/${channel.id}`), { timeout: 15_000 });
-  await expect(page.getByPlaceholder("输入消息…")).toBeVisible();
+  await expect(page.getByPlaceholder(/Enter to send/)).toBeVisible();
 
   // Send a message and see it rendered (optimistic or via ack).
-  const composer = page.getByPlaceholder("输入消息…");
+  const composer = page.getByPlaceholder(/Enter to send/);
   await composer.fill("hello from e2e");
   await composer.press("Enter");
   await expect(page.getByText("hello from e2e").first()).toBeVisible();

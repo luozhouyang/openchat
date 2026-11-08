@@ -33,11 +33,11 @@ test("second user receives a channel message live over websocket", async ({
     await joinChannel(request, b.token, channelId);
     await pageB.reload();
     await pageB.getByRole("link", { name: "Live Channel" }).click();
-    await expect(pageB.getByPlaceholder("输入消息…")).toBeVisible();
+    await expect(pageB.getByPlaceholder(/Enter to send/)).toBeVisible();
 
     // A sends a message
-    await page.getByPlaceholder("输入消息…").fill("live hello");
-    await page.getByPlaceholder("输入消息…").press("Enter");
+    await page.getByPlaceholder(/Enter to send/).fill("live hello");
+    await page.getByPlaceholder(/Enter to send/).press("Enter");
 
     // B sees it with no reload / no navigation — the only delivery path is
     // the websocket push from the channel DO to B's open socket.

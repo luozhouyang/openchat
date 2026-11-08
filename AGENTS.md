@@ -66,6 +66,10 @@ Notes:
 corepack pnpm test`.
   - `apps/openchat/e2e` + `apps/desktop/e2e` — Playwright → `vp run
 openchat#e2e` / `vp run desktop#e2e`.
+  - In the DSH sandbox, e2e needs a writable HOME (wrangler writes its dev
+    registry to `~/.config/.wrangler`) and the browser cache path:
+    `cd apps/openchat && HOME=$PWD/.home SQLITE_TMPDIR=/tmp
+PLAYWRIGHT_BROWSERS_PATH=$HOME/.cache/ms-playwright vp exec playwright test`.
 - jsdom-dependent test files declare `// @vitest-environment jsdom` themselves
   (docblock) so they pass under both the per-package and root runners — keep
   that convention for new DOM-touching tests.
