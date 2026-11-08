@@ -5,24 +5,7 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>openchat</title>
-    <script>
-      (() => {
-        const KEY = "openchat.theme";
-        const mq = window.matchMedia("(prefers-color-scheme: dark)");
-        const read = () => localStorage.getItem(KEY) || "system";
-        const apply = () => {
-          const theme = read();
-          document.documentElement.classList.toggle(
-            "dark",
-            theme === "dark" || (theme === "system" && mq.matches),
-          );
-        };
-        apply();
-        mq.addEventListener("change", () => {
-          if (read() === "system") apply();
-        });
-      })();
-    </script>
+    <script src="/theme-boot.js"></script>
   </head>
   <body>
     <div id="root"></div>

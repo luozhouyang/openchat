@@ -68,6 +68,11 @@ review. Local docs only (see the note at the end).
 
 ## Security checklist
 
+- Done: API responses carry `nosniff`, `referrer-policy: no-referrer`,
+  `X-Frame-Options: DENY`, `Permissions-Policy` and HSTS (also on error
+  responses). Static assets use `apps/openchat/public/_headers` with a CSP
+  (`script-src 'self'`); the theme boot script is an external file so no inline
+  JavaScript is needed.
 - Rate limiting for search/uploads/reactions is per isolate (best effort);
   auth endpoints use better-auth's limiter.
 - `/ws` accepts a session cookie; the query-string JWT remains for desktop.

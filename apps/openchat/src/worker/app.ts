@@ -7,8 +7,27 @@ import { isHttpError, toErrorBody } from "@worker/lib/errors";
 
 type AppEnv = { Bindings: Env; Variables: { requestId: string } };
 
+const SECURITY_HEADERS: [string, string][] = [
+  ["x-content-type-options", "nosniff"],
+  ["referrer-policy", "no-referrer"],
+  ["x-frame-options", "DENY"],
+  ["permissions-policy", "geolocation=(), camera=(), microphone=()"],
+  ["strict-transport-security", "max-age=31536000; includeSubDomains"],
+];
+
+function applySecurityHeaders(c: { header: (name: string, value: string) => void }): void {
+  for (const [name, value] of SECURITY_HEADERS) {
+    c.header(name, value);
+  }
+}
+
 export function createApp() {
   const app = new Hono<AppEnv>();
+
+  app.use("*", async (c, next) => {
+    applySecurityHeaders(c);
+    await next();
+  });
 
   // One request id per call, echoed to the client and attached to every log
   // line and error body so support can correlate a report with the logs.
@@ -43,6 +62,7 @@ export function createApp() {
     return auth.handler(c.req.raw);
   });
   app.onError((err, c) => {
+    applySecurityHeaders(c);
     const requestId = c.get("requestId") ?? "";
     if (isHttpError(err)) {
       console.error(
