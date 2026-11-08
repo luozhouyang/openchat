@@ -9,6 +9,8 @@ import {
   OpenChannelOutput,
   ChannelsForTeamOutput,
   ChannelDetailOutput,
+  UpdateChannelInput,
+  type UpdateChannelOutput,
   ListMembersQuery,
   ChannelsListOutput,
   NotifyPropsInput,
@@ -24,7 +26,12 @@ import { requireTeamRole, requireChannelRole } from "@worker/auth/guards";
 import { PERMISSIONS, resolvePermissions } from "@worker/auth/rbac";
 import { getDb } from "@worker/db/client";
 import { channelMembers } from "@worker/db/schema-d1";
-import { listChannelsForTeam, getChannel, listChannelMemberIds } from "@worker/db/repos/channels";
+import {
+  listChannelsForTeam,
+  getChannel,
+  listChannelMemberIds,
+  updateChannel,
+} from "@worker/db/repos/channels";
 import { getTeamMember } from "@worker/db/repos/teams";
 import {
   createChannel,
@@ -315,6 +322,33 @@ channelsV1.post(
     }
     const out: OpenChannelOutput = { id: channelId, existing };
     return c.json(out, existing ? 200 : 201);
+  },
+);
+
+channelsV1.put(
+  "/channels/:channelId",
+  requireSession,
+  requireChannelRole("admin"),
+  zodValidator("json", UpdateChannelInput),
+  async (c) => {
+    const db = getDb(c.env.DB);
+    const channelId = c.req.param("channelId");
+    const body = c.req.valid("json");
+    const updated = await updateChannel(db, {
+      channelId,
+      displayName: body.displayName,
+      purpose: body.purpose,
+      header: body.header,
+    });
+    if (!updated) {
+      throw apiError("not found", "not found", 404);
+    }
+    const summary = toSummary(updated, true);
+    await createChannelBroadcaster(c.env, channelId).broadcast(
+      channelUpdatedEvent.parse({ type: "channel.updated", channel: summary }),
+    );
+    const out: UpdateChannelOutput = { channel: summary };
+    return c.json(out);
   },
 );
 

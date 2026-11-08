@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { Link, useLocation, useParams } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import { id } from "protocol";
+import { ALLOWED_EMOJI, id } from "protocol";
 import { PinIcon } from "lucide-react";
 import { wsClient } from "@/ws/client";
 import { api } from "@/lib/api";
@@ -48,6 +48,7 @@ export function MessageRow({
   const author = useUser(message.userId);
   const name = displayNameOf(author, message.userId);
   const [editing, setEditing] = useState(false);
+  const [reactionsOpen, setReactionsOpen] = useState(false);
   const [draft, setDraft] = useState(message.content);
   const editRef = useRef<HTMLTextAreaElement>(null);
 
@@ -107,12 +108,13 @@ export function MessageRow({
     }
   }
 
-  function toggleReaction() {
+  function react(emoji: string) {
+    setReactionsOpen(false);
     wsClient.send({
       type: "react",
       channelId,
       messageSeq: message.seq,
-      emoji: "👍",
+      emoji,
       clientToken: id("int"),
     });
   }
@@ -137,15 +139,39 @@ export function MessageRow({
           {t("messages.reply")}
         </Link>
       )}
-      <button
-        type="button"
-        onClick={toggleReaction}
-        aria-label={t("messages.react")}
-        title={t("messages.react")}
-        className="rounded px-2 py-1 text-xs hover:bg-accent"
-      >
-        👍
-      </button>
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => setReactionsOpen((open) => !open)}
+          aria-label={t("messages.react")}
+          title={t("messages.react")}
+          className="rounded px-2 py-1 text-xs hover:bg-accent"
+        >
+          😊
+        </button>
+        {reactionsOpen && (
+          <>
+            <button
+              type="button"
+              aria-label={t("messages.closeEmoji")}
+              className="fixed inset-0 z-10 cursor-default"
+              onClick={() => setReactionsOpen(false)}
+            />
+            <div className="absolute top-full right-0 z-20 mt-1 grid w-56 grid-cols-7 gap-1 rounded-md border bg-popover p-2 shadow-md">
+              {ALLOWED_EMOJI.map((emoji) => (
+                <button
+                  key={emoji}
+                  type="button"
+                  className="rounded p-1 text-base hover:bg-accent"
+                  onClick={() => react(emoji)}
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
       {!pending && (
         <button
           type="button"

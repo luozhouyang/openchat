@@ -10,10 +10,12 @@ import {
   MessagesSquareIcon,
   PinIcon,
   SearchIcon,
+  SettingsIcon,
   UsersIcon,
 } from "lucide-react";
 import { useTeamsStore } from "state";
 import { api } from "@/lib/api";
+import { ChannelSettingsDialog } from "./ChannelSettingsDialog";
 
 const NOTIFY_OPTIONS = ["all", "mention", "none"] as const;
 
@@ -31,6 +33,7 @@ export function ChannelHeader({
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [notifyOpen, setNotifyOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const { data } = useQuery({
     queryKey: ["channel", channelId],
     queryFn: () => api.channels.get(channelId),
@@ -77,6 +80,15 @@ export function ChannelHeader({
         </span>
       )}
       <div className="ml-auto flex items-center gap-1">
+        <button
+          type="button"
+          aria-label={t("channel.settings")}
+          title={t("channel.settings")}
+          className="rounded p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+          onClick={() => setSettingsOpen(true)}
+        >
+          <SettingsIcon className="size-4" />
+        </button>
         <div className="relative">
           <button
             type="button"
@@ -140,6 +152,12 @@ export function ChannelHeader({
           {channel?.memberCount ?? 0}
         </button>
       </div>
+      <ChannelSettingsDialog
+        channelId={channelId}
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        initial={channel}
+      />
     </header>
   );
 }

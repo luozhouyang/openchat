@@ -10,7 +10,10 @@
       "submit": "登录",
       "submitting": "登录中…",
       "failed": "登录失败",
-      "errors": { "email": "请输入有效的邮箱地址", "password": "请输入密码" },
+      "errors": {
+        "email": "请输入有效的邮箱地址",
+        "password": "请输入密码"
+      },
       "noAccount": "还没有账号？",
       "signupLink": "注册新账号"
     },
@@ -64,7 +67,12 @@
       "sentDescription": "验证邮件已重新发送，请查收。"
     }
   },
-  "common": { "lang": { "en": "English", "zh": "中文" } },
+  "common": {
+    "lang": {
+      "en": "English",
+      "zh": "中文"
+    }
+  },
   "workspace": {
     "channels": "频道",
     "directs": "私信",
@@ -113,7 +121,6 @@
     "members": "成员",
     "save": "保存",
     "saved": "已保存",
-    "saveFailed": "保存失败",
     "membersLoadFailed": "无法加载成员"
   },
   "messages": {
@@ -161,7 +168,12 @@
     "searchHint": "输入关键词搜索本频道的历史消息。",
     "searching": "搜索中…",
     "noResults": "没有匹配的消息",
-    "unpin": "取消置顶"
+    "unpin": "取消置顶",
+    "settings": "频道设置",
+    "displayName": "频道名称",
+    "purpose": "频道简介",
+    "header": "频道公告",
+    "saveFailed": "保存失败"
   },
   "presence": {
     "online": "在线",

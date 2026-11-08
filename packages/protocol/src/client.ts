@@ -6,6 +6,8 @@ import type {
   CompleteUploadOutput,
   CreateChannelInput,
   CreateChannelOutput,
+  UpdateChannelInput,
+  UpdateChannelOutput,
   CreateInviteOutput,
   CreateTeamInput,
   CreateTeamOutput,
@@ -185,6 +187,8 @@ export function createApi(opts: ApiFetchOptions = {}) {
         f<CreateChannelOutput>("/api/v1/channels", json("POST", input)),
       listByTeam: (teamId: string) => f<ChannelsForTeamOutput>(`/api/v1/teams/${teamId}/channels`),
       get: (channelId: string) => f<ChannelDetailOutput>(`/api/v1/channels/${channelId}`),
+      update: (channelId: string, input: UpdateChannelInput) =>
+        f<UpdateChannelOutput>(`/api/v1/channels/${channelId}`, json("PUT", input)),
       listMembers: (channelId: string, query?: ListMembersQuery) =>
         f<ChannelsListOutput>(
           `/api/v1/channels/${channelId}/members${query ? `?page=${query.page ?? 0}&perPage=${query.perPage ?? 60}` : ""}`,

@@ -24,6 +24,31 @@ export async function createChannel(
   return getChannel(db, row.id);
 }
 
+export async function updateChannel(
+  db: Db,
+  input: {
+    channelId: string;
+    displayName?: string;
+    purpose?: string | null;
+    header?: string | null;
+  },
+): Promise<Channel | null> {
+  const patch: Partial<typeof channels.$inferInsert> = {};
+  if (input.displayName !== undefined) {
+    patch.displayName = input.displayName;
+  }
+  if (input.purpose !== undefined) {
+    patch.purpose = input.purpose;
+  }
+  if (input.header !== undefined) {
+    patch.header = input.header;
+  }
+  if (Object.keys(patch).length > 0) {
+    await db.update(channels).set(patch).where(eq(channels.id, input.channelId));
+  }
+  return getChannel(db, input.channelId);
+}
+
 export async function getChannel(db: Db, channelId: string): Promise<Channel | null> {
   const rows = await db.select().from(channels).where(eq(channels.id, channelId)).limit(1);
   return rows[0] ?? null;

@@ -10,7 +10,10 @@
       "submit": "Sign in",
       "submitting": "Signing in…",
       "failed": "Sign-in failed",
-      "errors": { "email": "Enter a valid email address", "password": "Password is required" },
+      "errors": {
+        "email": "Enter a valid email address",
+        "password": "Password is required"
+      },
       "noAccount": "No account?",
       "signupLink": "Create an account"
     },
@@ -64,7 +67,12 @@
       "sentDescription": "A verification email has been resent. Check your inbox."
     }
   },
-  "common": { "lang": { "en": "English", "zh": "中文" } },
+  "common": {
+    "lang": {
+      "en": "English",
+      "zh": "中文"
+    }
+  },
   "workspace": {
     "channels": "Channels",
     "directs": "Direct messages",
@@ -113,7 +121,6 @@
     "members": "Members",
     "save": "Save",
     "saved": "Saved",
-    "saveFailed": "Failed to save",
     "membersLoadFailed": "Failed to load members"
   },
   "messages": {
@@ -161,7 +168,12 @@
     "searchHint": "Type a keyword to search this channel's history.",
     "searching": "Searching…",
     "noResults": "No matching messages",
-    "unpin": "Unpin"
+    "unpin": "Unpin",
+    "settings": "Channel settings",
+    "displayName": "Channel name",
+    "purpose": "Purpose",
+    "header": "Header",
+    "saveFailed": "Failed to save"
   },
   "presence": {
     "online": "Online",

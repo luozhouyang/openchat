@@ -112,6 +112,14 @@ export const ChannelDetail = z.object({
 export type ChannelDetail = z.infer<typeof ChannelDetail>;
 export const ChannelDetailOutput = z.object({ channel: ChannelDetail });
 export type ChannelDetailOutput = z.infer<typeof ChannelDetailOutput>;
+export const UpdateChannelInput = z.object({
+  displayName: displayNameSchema.optional(),
+  purpose: z.string().max(1024).nullable().optional(),
+  header: z.string().max(1024).nullable().optional(),
+});
+export type UpdateChannelInput = z.infer<typeof UpdateChannelInput>;
+export const UpdateChannelOutput = z.object({ channel: ChannelSummary });
+export type UpdateChannelOutput = z.infer<typeof UpdateChannelOutput>;
 
 export const ListMembersQuery = z.object({
   page: z.coerce.number().int().nonnegative().optional(),
