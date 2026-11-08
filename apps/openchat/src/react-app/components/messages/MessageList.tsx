@@ -1,13 +1,18 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
 import { appClient } from "@/app-client";
 import { useMessageStore } from "@/stores/messages";
 import { MessageRow } from "./MessageRow";
 
+/** Same-author messages inside this window render as one visual block. */
+const GROUP_WINDOW_MS = 5 * 60_000;
+
 export function MessageList({ channelId }: { channelId: string }) {
   // list() derives a fresh array; shallow-compare so unchanged state stays snapshot-stable.
   const list = useMessageStore(useShallow((s) => s.list(channelId)));
+  const { t } = useTranslation();
   const parentRef = useRef<HTMLDivElement>(null);
   const loadingOlder = useRef(false);
   const autoScroll = useRef(true);
@@ -15,26 +20,44 @@ export function MessageList({ channelId }: { channelId: string }) {
 
   const maxSeq = useMessageStore((s) => s.maxSeq(channelId));
 
+  const items = useMemo(
+    () =>
+      list.map((message, index) => {
+        const prev = list[index - 1];
+        const compact =
+          prev !== undefined &&
+          prev.userId === message.userId &&
+          !prev.deletedAt &&
+          !message.deletedAt &&
+          message.createdAt - prev.createdAt < GROUP_WINDOW_MS;
+        return { message, compact };
+      }),
+    [list],
+  );
+
   const virtualizer = useVirtualizer({
-    count: list.length,
+    count: items.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 56,
+    estimateSize: () => 64,
     overscan: 10,
+    // Message ids stay stable when older pages are prepended, so measurement
+    // caches survive the index shift.
+    getItemKey: (index) => items[index]!.message.id,
   });
 
   useEffect(() => {
-    if (maxSeq > prevMaxSeq.current && autoScroll.current && list.length > 0) {
-      virtualizer.scrollToIndex(list.length - 1, { align: "end" });
+    if (maxSeq > prevMaxSeq.current && autoScroll.current && items.length > 0) {
+      virtualizer.scrollToIndex(items.length - 1, { align: "end" });
     }
     prevMaxSeq.current = maxSeq;
-  }, [maxSeq, list.length, virtualizer]);
+  }, [maxSeq, items.length, virtualizer]);
 
   const loadOlder = useCallback(async () => {
-    if (loadingOlder.current || list.length === 0) {
+    if (loadingOlder.current || items.length === 0) {
       return;
     }
     loadingOlder.current = true;
-    const anchorSeq = list[0].seq;
+    const anchorSeq = items[0]!.message.seq;
     const scrollTop = parentRef.current?.scrollTop ?? 0;
     try {
       // Shared service: fetch page + apply history to store and local DB in
@@ -52,7 +75,7 @@ export function MessageList({ channelId }: { channelId: string }) {
     } finally {
       loadingOlder.current = false;
     }
-  }, [channelId, list, virtualizer]);
+  }, [channelId, items, virtualizer]);
 
   return (
     <div
@@ -67,16 +90,33 @@ export function MessageList({ channelId }: { channelId: string }) {
           80;
       }}
     >
-      <div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
-        {virtualizer.getVirtualItems().map((vi) => (
-          <div
-            key={vi.key}
-            style={{ position: "absolute", top: vi.start, width: "100%", height: vi.size }}
-          >
-            <MessageRow message={list[vi.index]} channelId={channelId} />
-          </div>
-        ))}
-      </div>
+      {items.length === 0 ? (
+        <div className="grid h-full place-items-center text-sm text-muted-foreground">
+          {t("messages.emptyChannel")}
+        </div>
+      ) : (
+        <div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
+          {virtualizer.getVirtualItems().map((vi) => {
+            const item = items[vi.index]!;
+            return (
+              <div
+                key={vi.key}
+                data-index={vi.index}
+                ref={virtualizer.measureElement}
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  width: "100%",
+                  transform: `translateY(${vi.start}px)`,
+                }}
+              >
+                <MessageRow message={item.message} channelId={channelId} compact={item.compact} />
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
