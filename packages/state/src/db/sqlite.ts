@@ -83,7 +83,13 @@ export class SqliteMessageRepository implements MessageRepository {
   }
 
   async query(channelId: string, opts: ChannelQuery): Promise<MessagePage> {
-    const where = opts.beforeSeq === undefined ? "channel_id = ?" : "channel_id = ? AND seq < ?";
+    // Thread replies share the channel's seq space but are not timeline
+    // entries; history (REST) filters them the same way (`parentId IS NULL`),
+    // so the local cache must match or a refresh would re-inject replies.
+    const where =
+      opts.beforeSeq === undefined
+        ? "channel_id = ? AND parent_id IS NULL"
+        : "channel_id = ? AND parent_id IS NULL AND seq < ?";
     const args: unknown[] =
       opts.beforeSeq === undefined ? [channelId] : [channelId, opts.beforeSeq];
     const rows = await this.d.all<MessageRow>(

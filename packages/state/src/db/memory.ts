@@ -54,6 +54,8 @@ export class MemoryMessageRepository implements MessageRepository {
     }
     const seqs = [...ch.bySeq.keys()]
       .filter((s) => opts.beforeSeq === undefined || s < opts.beforeSeq)
+      // Thread replies share the seq space but never appear in the timeline.
+      .filter((s) => ch.byId.get(ch.bySeq.get(s)!)!.parentId === null)
       .sort((a, b) => a - b);
     const page = seqs.slice(0, opts.limit);
     return {

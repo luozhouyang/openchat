@@ -47,12 +47,16 @@ export function createDispatcher(deps: DispatcherDeps) {
         const inner = ev.event;
         if (inner.type === "message.new") {
           const message = inner.message as Message;
-          useMessageStore.getState().ingest(ev.channelId, message);
           if (message.parentId) {
+            // Thread replies are not timeline entries: the channel history
+            // endpoint filters them (`parentId IS NULL`), so putting them in
+            // the channel store made them appear live and vanish on refresh.
             useMessageStore.getState().ingestThread(ev.channelId, message);
+          } else {
+            useMessageStore.getState().ingest(ev.channelId, message);
+            // Instant badge; the authoritative sidebar.update follows right after.
+            useSidebarStore.getState().bump(ev.channelId);
           }
-          // Instant badge; the authoritative sidebar.update follows right after.
-          useSidebarStore.getState().bump(ev.channelId);
           void deps
             .getDb()
             .then((db) => db.messages.append(ev.channelId, normalize(message)))

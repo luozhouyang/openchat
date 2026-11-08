@@ -4,6 +4,7 @@ import { createMemoryDatabase } from "../src/db/database.ts";
 import { createDispatcher } from "../src/realtime/dispatch.ts";
 import { buildSyncChannels, createSyncGapHandler } from "../src/realtime/sync.ts";
 import { useMessageStore } from "../src/stores/messages.ts";
+import { useSidebarStore } from "../src/stores/sidebar.ts";
 import { useTeamsStore } from "../src/stores/teams.ts";
 
 const msg = (seq: number, id = `m${seq}`): Message => ({
@@ -22,6 +23,7 @@ const msg = (seq: number, id = `m${seq}`): Message => ({
 
 function setup() {
   useMessageStore.setState({ channels: {}, threads: {} });
+  useSidebarStore.setState({ entries: {} });
   const db = createMemoryDatabase();
   const onMessageNew = vi.fn();
   const onSyncGap = vi.fn();
@@ -57,6 +59,26 @@ test("dispatch message.new ingests, persists and fires onMessageNew", async () =
   await vi.waitFor(() => expect(db.messages.maxSeq("c1")).resolves.toBe(1));
   expect(useMessageStore.getState().list("c1")).toHaveLength(1);
   expect(onMessageNew).toHaveBeenCalledWith("c1", msg(1));
+});
+
+test("dispatch keeps thread replies out of the timeline, badge and local history", async () => {
+  const { db, dispatch, onMessageNew } = setup();
+  const reply = { ...msg(2), parentId: "m1" };
+  dispatch(
+    JSON.stringify({
+      type: "channel.event",
+      channelId: "c1",
+      event: { type: "message.new", message: reply },
+    }),
+  );
+  expect(useMessageStore.getState().list("c1")).toHaveLength(0);
+  expect(useMessageStore.getState().threadList("c1", "m1")).toHaveLength(1);
+  expect(useSidebarStore.getState().entries["c1"]).toBeUndefined();
+  await vi.waitFor(async () => {
+    const { rows } = await db.messages.query("c1", { limit: 10 });
+    expect(rows).toHaveLength(0);
+  });
+  expect(onMessageNew).toHaveBeenCalledWith("c1", reply);
 });
 
 test("dispatch sync.result applies, persists and passes through", async () => {
@@ -155,6 +177,7 @@ test("dispatch ack confirms pending, channel.read syncs sidebar", async () => {
 
 test("buildSyncChannels takes lastSeq from db and store, capped at maxChannels", async () => {
   useMessageStore.setState({ channels: {}, threads: {} });
+  useSidebarStore.setState({ entries: {} });
   const db = createMemoryDatabase();
 
   await db.messages.append("c1", msg(5)); // db ahead of store
@@ -170,6 +193,7 @@ test("buildSyncChannels takes lastSeq from db and store, capped at maxChannels",
 
 test("createSyncGapHandler pages history backwards (at the server cap) until overlap", async () => {
   useMessageStore.setState({ channels: {}, threads: {} });
+  useSidebarStore.setState({ entries: {} });
   const db = createMemoryDatabase();
   // Server holds seq 1..1200; pages honour the requested limit (like the DO).
   const SERVER_TOP = 1200;
@@ -203,6 +227,7 @@ test("createSyncGapHandler pages history backwards (at the server cap) until ove
 
 test("createSyncGapHandler refills the store from the DB — a big landed gap is fully visible in the open channel list", async () => {
   useMessageStore.setState({ channels: {}, threads: {} });
+  useSidebarStore.setState({ entries: {} });
   const db = createMemoryDatabase();
   const SERVER_TOP = 900;
   const fetchHistory = vi.fn(async (channelId: string, beforeSeq?: number, limit = 30) => {
@@ -236,6 +261,7 @@ test("createSyncGapHandler refills the store from the DB — a big landed gap is
 
 test("createSyncGapHandler requests big pages and closes a ≥500-message gap", async () => {
   useMessageStore.setState({ channels: {}, threads: {} });
+  useSidebarStore.setState({ entries: {} });
   const db = createMemoryDatabase();
   const SERVER_TOP = 900;
   const fetchHistory = vi.fn(async (channelId: string, beforeSeq?: number, limit = 30) => {
@@ -261,6 +287,7 @@ test("createSyncGapHandler requests big pages and closes a ≥500-message gap", 
 
 test("createSyncGapHandler retries a failed walk then gives up with a warning", async () => {
   useMessageStore.setState({ channels: {}, threads: {} });
+  useSidebarStore.setState({ entries: {} });
   const db = createMemoryDatabase();
   let calls = 0;
   const failTimes = 2; // succeeds on the 3rd attempt
@@ -299,6 +326,7 @@ test("createSyncGapHandler retries a failed walk then gives up with a warning", 
 
 test("createSyncGapHandler stops quietly when offline wrapper gives up", async () => {
   useMessageStore.setState({ channels: {}, threads: {} });
+  useSidebarStore.setState({ entries: {} });
   const db = createMemoryDatabase();
   const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
   try {
