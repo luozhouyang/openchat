@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { useTeamsStore } from "state";
 import { api } from "@/lib/api";
+import { useMe } from "@/hooks/use-me";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
@@ -24,6 +26,8 @@ export function ChannelSettingsDialog({
   initial?: ChannelSettingsInitial;
 }) {
   const { t } = useTranslation();
+  const me = useMe();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [displayName, setDisplayName] = useState(initial?.displayName ?? "");
   const [purpose, setPurpose] = useState(initial?.purpose ?? "");
@@ -40,6 +44,20 @@ export function ChannelSettingsDialog({
     setHeader(initial.header ?? "");
     setError(null);
   }, [open, initial]);
+
+  async function leave() {
+    if (!me || !window.confirm(t("channel.leaveConfirm"))) {
+      return;
+    }
+    try {
+      await api.channels.leave(channelId, me.id);
+      useTeamsStore.getState().removeChannel(channelId);
+      onOpenChange(false);
+      await navigate({ to: "/dm" });
+    } catch {
+      setError(t("channel.leaveFailed"));
+    }
+  }
 
   async function save() {
     setSaving(true);
@@ -97,13 +115,18 @@ export function ChannelSettingsDialog({
               {error}
             </p>
           )}
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-              {t("messages.cancel")}
+          <div className="flex items-center justify-between gap-2">
+            <Button variant="destructive" size="sm" onClick={() => void leave()}>
+              {t("channel.leave")}
             </Button>
-            <Button onClick={() => void save()} disabled={saving || !displayName.trim()}>
-              {t("messages.save")}
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => onOpenChange(false)}>
+                {t("messages.cancel")}
+              </Button>
+              <Button onClick={() => void save()} disabled={saving || !displayName.trim()}>
+                {t("messages.save")}
+              </Button>
+            </div>
           </div>
         </div>
       </DialogContent>

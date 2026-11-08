@@ -195,6 +195,8 @@ export function createApi(opts: ApiFetchOptions = {}) {
         ),
       join: (channelId: string) =>
         f<{ ok: true }>(`/api/v1/channels/${channelId}/members`, { method: "POST" }),
+      leave: (channelId: string, userId: string) =>
+        f<{ ok: true }>(`/api/v1/channels/${channelId}/members/${userId}`, { method: "DELETE" }),
       openDirect: (input: OpenDirectInput) =>
         f<OpenChannelOutput>("/api/v1/channels/direct", json("POST", input)),
       openGroup: (input: OpenGroupInput) =>

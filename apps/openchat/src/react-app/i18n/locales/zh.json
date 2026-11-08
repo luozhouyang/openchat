@@ -97,7 +97,13 @@
     "newDm": "新建直聊",
     "dmSearchPlaceholder": "按姓名或用户名搜索成员",
     "dmSearchEmpty": "未找到匹配的人",
-    "dmSearchFailed": "搜索失败"
+    "dmSearchFailed": "搜索失败",
+    "browseChannels": "浏览频道",
+    "join": "加入",
+    "joined": "已加入",
+    "inviteOnly": "需邀请",
+    "noBrowseChannels": "没有可浏览的频道",
+    "joinChannelFailed": "加入频道失败"
   },
   "teams": {
     "title": "团队",
@@ -173,7 +179,10 @@
     "displayName": "频道名称",
     "purpose": "频道简介",
     "header": "频道公告",
-    "saveFailed": "保存失败"
+    "saveFailed": "保存失败",
+    "leave": "离开频道",
+    "leaveConfirm": "确定要离开这个频道吗？",
+    "leaveFailed": "离开频道失败"
   },
   "presence": {
     "online": "在线",

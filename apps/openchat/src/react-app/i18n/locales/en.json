@@ -97,7 +97,13 @@
     "newDm": "New direct message",
     "dmSearchPlaceholder": "Search people by name or username",
     "dmSearchEmpty": "No people found",
-    "dmSearchFailed": "Search failed"
+    "dmSearchFailed": "Search failed",
+    "browseChannels": "Browse channels",
+    "join": "Join",
+    "joined": "Joined",
+    "inviteOnly": "Invite only",
+    "noBrowseChannels": "No channels to browse",
+    "joinChannelFailed": "Could not join the channel"
   },
   "teams": {
     "title": "Teams",
@@ -173,7 +179,10 @@
     "displayName": "Channel name",
     "purpose": "Purpose",
     "header": "Header",
-    "saveFailed": "Failed to save"
+    "saveFailed": "Failed to save",
+    "leave": "Leave channel",
+    "leaveConfirm": "Leave this channel?",
+    "leaveFailed": "Could not leave the channel"
   },
   "presence": {
     "online": "Online",

@@ -16,7 +16,8 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { StatusDot } from "@/components/presence/StatusDot";
-import { HashIcon, MessagesSquareIcon, PlusIcon } from "lucide-react";
+import { CompassIcon, HashIcon, MessagesSquareIcon, PlusIcon } from "lucide-react";
+import { BrowseChannelsDialog } from "./BrowseChannelsDialog";
 import { NewChannelDialog } from "./NewChannelDialog";
 import { NewDmDialog } from "./NewDmDialog";
 
@@ -47,6 +48,7 @@ export function WorkspaceMenu({
   const entries = useSidebarStore((s) => s.entries);
   const match = useMatchRoute();
   const [channelOpen, setChannelOpen] = useState(false);
+  const [browseOpen, setBrowseOpen] = useState(false);
   const [dmOpen, setDmOpen] = useState(false);
 
   const partnerIds = directs
@@ -104,6 +106,15 @@ export function WorkspaceMenu({
                 </SidebarMenuItem>
               );
             })}
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                onClick={() => setBrowseOpen(true)}
+                tooltip={t("workspace.browseChannels")}
+              >
+                <CompassIcon />
+                <span>{t("workspace.browseChannels")}</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
           </SidebarMenu>
         </SidebarGroup>
       )}
@@ -119,6 +130,9 @@ export function WorkspaceMenu({
         </SidebarMenu>
       </SidebarGroup>
       {channelOpen && <NewChannelDialog teamId={teamId!} open onOpenChange={setChannelOpen} />}
+      {browseOpen && teamId && (
+        <BrowseChannelsDialog teamId={teamId} open onOpenChange={setBrowseOpen} />
+      )}
       {dmOpen && <NewDmDialog open onOpenChange={setDmOpen} />}
     </SidebarContent>
   );
