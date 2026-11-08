@@ -16,9 +16,9 @@ catalog:
   vite: npm:@voidzero-dev/vite-plus-core@0.2.9
   vite-plus: 0.2.9
   uuid: ^14.0.2
-  zod: ^4.5.4
+  zod: ^4.6.6
   zustand: ^5.0.15
-  better-auth: 1.7.2
+  better-auth: 1.7.7
 allowBuilds:
   "@parcel/watcher": true
   unrs-resolver: true

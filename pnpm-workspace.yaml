@@ -19,11 +19,11 @@ catalog:
   wrangler: ^4.128.0
   "@cloudflare/workers-types": ^5.20260830.1
   "@cloudflare/vite-plugin": ^1.54.3
-  zod: ^4.5.4
+  zod: ^4.6.6
   vitest: ^4.1.11
   "@cloudflare/vitest-plugin": ^1.1.2
-  better-auth: 1.7.2
-  "@better-auth/drizzle-adapter": 1.7.2
+  better-auth: 1.7.7
+  "@better-auth/drizzle-adapter": 1.7.7
   jose: ^6.2.10
   "@aws-sdk/client-s3": 3.1121.0
   "@sqlite.org/sqlite-wasm": 3.53.0-build1
@@ -61,6 +61,8 @@ catalog:
   photon-wasm: ^0.0.4
 overrides:
   vite: "catalog:"
+  # GHSA high: seroval <1.6.8 (transitive via @tanstack/router-core).
+  seroval: ^1.6.8
 peerDependencyRules:
   allowAny:
     - vite

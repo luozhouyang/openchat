@@ -30,6 +30,7 @@ export default defineConfig({
     setupFiles: ["./apps/openchat/test/app/setup.ts"],
     exclude: [
       "**/node_modules/**",
+      "**/.pnpm-store/**",
       "apps/openchat/test/worker/**",
       "apps/openchat/e2e/**",
       "apps/mobile/**",

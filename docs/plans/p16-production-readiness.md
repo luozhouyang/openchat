@@ -50,6 +50,21 @@ review. Local docs only (see the note at the end).
   table in the same maintenance window or keep the secret stable.
 - `INTERNAL_TOKEN_KEY` rotation is safe (short-lived internal tokens).
 
+## Dependency security (2026-11-09)
+
+`vp pm audit -- --prod --registry=https://registry.npmjs.org` (the default
+npmmirror registry has no audit endpoint).
+
+- Fixed: `better-auth` 1.7.2 → 1.7.7 (critical), `zod` → 4.6.7 (high) and
+  `seroval` forced to >=1.6.8 via a pnpm override (high). better-auth 1.7.7
+  requires `accounts.issuer` to be nullable; migration `0020` rebuilds the
+  accounts table preserving rows.
+- Remaining critical/high findings are all under the dev-only `shadcn` CLI
+  (MCP SDK → express/proxy-addr, bundled zod/undici). They are not shipped in
+  the worker or web bundle; revisit when upgrading the shadcn dev dependency.
+- `vite.config.ts` excludes `.pnpm-store/**` from the root vitest scan (the
+  managed pnpm store lives inside the repo in this environment).
+
 ## Backups
 
 - D1: schedule `wrangler d1 export openchat --remote --output backup-<date>.sql`
