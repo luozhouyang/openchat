@@ -61,7 +61,12 @@ export const messageSchema = z.object({
 });
 
 export const channelEventSchema = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("message.new"), message: messageSchema }),
+  z.object({
+    type: z.literal("message.new"),
+    message: messageSchema,
+    /** Present on server fan-out so push notifications can show the channel name. */
+    channelDisplayName: z.string().optional(),
+  }),
   z.object({
     type: z.literal("message.edit"),
     messageId: z.string(),

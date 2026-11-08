@@ -12,7 +12,8 @@ export type IdKind =
   | "rol"
   | "sch"
   | "ntf"
-  | "int";
+  | "int"
+  | "aud";
 
 export function id(kind: IdKind): string {
   return `${kind}_${uuidv7()}`;

@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc, lt } from "drizzle-orm";
 import { channelDoName } from "protocol";
 import {
   RemoveMemberInput,
@@ -20,7 +20,14 @@ import {
 import { requireAdmin } from "@worker/auth/admin-gate";
 import type { SessionContext } from "@worker/auth/session";
 import { getDb } from "@worker/db/client";
-import { users, teams, channels, teamMembers, channelMembers } from "@worker/db/schema-d1";
+import {
+  users,
+  teams,
+  channels,
+  teamMembers,
+  channelMembers,
+  auditLogs,
+} from "@worker/db/schema-d1";
 import { listChannelsForTeam, listChannelMemberIds, getChannel } from "@worker/db/repos/channels";
 import { getTeam, getTeamMember, countTeamAdmins } from "@worker/db/repos/teams";
 import { syncUserChannels } from "@worker/user-do-sync";
@@ -59,7 +66,7 @@ adminV1.put("/settings", zodValidator("json", RegistrationModeInput), async (c) 
   const body = c.req.valid("json");
   const db = getDb(c.env.DB);
   await setRegistrationMode(db, body.registrationMode);
-  auditLog({
+  await auditLog(getDb(c.env.DB), {
     actor: c.get("adminUserId"),
     action: "settings.registration_mode",
     target: body.registrationMode,
@@ -105,6 +112,36 @@ adminV1.get("/stats", async (c) => {
   };
   return c.json(out);
 });
+
+// Local query shape for the read-only audit endpoint; the wire contract is
+// `{ entries: [...] }` and does not extend packages/protocol yet.
+const AuditQuery = z.object({
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+  before: z.coerce.number().int().optional(),
+});
+
+adminV1.get("/audit", zodValidator("query", AuditQuery), async (c) => {
+  const { limit, before } = c.req.valid("query");
+  const db = getDb(c.env.DB);
+  const rows = await db
+    .select()
+    .from(auditLogs)
+    .where(before === undefined ? undefined : lt(auditLogs.createdAt, before))
+    .orderBy(desc(auditLogs.createdAt))
+    .limit(limit);
+  return c.json({
+    entries: rows.map((row) => ({
+      id: row.id,
+      actorId: row.actorId,
+      action: row.action,
+      target: row.target,
+      status: row.status,
+      detail: row.detail === null ? null : JSON.parse(row.detail),
+      createdAt: row.createdAt,
+    })),
+  });
+});
+
 adminV1.post("/teams/:teamId/archive", async (c) => {
   const db = getDb(c.env.DB);
   const teamId = c.req.param("teamId");
@@ -129,7 +166,12 @@ adminV1.post("/teams/:teamId/archive", async (c) => {
       }),
     );
   }
-  auditLog({ actor: c.get("adminUserId"), action: "team.archive", target: teamId, status: "ok" });
+  await auditLog(getDb(c.env.DB), {
+    actor: c.get("adminUserId"),
+    action: "team.archive",
+    target: teamId,
+    status: "ok",
+  });
   return c.json({ ok: true });
 });
 adminV1.post("/channels/:channelId/archive", async (c) => {
@@ -154,7 +196,7 @@ adminV1.post("/channels/:channelId/archive", async (c) => {
       }),
     );
   }
-  auditLog({
+  await auditLog(getDb(c.env.DB), {
     actor: c.get("adminUserId"),
     action: "channel.archive",
     target: channelId,
@@ -175,7 +217,7 @@ adminV1.post("/channels/:channelId/delete", async (c) => {
   await db.delete(channels).where(eq(channels.id, channelId));
   const deleted = channelDeletedEvent.parse({ type: "channel.deleted", channelId });
   await Promise.all(memberIds.map((uid) => deliverStructure(c.env, uid, deleted)));
-  auditLog({
+  await auditLog(getDb(c.env.DB), {
     actor: c.get("adminUserId"),
     action: "channel.delete",
     target: channelId,
@@ -215,7 +257,7 @@ adminV1.post(
       teamMemberRemovedEvent.parse({ type: "team.member_removed", teamId, userId }),
       [userId],
     );
-    auditLog({
+    await auditLog(getDb(c.env.DB), {
       actor: c.get("adminUserId"),
       action: "team.member.remove",
       target: `${teamId}/${userId}`,

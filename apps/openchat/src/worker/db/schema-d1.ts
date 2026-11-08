@@ -236,6 +236,23 @@ export const userStatus = sqliteTable(
   (t) => [index("idx_user_status_online").on(t.online)],
 );
 
+export const auditLogs = sqliteTable(
+  "audit_logs",
+  {
+    id: text("id").primaryKey(),
+    actorId: text("actor_id").notNull(),
+    action: text("action").notNull(),
+    target: text("target"),
+    status: text("status").notNull(),
+    detail: text("detail"),
+    createdAt: integer("created_at").notNull(),
+  },
+  (t) => [
+    index("idx_audit_created").on(t.createdAt),
+    index("idx_audit_actor").on(t.actorId, t.createdAt),
+  ],
+);
+
 /**
  * In-app notification inbox. One row per (recipient, message) for mentions and
  * thread replies; the source of truth for the bell badge, independent of push.

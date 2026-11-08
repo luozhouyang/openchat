@@ -3,6 +3,7 @@ import { handleWsUpgrade } from "@worker/routes/ws";
 import { ensureSeedRoles } from "@worker/auth/rbac";
 import { getDb } from "@worker/db/client";
 import { runMaintenance } from "@worker/maintenance";
+import { reconcileBatch } from "@worker/services/reconcile.service";
 import { UserDO } from "@worker/do/user";
 import { ChannelDO } from "@worker/do/channel";
 
@@ -38,6 +39,11 @@ export default {
     env: Env,
     ctx: ExecutionContext,
   ): Promise<void> {
-    ctx.waitUntil(runMaintenance(env));
+    ctx.waitUntil(
+      (async () => {
+        await runMaintenance(env);
+        await reconcileBatch(env, 5);
+      })(),
+    );
   },
 };

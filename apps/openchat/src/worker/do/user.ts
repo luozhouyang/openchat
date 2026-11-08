@@ -161,6 +161,7 @@ export class UserDO extends DurableObject<Env> {
 
   async push(body: {
     channelId?: string;
+    channelDisplayName?: string;
     events: unknown[];
     notifPref?: "all" | "mention" | "none";
   }): Promise<void> {
@@ -257,6 +258,7 @@ export class UserDO extends DurableObject<Env> {
       const e = ev as {
         type?: string;
         message?: { id: string; mentions?: string[] | null; content?: string };
+        channelDisplayName?: string;
         notifPref?: "all" | "mention" | "none";
       };
       if (e.type !== "message.new" && e.type !== "thread.reply") {
@@ -308,7 +310,7 @@ export class UserDO extends DurableObject<Env> {
         userId: this.userId,
         channelId: body.channelId,
         messageId: e.message.id,
-        title: body.channelId,
+        title: body.channelDisplayName ?? e.channelDisplayName ?? body.channelId,
         body: e.message.content?.slice(0, 100) ?? "",
         mentions,
         createdAt: Date.now(),

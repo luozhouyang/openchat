@@ -16,6 +16,7 @@ import { sidebarV1 } from "@worker/routes/v1/sidebar";
 import { rolesV1 } from "@worker/routes/v1/roles";
 import { notificationsV1 } from "@worker/routes/v1/notifications";
 import { searchV1 } from "@worker/routes/v1/search";
+import { adminConsistencyV1 } from "@worker/routes/v1/admin-consistency";
 
 export const v1Router = new Hono<{ Bindings: Env }>();
 v1Router.route("/", usersV1);
@@ -30,6 +31,7 @@ v1Router.route("/", uploadsV1);
 v1Router.route("/", filesV1);
 v1Router.route("/", invitesV1);
 v1Router.route("/admin", adminV1);
+v1Router.route("/admin", adminConsistencyV1);
 v1Router.route("/", pushV1);
 v1Router.route("/", sidebarV1);
 v1Router.route("/", rolesV1);

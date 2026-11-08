@@ -13,10 +13,7 @@ import { getRegistrationMode } from "@worker/db/repos/settings";
 import { auditLog } from "@worker/audit";
 import { sendVerificationMail } from "@worker/email";
 
-let currentEnv: Env | null = null;
-
 export function makeAuth(env: Env) {
-  currentEnv = env;
   return betterAuth({
     baseURL: env.BETTER_AUTH_URL,
     secret: env.BETTER_AUTH_SECRET,
@@ -42,13 +39,9 @@ export function makeAuth(env: Env) {
         if (ctx.path !== "/sign-up/email") {
           return;
         }
-        const env = currentEnv;
-        if (!env) {
-          return;
-        }
         const mode = await getRegistrationMode(getDb(env.DB));
         if (mode === "closed") {
-          auditLog({
+          await auditLog(getDb(env.DB), {
             actor: "system",
             action: "sign-up.rejected",
             target: "registration_closed",
@@ -81,10 +74,6 @@ export function makeAuth(env: Env) {
         },
         update: {
           after: async (user) => {
-            const env = currentEnv;
-            if (!env) {
-              return;
-            }
             try {
               const db = getDb(env.DB);
               const rows = await db
@@ -96,7 +85,7 @@ export function makeAuth(env: Env) {
               if (row?.banned) {
                 const id = env.USER_DO.idFromName(userDoName(user.id));
                 await env.USER_DO.get(id).forceDisconnect();
-                auditLog({
+                await auditLog(getDb(env.DB), {
                   actor: "system",
                   action: "ban.force-disconnect",
                   target: user.id,
@@ -105,7 +94,7 @@ export function makeAuth(env: Env) {
               }
             } catch (err) {
               console.error("ban force-disconnect failed", err);
-              auditLog({
+              await auditLog(getDb(env.DB), {
                 actor: "system",
                 action: "ban.force-disconnect",
                 target: user.id,

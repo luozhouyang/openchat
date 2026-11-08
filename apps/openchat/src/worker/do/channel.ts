@@ -387,6 +387,14 @@ export class ChannelDO extends DurableObject<Env> {
       .where(eq(schema.messages.seq, messageSeq));
   }
 
+  /** All member ids regardless of presence; used by consistency checks. */
+  async memberIds(): Promise<string[]> {
+    const rows = await this.db
+      .select({ userId: schema.memberState.userId })
+      .from(schema.memberState);
+    return rows.map((row) => row.userId);
+  }
+
   async structureTargets(): Promise<string[]> {
     const rows = await this.db
       .select({ userId: schema.memberState.userId })
@@ -1536,7 +1544,36 @@ export class ChannelDO extends DurableObject<Env> {
           .map((r) => r.userId);
       }
     }
-    await this.broadcaster.broadcast(event, prefs, targets);
+    const outgoing =
+      event.type === "message.new"
+        ? { ...event, channelDisplayName: await this.channelDisplayName() }
+        : event;
+    await this.broadcaster.broadcast(outgoing, prefs, targets);
+  }
+
+  /**
+   * Channel display name for push titles; cached in DO storage because D1 is
+   * the source of truth and names change rarely.
+   */
+  private async channelDisplayName(): Promise<string | undefined> {
+    const cached = await this.ctx.storage.get<{ name: string; at: number }>("channelDisplayName");
+    if (cached && Date.now() - cached.at < 5 * 60_000) {
+      return cached.name;
+    }
+    try {
+      const rows = await getDb(this.env.DB)
+        .select({ displayName: schemaD1.channels.displayName })
+        .from(schemaD1.channels)
+        .where(eq(schemaD1.channels.id, this.channelId))
+        .limit(1);
+      const name = rows[0]?.displayName;
+      if (name) {
+        await this.ctx.storage.put("channelDisplayName", { name, at: Date.now() });
+      }
+      return name;
+    } catch {
+      return cached?.name;
+    }
   }
 
   /** Online member ids from D1 `user_status`; `null` signals a D1 failure. */

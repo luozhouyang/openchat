@@ -8,11 +8,14 @@ import { getDb } from "@worker/db/client";
 import { users } from "@worker/db/schema-d1";
 import { getChannel, getChannelMember } from "@worker/db/repos/channels";
 import { apiError } from "@worker/lib/errors";
+import { createRateLimit } from "@worker/lib/rate-limit";
 import { zodValidator } from "@worker/lib/validation";
 
 type ReactionsCtx = Context<{ Bindings: Env; Variables: { session: SessionContext } }>;
 
 export const reactionsV1 = new Hono<{ Bindings: Env }>();
+
+const reactionRateLimit = createRateLimit({ bucket: "reaction", limit: 120, windowMs: 60_000 });
 
 function channelStub(env: Env, channelId: string) {
   return env.CHANNEL_DO.get(env.CHANNEL_DO.idFromName(channelDoName(channelId)));
@@ -33,6 +36,7 @@ async function requireChannelMember(c: ReactionsCtx, channelId: string) {
 reactionsV1.post(
   "/reactions",
   requireSession,
+  reactionRateLimit,
   zodValidator("json", AddReactionInput),
   async (c) => {
     const body = c.req.valid("json");
@@ -71,6 +75,7 @@ reactionsV1.get(
 reactionsV1.delete(
   "/users/:userId/posts/:postId/reactions/:emojiName",
   requireSession,
+  reactionRateLimit,
   zodValidator("query", ReactionsQuery),
   async (c) => {
     const body = c.req.valid("query");

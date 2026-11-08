@@ -7,7 +7,8 @@
     "dev": "wrangler dev",
     "types": "wrangler types",
     "test": "vp test",
-    "deploy:dry": "wrangler deploy --dry-run"
+    "deploy:dry": "wrangler deploy --dry-run",
+    "setup:r2-events": "wrangler r2 bucket notification create openchat-files --event-type object-create --queue openchat-thumbnails --prefix uploads/"
   },
   "dependencies": {
     "photon-wasm": "catalog:",
