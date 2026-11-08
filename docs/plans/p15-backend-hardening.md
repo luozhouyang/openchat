@@ -172,8 +172,10 @@ with 150 ids returned HTTP 500 before this change.
 ### E2E coverage
 
 - New specs: theme persistence across reloads, pinning a message and finding it
-  in the pinned dialog, replying in the thread panel, and the notification bell
-  clearing after an entry is opened.
+  in the pinned dialog, replying in the thread panel, the notification bell
+  clearing after an entry is opened, online presence in the members dialog,
+  leaving a channel, and browsing/joining a public channel (the join flow now
+  reloads the workspace payload so the sidebar cannot stay stale).
 
 ## Deferred — backend
 
@@ -184,7 +186,7 @@ with 150 ids returned HTTP 500 before this change.
 ## Deferred — frontend / UI
 
 1. Mobile app parity with the new notifications/search/settings features.
-2. E2E coverage for presence, channel settings and leave/browse/join flows.
+2. E2E coverage for channel settings saves (the team settings path is covered).
 
 > Note: `docs/` is listed in `.gitignore`; this file was committed explicitly
 > with `git add -f`, other docs stay local.

@@ -35,7 +35,10 @@ export function BrowseChannelsDialog({
     setError(null);
     try {
       await api.channels.join(channel.id);
-      useTeamsStore.getState().addChannel({ ...channel, member: true });
+      // Reload the workspace payload instead of patching the store: the sidebar
+      // renders `team.channels` and a single stale entry would hide the join.
+      const workspaces = await api.workspaces();
+      useTeamsStore.getState().loadAll(workspaces);
       await queryClient.invalidateQueries({ queryKey: ["team-channels", teamId] });
       onOpenChange(false);
       await navigate({
