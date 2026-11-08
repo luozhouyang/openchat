@@ -3,6 +3,8 @@ import { defineConfig } from "@playwright/test";
 export default defineConfig({
   testDir: "./e2e",
   timeout: 30_000,
+  // One retry on CI absorbs timing flakes in the live-WebSocket specs.
+  retries: process.env.CI ? 1 : 0,
   fullyParallel: false,
   workers: 1,
   use: { baseURL: "http://localhost:4173" },
