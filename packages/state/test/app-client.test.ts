@@ -185,6 +185,16 @@ test("app client: bearer mode REST carries the session token; cookie mode stays 
   expect(call?.[1]?.credentials).toBe("include");
 });
 
+test("channels service: hydrate reads the DB isPinned flag through to the store", async () => {
+  const db = createMemoryDatabase();
+  await db.messages.append("c1", { ...msg(1), isPinned: true });
+  await db.messages.append("c1", msg(2));
+  const svc = createChannelsService({ getDb: async () => db, fetchHistory: vi.fn() });
+  await svc.hydrate("c1");
+  const list = useMessageStore.getState().list("c1");
+  expect(list.map((m) => m.isPinned)).toEqual([true, false]);
+});
+
 test("app client: createRealtime wires sync + dispatch through shared pipeline", async () => {
   const db: LocalDatabase = createMemoryDatabase();
   await db.messages.append("c1", msg(3));
@@ -207,4 +217,27 @@ test("app client: createRealtime wires sync + dispatch through shared pipeline",
   await vi.waitFor(async () => expect(await db.messages.maxSeq("c1")).toBe(4));
   expect(typeof conn.send).toBe("function");
   expect(typeof conn.sendActivity).toBe("function");
+});
+
+test("app client: createRealtime surfaces error frames through the onLocal hook", () => {
+  const client = createAppClient({ platform: fakePlatform() });
+  const onLocal = vi.fn();
+  const conn = client.createRealtime({ onLocal });
+  // react-path error frame with attribution (P1-3): dispatcher fails any
+  // pending message and the app hook receives the verbatim event.
+  useMessageStore.getState().appendPending("c1", "tok", { ...msg(0), id: "pending-tok" });
+  conn.dispatch(
+    JSON.stringify({
+      type: "error",
+      code: "http_429",
+      message: "slow down",
+      channelId: "c1",
+      clientToken: "tok",
+    }),
+  );
+  expect(useMessageStore.getState().list("c1")).toHaveLength(0); // pending rolled back
+  expect(onLocal).toHaveBeenCalledTimes(1);
+  expect(onLocal).toHaveBeenCalledWith(
+    expect.objectContaining({ type: "error", clientToken: "tok", code: "http_429" }),
+  );
 });

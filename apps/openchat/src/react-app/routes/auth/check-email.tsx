@@ -2,7 +2,7 @@ import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { z } from "zod";
-import { authClient } from "@/lib/auth-client";
+import { appClient } from "@/app-client";
 import { LanguageSwitcher } from "@/components/auth/LanguageSwitcher";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -28,16 +28,10 @@ function CheckEmailPage() {
     setError(null);
     setSent(false);
     try {
-      const res = await authClient.sendVerificationEmail({
-        email,
-        callbackURL: "/auth/verify-email",
-      });
-      if (res.error) {
-        throw new Error(res.error.message ?? t("auth.checkEmail.sendFailed"));
-      }
+      await appClient.auth.sendVerificationEmail(email);
       setSent(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("auth.checkEmail.sendFailed"));
+      setError(err instanceof Error && err.message ? err.message : t("auth.checkEmail.sendFailed"));
     } finally {
       setSending(false);
     }

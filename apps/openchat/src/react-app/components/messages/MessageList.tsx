@@ -37,12 +37,9 @@ export function MessageList({ channelId }: { channelId: string }) {
     const anchorSeq = list[0].seq;
     const scrollTop = parentRef.current?.scrollTop ?? 0;
     try {
-      // Shared history application (store + local DB persistence).
-      const res = await appClient.api.posts.list(channelId, {
-        beforeSeq: anchorSeq,
-        limit: 30,
-      });
-      await appClient.channels.applyHistory(channelId, res.messages);
+      // Shared service: fetch page + apply history to store and local DB in
+      // one call (no service-layer duplication, review P2 死代码段).
+      await appClient.channels.loadOlder(channelId);
       const idx = useMessageStore
         .getState()
         .list(channelId)

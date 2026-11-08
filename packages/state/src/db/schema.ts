@@ -32,4 +32,14 @@ export const MIGRATIONS: Migration[] = [
       `CREATE INDEX IF NOT EXISTS idx_messages_thread ON messages (channel_id, parent_id);`,
     ],
   },
+  {
+    version: 3,
+    name: "0003_message_is_pinned",
+    statements: [
+      // P12 D6: the pin flag now round-trips through local storage (REST
+      // PostOutput.isPinned / message.pinned events → hydrate shows it after
+      // reload). Plain SQLite ADD COLUMN: node:sqlite and expo-sqlite alike.
+      `ALTER TABLE messages ADD COLUMN is_pinned INTEGER NOT NULL DEFAULT 0;`,
+    ],
+  },
 ];

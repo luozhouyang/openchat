@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 // Auth pages (login/signup/check-email/verify-email) rendered via the real
-// router; the better-auth client (lib/auth-client.ts) is mocked so no network
-// happens. Pages call authClient directly (not the state AuthService).
+// router; the shared composition root (@/app-client) is mocked so no network
+// happens — these pages MUST go through appClient.auth (review #14): that is
+// the only path that persists a bearer token for desktop file:// mode.
 import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
@@ -9,19 +10,38 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider, createRouter } from "@tanstack/react-router";
 import { routeTree } from "@/routeTree.gen";
 import { setLanguage } from "@/i18n";
-import * as authClientMod from "@/lib/auth-client";
 
-vi.mock("@/lib/auth-client", () => ({
-  authClient: {
-    signIn: { email: vi.fn() },
-    signUp: { email: vi.fn() },
-    sendVerificationEmail: vi.fn(),
-    verifyEmail: vi.fn(),
-    getSession: vi.fn(async () => ({ data: null, error: null })),
+const mockSignIn = vi.hoisted(() => vi.fn());
+const mockSignUp = vi.hoisted(() => vi.fn());
+const mockSendVerificationEmail = vi.hoisted(() => vi.fn());
+const mockVerifyEmail = vi.hoisted(() => vi.fn());
+
+vi.mock("@/app-client", () => ({
+  appClient: {
+    auth: {
+      signIn: mockSignIn,
+      signUp: mockSignUp,
+      sendVerificationEmail: mockSendVerificationEmail,
+      verifyEmail: mockVerifyEmail,
+      // AuthService contract returns a plain boolean (services/auth.ts hasSession).
+      hasSession: vi.fn(async () => true),
+    },
   },
 }));
-
-const auth = vi.mocked(authClientMod.authClient, true);
+vi.mock("@/lib/auth-client", () => ({
+  authClient: {
+    getSession: vi.fn(async () => ({ data: null, error: null })),
+    admin: {
+      listUsers: vi.fn(),
+      banUser: vi.fn(),
+      unbanUser: vi.fn(),
+    },
+  },
+}));
+// __root.tsx pulls in the ws client singleton; auth pages never touch it.
+vi.mock("@/ws/client", () => ({
+  wsClient: { ensureConnected: async () => {}, sendActivity: () => {}, send: () => {} },
+}));
 
 const queryClient = new QueryClient();
 
@@ -45,7 +65,7 @@ async function renderRoute(path: string, search?: Record<string, string>) {
 describe("login page", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    auth.signIn.email.mockResolvedValue({ data: null, error: null });
+    mockSignIn.mockResolvedValue(undefined);
   });
 
   it("renders the login card", async () => {
@@ -59,7 +79,7 @@ describe("login page", () => {
     expect(await screen.findByTestId("email-field-error")).toHaveTextContent(
       "Enter a valid email address",
     );
-    expect(auth.signIn.email).not.toHaveBeenCalled();
+    expect(mockSignIn).not.toHaveBeenCalled();
   });
 
   it("associates labels with the email and password inputs", async () => {
@@ -70,7 +90,7 @@ describe("login page", () => {
     expect(screen.getByLabelText("Password")).toHaveAttribute("id", "password");
   });
 
-  it("submits valid credentials to authClient.signIn.email", async () => {
+  it("submits valid credentials to the shared appClient.auth.signIn", async () => {
     await renderRoute("/auth/login");
     fireEvent.change(screen.getByPlaceholderText("you@example.com"), {
       target: { value: "alice@test.dev" },
@@ -79,16 +99,11 @@ describe("login page", () => {
       target: { value: "password" },
     });
     fireEvent.submit(screen.getByRole("button", { name: "Sign in" }));
-    await vi.waitFor(() =>
-      expect(auth.signIn.email).toHaveBeenCalledWith({
-        email: "alice@test.dev",
-        password: "password",
-      }),
-    );
+    await vi.waitFor(() => expect(mockSignIn).toHaveBeenCalledWith("alice@test.dev", "password"));
   });
 
   it("shows the server error in a destructive alert", async () => {
-    auth.signIn.email.mockRejectedValueOnce(new Error("密码错误"));
+    mockSignIn.mockRejectedValueOnce(new Error("密码错误"));
     await renderRoute("/auth/login");
     fireEvent.change(screen.getByPlaceholderText("you@example.com"), {
       target: { value: "alice@test.dev" },
@@ -110,7 +125,7 @@ describe("login page", () => {
 describe("signup page", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    auth.signUp.email.mockResolvedValue({ data: null, error: null });
+    mockSignUp.mockResolvedValue(undefined);
   });
 
   it("shows a short-password error", async () => {
@@ -126,10 +141,10 @@ describe("signup page", () => {
     expect(await screen.findByTestId("password-field-error")).toHaveTextContent(
       "Password must be at least 8 characters",
     );
-    expect(auth.signUp.email).not.toHaveBeenCalled();
+    expect(mockSignUp).not.toHaveBeenCalled();
   });
 
-  it("submits and navigates to /check-email with the email", async () => {
+  it("submits to the shared appClient.auth.signUp and navigates to /check-email", async () => {
     await renderRoute("/auth/signup");
     fireEvent.change(screen.getByPlaceholderText("Your name"), { target: { value: "Alice" } });
     fireEvent.change(screen.getByPlaceholderText("Your unique username"), {
@@ -143,11 +158,9 @@ describe("signup page", () => {
     });
     fireEvent.submit(screen.getByRole("button", { name: "Sign up" }));
     await vi.waitFor(() =>
-      expect(auth.signUp.email).toHaveBeenCalledWith({
+      expect(mockSignUp).toHaveBeenCalledWith("alice@test.dev", "alice-password", {
         name: "Alice",
         username: "alice",
-        email: "alice@test.dev",
-        password: "alice-password",
         callbackURL: "/auth/verify-email",
       }),
     );
@@ -158,19 +171,16 @@ describe("signup page", () => {
 describe("check-email page", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    auth.sendVerificationEmail.mockResolvedValue({ data: null, error: null });
+    mockSendVerificationEmail.mockResolvedValue(undefined);
   });
 
-  it("renders the target email and resends via authClient", async () => {
+  it("renders the target email and resends via appClient.auth", async () => {
     await renderRoute("/auth/check-email", { email: "alice@test.dev" });
     expect(await screen.findByText("Verify your email")).toBeInTheDocument();
     expect(screen.getByText(/alice@test\.dev/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Resend verification email" }));
     await vi.waitFor(() =>
-      expect(auth.sendVerificationEmail).toHaveBeenCalledWith({
-        email: "alice@test.dev",
-        callbackURL: "/auth/verify-email",
-      }),
+      expect(mockSendVerificationEmail).toHaveBeenCalledWith("alice@test.dev"),
     );
   });
 });
@@ -178,8 +188,8 @@ describe("check-email page", () => {
 describe("verify-email page", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    auth.verifyEmail.mockResolvedValue({ data: null, error: null });
-    auth.sendVerificationEmail.mockResolvedValue({ data: null, error: null });
+    mockVerifyEmail.mockResolvedValue(undefined);
+    mockSendVerificationEmail.mockResolvedValue(undefined);
   });
 
   it("shows the success state with workspace/login actions", async () => {
@@ -193,25 +203,18 @@ describe("verify-email page", () => {
     expect(await screen.findByText("Verification failed")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Resend verification email" }));
     await vi.waitFor(() =>
-      expect(auth.sendVerificationEmail).toHaveBeenCalledWith({
-        email: "alice@test.dev",
-        callbackURL: "/auth/verify-email",
-      }),
+      expect(mockSendVerificationEmail).toHaveBeenCalledWith("alice@test.dev"),
     );
   });
 
   it("verifies via the token query when present", async () => {
     await renderRoute("/auth/verify-email", { token: "tok-1" });
-    await vi.waitFor(() =>
-      expect(auth.verifyEmail).toHaveBeenCalledWith({
-        query: { token: "tok-1", callbackURL: "/auth/verify-email" },
-      }),
-    );
+    await vi.waitFor(() => expect(mockVerifyEmail).toHaveBeenCalledWith("tok-1"));
     expect(await screen.findByText("Email verified")).toBeInTheDocument();
   });
 
   it("shows a failure alert when resending the verification email fails", async () => {
-    auth.sendVerificationEmail.mockRejectedValueOnce(new Error("Send failed"));
+    mockSendVerificationEmail.mockRejectedValueOnce(new Error("Send failed"));
     await renderRoute("/auth/verify-email", { error: "invalid_token", email: "alice@test.dev" });
     fireEvent.click(screen.getByRole("button", { name: "Resend verification email" }));
     expect(await screen.findAllByText("Send failed")).toHaveLength(2);

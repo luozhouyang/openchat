@@ -15,7 +15,8 @@ export function normalizeMessage(m: MessageLike): Message {
 
 export interface ChannelsServiceDeps {
   getDb(): Promise<LocalDatabase>;
-  fetchHistory(channelId: string, beforeSeq?: number): Promise<MessageLike[]>;
+  /** `limit` overrides the default page size (the gap backfill uses page-size-500 walks). */
+  fetchHistory(channelId: string, beforeSeq?: number, limit?: number): Promise<MessageLike[]>;
   pageSize?: number;
 }
 

@@ -15,16 +15,27 @@ export interface Message {
   editedAt: number | null;
   deletedAt: number | null;
   createdAt: number;
+  /** Pin flag from the REST output / DO broadcasts; absent → unpinned (client default). */
+  isPinned?: boolean;
 }
 
 export type ChannelEvent =
   | ({ type: "message.new" } & { message: Message })
   | { type: "message.edit"; messageId: string; content: string; editedAt: number }
   | { type: "message.delete"; messageId: string }
-  | { type: "typing"; userId: string; expiresAt: number }
+  /**
+   * Single typing shape (review 2026-11-07 PROTOCOL P2): only `typing.start`
+   * is on the wire (ChannelDO `typing()` broadcasts `typing.start`; the bare
+   * `typing` literal never had a sender). One alias keeps the type side and
+   * the zod side from drifting apart again.
+   */
+  | TypingEvent
   | { type: "reaction.update"; messageSeq: number; reactions: Record<string, string[]> }
   | { type: "thread.reply"; parentId: string; message: Message }
-  | { type: "typing.start"; userId: string; expiresAt: number };
+  /** Matches ChannelDO.pinMessage's broadcast verbatim (channel.ts:545-549). */
+  | { type: "message.pinned"; messageId: string; pinned: boolean };
+
+export type TypingEvent = { type: "typing.start"; userId: string; expiresAt: number };
 
 export function messageNewEvent(
   channelId: string,
@@ -45,6 +56,8 @@ export const messageSchema = z.object({
   editedAt: z.number().nullable(),
   deletedAt: z.number().nullable(),
   createdAt: z.number(),
+  /** Keep the DO's isPinned through the parse instead of silently stripping it. */
+  isPinned: z.boolean().optional(),
 });
 
 export const channelEventSchema = z.discriminatedUnion("type", [
@@ -56,7 +69,6 @@ export const channelEventSchema = z.discriminatedUnion("type", [
     editedAt: z.number(),
   }),
   z.object({ type: z.literal("message.delete"), messageId: z.string() }),
-  z.object({ type: z.literal("typing"), userId: z.string(), expiresAt: z.number() }),
   z.object({ type: z.literal("typing.start"), userId: z.string(), expiresAt: z.number() }),
   z.object({
     type: z.literal("reaction.update"),
@@ -64,5 +76,6 @@ export const channelEventSchema = z.discriminatedUnion("type", [
     reactions: z.record(z.string(), z.array(z.string())),
   }),
   z.object({ type: z.literal("thread.reply"), parentId: z.string(), message: messageSchema }),
+  z.object({ type: z.literal("message.pinned"), messageId: z.string(), pinned: z.boolean() }),
 ]);
 export type ChannelEventParsed = z.infer<typeof channelEventSchema>;

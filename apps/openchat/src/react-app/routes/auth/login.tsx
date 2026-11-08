@@ -3,7 +3,7 @@ import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useForm } from "@tanstack/react-form";
 import { useTranslation } from "react-i18next";
 import { z } from "zod";
-import { authClient } from "@/lib/auth-client";
+import { appClient } from "@/app-client";
 import { LanguageSwitcher } from "@/components/auth/LanguageSwitcher";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -30,13 +30,15 @@ function LoginPage() {
     onSubmit: async ({ value }) => {
       setError(null);
       try {
-        const res = await authClient.signIn.email({ email: value.email, password: value.password });
-        if (res.error) {
-          throw new Error(res.error.message ?? t("auth.login.failed"));
-        }
+        // Shared AuthService (better-auth): browser cookie mode keeps working;
+        // the desktop file:// shell relies on this same path to persist the
+        // bearer token that the WS upgrade needs (review #14).
+        await appClient.auth.signIn(value.email, value.password);
         void router.navigate({ to: "/" });
       } catch (err) {
-        setError(err instanceof Error ? err.message : t("auth.login.failed"));
+        // i18n fallback restored (review round 2, small item): keep
+        // better-auth's real message when present, localized default otherwise.
+        setError(err instanceof Error && err.message ? err.message : t("auth.login.failed"));
       }
     },
   });

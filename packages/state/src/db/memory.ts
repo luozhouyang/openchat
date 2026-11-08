@@ -20,7 +20,10 @@ function applyUpsert(ch: ChannelState, message: Message) {
   if (existing) {
     ch.bySeq.delete(existing.seq);
   }
-  ch.byId.set(message.id, message);
+  // Mirror the sqlite repository's row contract: is_pinned is NOT NULL with a
+  // false default, so flagless messages normalize to `false`.
+  const normalized = { ...message, isPinned: message.isPinned ?? false };
+  ch.byId.set(message.id, normalized);
   ch.bySeq.set(message.seq, message.id);
 }
 
@@ -91,6 +94,14 @@ export class MemoryMessageRepository implements MessageRepository {
     const m = ch?.byId.get(messageId);
     if (m) {
       m.deletedAt = Date.now();
+    }
+  }
+
+  async setPinned(channelId: string, messageId: string, pinned: boolean) {
+    const ch = this.channels.get(channelId);
+    const m = ch?.byId.get(messageId);
+    if (m) {
+      m.isPinned = pinned;
     }
   }
 

@@ -73,8 +73,54 @@ test("dispatch sync.gap triggers the app hook", () => {
   expect(onSyncGap).toHaveBeenCalledWith("c1");
 });
 
-test("dispatch error with clientToken fails the optimistic message", () => {
-  const { dispatch } = setup();
+test("dispatch message.pinned merges the pin flag into the store and the local DB", async () => {
+  const { db, dispatch } = setup();
+  await db.messages.append("c1", msg(1)); // the live history row
+  useMessageStore.getState().applySync("c1", [msg(1)]);
+  dispatch(
+    JSON.stringify({
+      type: "channel.event",
+      channelId: "c1",
+      event: { type: "message.pinned", messageId: "m1", pinned: true },
+    }),
+  );
+  const list = useMessageStore.getState().list("c1");
+  expect(list[0].isPinned).toBe(true);
+  await vi.waitFor(async () => {
+    const { rows } = await db.messages.query("c1", { limit: 10 });
+    expect(rows[0]?.isPinned).toBe(true);
+  });
+  // Unpin also reaches both layers.
+  dispatch(
+    JSON.stringify({
+      type: "channel.event",
+      channelId: "c1",
+      event: { type: "message.pinned", messageId: "m1", pinned: false },
+    }),
+  );
+  await vi.waitFor(() => expect(useMessageStore.getState().list("c1")[0].isPinned).toBe(false));
+  const { rows } = await db.messages.query("c1", { limit: 10 });
+  expect(rows[0]?.isPinned).toBe(false);
+});
+
+test("dispatch message.new persists the live isPinned flag from the DO broadcast", async () => {
+  const { db, dispatch } = setup();
+  dispatch(
+    JSON.stringify({
+      type: "channel.event",
+      channelId: "c1",
+      event: { type: "message.new", message: { ...msg(1), isPinned: true } },
+    }),
+  );
+  expect(useMessageStore.getState().list("c1")[0].isPinned).toBe(true);
+  await vi.waitFor(async () => {
+    const { rows } = await db.messages.query("c1", { limit: 10 });
+    expect(rows[0]?.isPinned).toBe(true);
+  });
+});
+
+test("dispatch error with clientToken fails the optimistic message and surfaces via onLocal", () => {
+  const { dispatch, onLocal } = setup();
   useMessageStore.getState().appendPending("c1", "tok", { ...msg(0), id: "pending-tok" });
   dispatch(
     JSON.stringify({
@@ -86,6 +132,7 @@ test("dispatch error with clientToken fails the optimistic message", () => {
     }),
   );
   expect(useMessageStore.getState().list("c1")).toHaveLength(0);
+  expect(onLocal).toHaveBeenCalledTimes(1);
 });
 
 test("dispatch ack confirms pending, channel.read syncs sidebar", async () => {
@@ -121,38 +168,151 @@ test("buildSyncChannels takes lastSeq from db and store, capped at maxChannels",
   expect(byId["c2"]).toBe(9);
 });
 
-test("createSyncGapHandler pages history backwards until overlap", async () => {
+test("createSyncGapHandler pages history backwards (at the server cap) until overlap", async () => {
   useMessageStore.setState({ channels: {}, threads: {} });
   const db = createMemoryDatabase();
-  const fetchHistory = vi.fn(async (channelId: string, beforeSeq?: number) => {
-    // Server has seq 1..250; latest page first, then older pages.
-    const top = beforeSeq === undefined ? 250 : beforeSeq - 1;
+  // Server holds seq 1..1200; pages honour the requested limit (like the DO).
+  const SERVER_TOP = 1200;
+  const fetchHistory = vi.fn(async (channelId: string, beforeSeq?: number, limit = 30) => {
+    const top = beforeSeq === undefined ? SERVER_TOP : beforeSeq - 1;
+    const bottom = Math.max(1, top - limit + 1);
     const msgs: Message[] = [];
-    for (let seq = top; seq > top - 100 && seq > 0; seq--) {
+    for (let seq = top; seq >= bottom; seq--) {
       msgs.unshift(msg(seq));
     }
     return msgs;
   });
   useMessageStore.getState().applySync("c1", [msg(30)]); // local head
-  const handle = createSyncGapHandler({ getDb: async () => db, fetchHistory });
-  await handle("c1");
-  expect(fetchHistory.mock.calls.length).toBeGreaterThanOrEqual(2);
-  // Fills from local head + 1 up to the latest page
-  const list = useMessageStore.getState().list("c1");
-  expect(list[list.length - 1].seq).toBe(250);
-  expect(await db.messages.maxSeq("c1")).toBe(250);
-});
-
-test("createSyncGapHandler stops quietly when offline", async () => {
-  useMessageStore.setState({ channels: {}, threads: {} });
-  const db = createMemoryDatabase();
   const handle = createSyncGapHandler({
     getDb: async () => db,
-    fetchHistory: vi.fn(async () => {
-      throw new Error("offline");
-    }),
+    fetchHistory,
+    backoffMs: 1,
   });
-  await expect(handle("c1")).resolves.toBeUndefined();
+  await handle("c1");
+  // Two full 500-message pages (1200..701, 700..201) walk back toward the
+  // local head; the trailing page overlaps → closed.
+  expect(fetchHistory.mock.calls.length).toBeGreaterThanOrEqual(2);
+  // First page requests the server history cap (500), not the 30-message page.
+  expect(fetchHistory.mock.calls[0]?.[2]).toBe(500);
+  expect(fetchHistory.mock.calls[0]?.[1]).toBeUndefined();
+  expect(fetchHistory.mock.calls[1]?.[1]).toBe(701);
+  const list = useMessageStore.getState().list("c1");
+  expect(list[list.length - 1].seq).toBe(1200);
+  expect(await db.messages.maxSeq("c1")).toBe(1200);
+});
+
+test("createSyncGapHandler refills the store from the DB — a big landed gap is fully visible in the open channel list", async () => {
+  useMessageStore.setState({ channels: {}, threads: {} });
+  const db = createMemoryDatabase();
+  const SERVER_TOP = 900;
+  const fetchHistory = vi.fn(async (channelId: string, beforeSeq?: number, limit = 30) => {
+    const top = beforeSeq === undefined ? SERVER_TOP : beforeSeq - 1;
+    const bottom = Math.max(1, top - limit + 1);
+    const msgs: Message[] = [];
+    for (let seq = top; seq >= bottom; seq--) {
+      msgs.unshift(msg(seq));
+    }
+    return msgs;
+  });
+  useMessageStore.getState().applySync("c1", [msg(50)]); // open channel holds only the head
+  useMessageStore.getState().appendPending("c1", "tok", { ...msg(0), id: "pending-tok" });
+  const handle = createSyncGapHandler({ getDb: async () => db, fetchHistory, backoffMs: 1 });
+  await handle("c1");
+
+  // The walk persists 1..900 to the DB, but the store-side applySync ignores
+  // everything ≤ maxSeq — without the refill the main list would keep a hole
+  // between seq 50 (local head) and 401 (first backfill page).
+  const list = useMessageStore.getState().list("c1");
+  expect(list).toHaveLength(901); // 900 confirmed + the surviving pending send
+  expect(list[0].seq).toBe(1);
+  expect(
+    list
+      .filter((m) => m.seq > 0)
+      .map((m) => m.seq)
+      .every((s, i) => s === i + 1),
+  ).toBe(true); // no hollow middle
+  expect(list[list.length - 1].id).toBe("pending-tok"); // pending kept, at seq 0
+});
+
+test("createSyncGapHandler requests big pages and closes a ≥500-message gap", async () => {
+  useMessageStore.setState({ channels: {}, threads: {} });
+  const db = createMemoryDatabase();
+  const SERVER_TOP = 900;
+  const fetchHistory = vi.fn(async (channelId: string, beforeSeq?: number, limit = 30) => {
+    const top = beforeSeq === undefined ? SERVER_TOP : beforeSeq - 1;
+    const bottom = Math.max(1, top - limit + 1);
+    const msgs: Message[] = [];
+    for (let seq = top; seq >= bottom; seq--) {
+      msgs.unshift(msg(seq));
+    }
+    return msgs;
+  });
+  useMessageStore.getState().applySync("c1", [msg(50)]);
+  const handle = createSyncGapHandler({ getDb: async () => db, fetchHistory, backoffMs: 1 });
+  await handle("c1");
+  // Page 1 (401..900) is full → page 2 (1..400) reaches the bottom and
+  // closes the gap against the local head.
+  expect(fetchHistory.mock.calls.length).toBe(2);
+  expect(fetchHistory.mock.calls[1]?.[1]).toBe(401);
+  const list = useMessageStore.getState().list("c1");
+  expect(list[list.length - 1].seq).toBe(900);
+  expect(await db.messages.maxSeq("c1")).toBe(900);
+});
+
+test("createSyncGapHandler retries a failed walk then gives up with a warning", async () => {
+  useMessageStore.setState({ channels: {}, threads: {} });
+  const db = createMemoryDatabase();
+  let calls = 0;
+  const failTimes = 2; // succeeds on the 3rd attempt
+  const walk = createSyncGapHandler({
+    getDb: async () => db,
+    fetchHistory: vi.fn(async () => {
+      calls++;
+      if (calls <= failTimes) {
+        throw new Error("flaky");
+      }
+      return [msg(1), msg(2)];
+    }),
+    backoffMs: 1,
+  });
+  const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  try {
+    await expect(walk("c1")).resolves.toBeUndefined(); // first retry closes it
+    expect(calls).toBe(3);
+
+    const alwaysFail = createSyncGapHandler({
+      getDb: async () => db,
+      fetchHistory: vi.fn(async () => {
+        throw new Error("offline");
+      }),
+      backoffMs: 1,
+    });
+    await expect(alwaysFail("c1")).resolves.toBeUndefined();
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining("sync.gap: backfill failed"),
+      expect.objectContaining({ message: expect.stringContaining("offline") }),
+    );
+  } finally {
+    warn.mockRestore();
+  }
+});
+
+test("createSyncGapHandler stops quietly when offline wrapper gives up", async () => {
+  useMessageStore.setState({ channels: {}, threads: {} });
+  const db = createMemoryDatabase();
+  const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  try {
+    const handle = createSyncGapHandler({
+      getDb: async () => db,
+      fetchHistory: vi.fn(async () => {
+        throw new Error("offline");
+      }),
+      backoffMs: 1,
+    });
+    await expect(handle("c1")).resolves.toBeUndefined();
+  } finally {
+    warn.mockRestore();
+  }
 });
 
 test("channel.created adds channel to the store team", () => {

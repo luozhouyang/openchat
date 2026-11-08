@@ -194,9 +194,44 @@ function showWindow() {
   win.focus();
 }
 
+/**
+ * Tray/icon assets resolve against several bases because electron-builder
+ * packs the main bundle as `.vite/build/main.js` while `assets/**` lands at
+ * the asar root (electron-builder.yml files layout):
+ *   - packaged: <app.asar>/assets  → app.getAppPath() + "assets"
+ *               (`__dirname/../assets` points into app.asar/.vite/assets,
+ *               which does not exist — review #15)
+ *   - dev:      apps/desktop/assets → also app.getAppPath() + "assets"
+ *               (app path is the project dir pre-package)
+ *   - test overrides via OPENCHAT_DESKTOP_APP_DIR keep working through the
+ *     same base.
+ * Returns null when nothing exists → caller degrades gracefully (no tray).
+ */
+function resolveAssetDir(): string | null {
+  const candidates = [
+    path.join(app.getAppPath(), "assets"),
+    process.env.OPENCHAT_DESKTOP_APP_DIR
+      ? path.join(process.env.OPENCHAT_DESKTOP_APP_DIR, "assets")
+      : null,
+    path.join(__dirname, "../../assets"),
+    path.join(__dirname, "../assets"), // legacy layout fallback
+  ].filter((p): p is string => typeof p === "string");
+  for (const dir of candidates) {
+    if (fs.existsSync(path.join(dir, "tray.png")) || fs.existsSync(path.join(dir, "icon.png"))) {
+      return dir;
+    }
+  }
+  return null;
+}
+
 function createTray() {
-  const iconPath = path.join(__dirname, "../assets/tray.png");
-  const trayIcon = fs.existsSync(iconPath) ? iconPath : path.join(__dirname, "../assets/icon.png");
+  const assetDir = resolveAssetDir();
+  if (!assetDir) {
+    console.warn("tray assets not found; starting without a tray");
+    return;
+  }
+  const iconPath = path.join(assetDir, "tray.png");
+  const trayIcon = fs.existsSync(iconPath) ? iconPath : path.join(assetDir, "icon.png");
   tray = new Tray(trayIcon);
   (globalThis as Record<string, unknown>).__openchatTrayAvailable = true;
   tray.setToolTip("openchat");

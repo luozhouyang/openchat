@@ -3,7 +3,7 @@ import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useForm } from "@tanstack/react-form";
 import { useTranslation } from "react-i18next";
 import { z } from "zod";
-import { authClient } from "@/lib/auth-client";
+import { appClient } from "@/app-client";
 import { LanguageSwitcher } from "@/components/auth/LanguageSwitcher";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -34,19 +34,17 @@ function SignupPage() {
     onSubmit: async ({ value }) => {
       setError(null);
       try {
-        const res = await authClient.signUp.email({
+        // Shared AuthService — same dual-mode story as login (review #14).
+        await appClient.auth.signUp(value.email, value.password, {
           name: value.name,
-          email: value.email,
-          password: value.password,
           username: value.username,
           callbackURL: "/auth/verify-email",
-        } as Parameters<typeof authClient.signUp.email>[0]);
-        if (res.error) {
-          throw new Error(res.error.message ?? t("auth.signup.failed"));
-        }
+        });
         void router.navigate({ to: "/auth/check-email", search: { email: value.email } });
       } catch (err) {
-        setError(err instanceof Error ? err.message : t("auth.signup.failed"));
+        // i18n fallback restored (review round 2, small item): keep
+        // better-auth's real message when present, localized default otherwise.
+        setError(err instanceof Error && err.message ? err.message : t("auth.signup.failed"));
       }
     },
   });

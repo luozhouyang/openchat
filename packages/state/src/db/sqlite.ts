@@ -23,6 +23,7 @@ function rowToMessage(r: {
   edited_at: number | null;
   deleted_at: number | null;
   created_at: number;
+  is_pinned: number | null;
 }): Message {
   return {
     id: r.message_id,
@@ -36,21 +37,23 @@ function rowToMessage(r: {
     editedAt: r.edited_at,
     deletedAt: r.deleted_at,
     createdAt: r.created_at,
+    isPinned: r.is_pinned === 1,
   };
 }
 
 type MessageRow = Parameters<typeof rowToMessage>[0];
 
 const UPSERT = `
-INSERT INTO messages (channel_id, seq, message_id, user_id, parent_id, type, content, attachments, mentions, edited_at, deleted_at, created_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+INSERT INTO messages (channel_id, seq, message_id, user_id, parent_id, type, content, attachments, mentions, edited_at, deleted_at, created_at, is_pinned)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT (channel_id, message_id) DO UPDATE SET
   seq = excluded.seq,
   content = excluded.content,
   attachments = excluded.attachments,
   mentions = excluded.mentions,
   edited_at = excluded.edited_at,
-  deleted_at = excluded.deleted_at
+  deleted_at = excluded.deleted_at,
+  is_pinned = excluded.is_pinned
 `;
 
 export class SqliteMessageRepository implements MessageRepository {
@@ -124,6 +127,14 @@ export class SqliteMessageRepository implements MessageRepository {
     ]);
   }
 
+  async setPinned(channelId: string, messageId: string, pinned: boolean) {
+    await this.d.run("UPDATE messages SET is_pinned = ? WHERE channel_id = ? AND message_id = ?", [
+      pinned ? 1 : 0,
+      channelId,
+      messageId,
+    ]);
+  }
+
   private params(channelId: string, m: Message): unknown[] {
     return [
       channelId,
@@ -138,6 +149,7 @@ export class SqliteMessageRepository implements MessageRepository {
       m.editedAt,
       m.deletedAt,
       m.createdAt,
+      m.isPinned ?? false,
     ];
   }
 }

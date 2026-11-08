@@ -18,13 +18,29 @@ export interface AuthServiceDeps {
   setSessionToken?(token: string | null): Promise<void>;
 }
 
+export interface SignUpOptions {
+  name?: string;
+  username?: string;
+  /** better-auth email-verification redirect (relative path). */
+  callbackURL?: string;
+}
+
 export interface AuthService {
+  /**
+   * Error contract: better-auth's real message is forwarded verbatim; when the
+   * server sends none, the service throws an EMPTY message and the routes
+   * layer applies its i18n default (`err.message || t("auth.…failed")`).
+   */
   signIn(email: string, password: string): Promise<void>;
-  signUp(email: string, password: string): Promise<void>;
+  signUp(email: string, password: string, options?: SignUpOptions): Promise<void>;
   signOut(): Promise<void>;
   hasSession(): Promise<boolean>;
   /** Short-lived better-auth JWT for the WebSocket upgrade. */
   getWsJwt(): Promise<string | null>;
+  /** Confirms an email-verification token. */
+  verifyEmail(token: string): Promise<void>;
+  /** Re-sends the email-verification email. */
+  sendVerificationEmail(email: string): Promise<void>;
 }
 
 const WS_JWT_TTL_MS = 10 * 60_000; // JWT lives 15min; rotate a bit early
@@ -81,21 +97,28 @@ export function createAuthService(deps: AuthServiceDeps): AuthService {
     async signIn(email, password) {
       const res = await authClient.signIn.email({ email, password });
       if (res.error) {
-        throw new Error(res.error.message ?? "sign-in failed");
+        // Empty fallback on purpose: the routes layer owns the i18n default
+        // (`err.message || t("auth.login.failed")`), keeping a localized message
+        // when better-auth sends none (review round 2, small item).
+        throw new Error(res.error.message ?? "");
       }
       if (!cookieMode) {
         await persistBearerToken(res.data);
       }
     },
 
-    async signUp(email, password) {
+    async signUp(email, password, options) {
       const res = await authClient.signUp.email({
         email,
         password,
         name: email.split("@")[0],
+        ...(options?.name !== undefined ? { name: options.name } : {}),
+        ...(options?.username !== undefined ? { username: options.username } : {}),
+        ...(options?.callbackURL !== undefined ? { callbackURL: options.callbackURL } : {}),
       });
       if (res.error) {
-        throw new Error(res.error.message ?? "sign-up failed");
+        // Same i18n ownership as signIn — see the comment above.
+        throw new Error(res.error.message ?? "");
       }
       if (!cookieMode) {
         await persistBearerToken(res.data);
@@ -120,6 +143,30 @@ export function createAuthService(deps: AuthServiceDeps): AuthService {
         return !!data;
       } catch {
         return false;
+      }
+    },
+
+    async verifyEmail(token) {
+      const res = await authClient.verifyEmail({
+        // Hardcoded relative path matching the /auth/verify-email route (no
+        // shared URL constant exists — verify against src/react-app routes).
+        query: { token, callbackURL: "/auth/verify-email" },
+      });
+      if (res.error) {
+        // Empty fallback on purpose — routes own the i18n default.
+        throw new Error(res.error.message ?? "");
+      }
+    },
+
+    async sendVerificationEmail(email) {
+      const res = await authClient.sendVerificationEmail({
+        email,
+        // Same hardcoded route path as verifyEmail.
+        callbackURL: "/auth/verify-email",
+      });
+      if (res.error) {
+        // Empty fallback on purpose — routes own the i18n default.
+        throw new Error(res.error.message ?? "");
       }
     },
 

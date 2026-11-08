@@ -227,3 +227,62 @@ test("store message type accepts optional reactions (superset of protocol Messag
   const m: StoreMessage = { ...msg(1), reactions: { "👍": ["u1"] } };
   expect(m.reactions).toBeDefined();
 });
+
+/**
+ * Review #12: edit/remove/setReactions mutate bySeq value objects in place —
+ * paired with react-app's `useShallow(s.list(channelId))` that meant unchanged
+ * element references, so the main list never re-rendered. These tests pin the
+ * clone-on-write contract: every mutator must produce NEW message references.
+ */
+test("edit produces a new reference for the edited message", () => {
+  const s = useMessageStore.getState();
+  s.reset("c-r1");
+  s.ingest("c-r1", msg(1));
+  s.ingest("c-r1", msg(2));
+  const before = useMessageStore.getState().list("c-r1");
+  s.edit("c-r1", "m1", "edited");
+  const after = useMessageStore.getState().list("c-r1");
+  expect(before.find((m) => m.id === "m1")).not.toBe(after.find((m) => m.id === "m1"));
+  expect(before.find((m) => m.id === "m2")).toBe(after.find((m) => m.id === "m2"));
+  expect(after.find((m) => m.id === "m1")?.content).toBe("edited");
+});
+
+test("remove produces a new reference with deletedAt set", () => {
+  const s = useMessageStore.getState();
+  s.reset("c-r2");
+  s.ingest("c-r2", msg(1));
+  const before = useMessageStore.getState().list("c-r2");
+  s.remove("c-r2", "m1");
+  const after = useMessageStore.getState().list("c-r2");
+  expect(after[0]).not.toBe(before[0]);
+  expect(after[0].deletedAt).toBeTruthy();
+  expect(before[0].deletedAt).toBeNull();
+});
+
+test("setReactions produces a new reference for the reacted message", () => {
+  const s = useMessageStore.getState();
+  s.reset("c-r3");
+  s.ingest("c-r3", msg(1));
+  s.ingest("c-r3", msg(2));
+  const before = useMessageStore.getState().list("c-r3");
+  s.setReactions("c-r3", 1, { "👍": ["u1"] });
+  const after = useMessageStore.getState().list("c-r3");
+  expect(after[0]).not.toBe(before[0]);
+  expect(after[1]).toBe(before[1]);
+  expect(after[0].reactions).toEqual({ "👍": ["u1"] });
+});
+
+test("setPinned merges the message.pinned state into the store (main list + thread)", () => {
+  const s = useMessageStore.getState();
+  s.reset("c-r4");
+  s.ingest("c-r4", msg(1));
+  s.ingestThread("c-r4", { ...msg(1), parentId: "root-1" });
+  s.setPinned("c-r4", "m1", true);
+  const list = useMessageStore.getState().list("c-r4");
+  expect(list[0].isPinned).toBe(true);
+  expect(useMessageStore.getState().threadList("c-r4", "root-1")[0].isPinned).toBe(true);
+  // Unknown ids are inert (post may not be loaded locally).
+  expect(() => s.setPinned("c-r4", "ghost", true)).not.toThrow();
+  s.setPinned("c-r4", "m1", false);
+  expect(useMessageStore.getState().list("c-r4")[0].isPinned).toBe(false);
+});

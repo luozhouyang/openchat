@@ -23,4 +23,6 @@ export interface MessageRepository {
   listChannels(): Promise<string[]>;
   edit(channelId: string, messageId: string, content: string, editedAt: number): Promise<void>;
   remove(channelId: string, messageId: string): Promise<void>;
+  /** Persist the dispatcher's message.pinned merge so hydrate sees it. */
+  setPinned(channelId: string, messageId: string, pinned: boolean): Promise<void>;
 }

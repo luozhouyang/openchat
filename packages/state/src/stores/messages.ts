@@ -4,6 +4,7 @@ import type { Message } from "protocol";
 export type StoreMessage = Omit<Message, "attachments"> & {
   attachments?: unknown[] | null;
   reactions?: Record<string, string[]>;
+  isPinned?: boolean;
 };
 
 interface ChannelState {
@@ -34,6 +35,7 @@ interface MessageState {
     messageSeq: number,
     reactions: Record<string, string[]>,
   ) => void;
+  setPinned: (channelId: string, messageId: string, pinned: boolean) => void;
   ingestThread: (channelId: string, message: StoreMessage) => void;
   threadList: (channelId: string, parentId: string) => StoreMessage[];
 }
@@ -155,74 +157,104 @@ export const useMessageStore = create<MessageState>((set, get) => ({
       return s;
     });
   },
+  /**
+   * Clone-on-write updates (review #12): editing/removing/reactions must yield
+   * NEW message references or `useShallow(s.list(channelId))` subscribers see
+   * identical element refs and skip the re-render.
+   */
   edit(channelId, messageId, content, editedAt) {
+    const at = editedAt ?? Date.now();
     set((s) => {
-      const ch = ensure(s, channelId);
-      for (const m of ch.bySeq.values()) {
-        if (m.id === messageId) {
-          m.content = content;
-          m.editedAt = editedAt ?? Date.now();
+      const ch = s.channels[channelId];
+      let channels = s.channels;
+      let channelChanged = false;
+      if (ch) {
+        let nextBySeq: Map<number, StoreMessage> | null = null;
+        for (const [seq, m] of ch.bySeq) {
+          if (m.id === messageId) {
+            nextBySeq ??= new Map(ch.bySeq);
+            nextBySeq.set(seq, { ...m, content, editedAt: at });
+            channelChanged = true;
+          }
+        }
+        if (nextBySeq) {
+          channels = { ...channels, [channelId]: { ...ch, bySeq: nextBySeq } };
         }
       }
-      const prefix = `${channelId}:`;
+      let threadsChanged = false;
       const threads = { ...s.threads };
+      const prefix = `${channelId}:`;
       for (const [key, arr] of Object.entries(threads)) {
         if (!key.startsWith(prefix)) {
           continue;
         }
-        let changed = false;
-        const next = arr.map((m) => {
-          if (m.id !== messageId) {
-            return m;
-          }
-          changed = true;
-          return { ...m, content, editedAt: editedAt ?? Date.now() };
-        });
-        if (changed) {
+        const next = arr.map((m) => (m.id === messageId ? { ...m, content, editedAt: at } : m));
+        if (next.some((m, i) => m !== arr[i])) {
           threads[key] = next;
+          threadsChanged = true;
         }
       }
-      return { channels: { ...s.channels }, threads };
+      if (!channelChanged && !threadsChanged) {
+        return s;
+      }
+      return { channels, threads };
     });
   },
   remove(channelId, messageId) {
+    const at = Date.now();
     set((s) => {
-      const ch = ensure(s, channelId);
-      for (const m of ch.bySeq.values()) {
-        if (m.id === messageId) {
-          m.deletedAt = Date.now();
+      const ch = s.channels[channelId];
+      let channels = s.channels;
+      let channelChanged = false;
+      if (ch) {
+        let nextBySeq: Map<number, StoreMessage> | null = null;
+        for (const [seq, m] of ch.bySeq) {
+          if (m.id === messageId) {
+            nextBySeq ??= new Map(ch.bySeq);
+            nextBySeq.set(seq, { ...m, deletedAt: at });
+            channelChanged = true;
+          }
+        }
+        if (nextBySeq) {
+          channels = { ...channels, [channelId]: { ...ch, bySeq: nextBySeq } };
         }
       }
-      const prefix = `${channelId}:`;
+      let threadsChanged = false;
       const threads = { ...s.threads };
+      const prefix = `${channelId}:`;
       for (const [key, arr] of Object.entries(threads)) {
         if (!key.startsWith(prefix)) {
           continue;
         }
-        let changed = false;
-        const next = arr.map((m) => {
-          if (m.id !== messageId) {
-            return m;
-          }
-          changed = true;
-          return { ...m, deletedAt: Date.now() };
-        });
-        if (changed) {
+        const next = arr.map((m) => (m.id === messageId ? { ...m, deletedAt: at } : m));
+        if (next.some((m, i) => m !== arr[i])) {
           threads[key] = next;
+          threadsChanged = true;
         }
       }
-      return { channels: { ...s.channels }, threads };
+      if (!channelChanged && !threadsChanged) {
+        return s;
+      }
+      return { channels, threads };
     });
   },
   setReactions(channelId, messageSeq, reactions) {
     set((s) => {
       const ch = s.channels[channelId];
-      if (ch) {
-        const m = ch.bySeq.get(messageSeq);
-        if (m) {
-          m.reactions = reactions;
-        }
+      let channels = s.channels;
+      let channelChanged = false;
+      if (ch && ch.bySeq.has(messageSeq)) {
+        const m = ch.bySeq.get(messageSeq)!;
+        channels = {
+          ...channels,
+          [channelId]: {
+            ...ch,
+            bySeq: new Map(ch.bySeq).set(messageSeq, { ...m, reactions }),
+          },
+        };
+        channelChanged = true;
       }
+      let threadsChanged = false;
       const threads = { ...s.threads };
       const prefix = `${channelId}:`;
       for (const [key, arr] of Object.entries(threads)) {
@@ -236,8 +268,49 @@ export const useMessageStore = create<MessageState>((set, get) => ({
         const next = [...arr];
         next[idx] = { ...next[idx], reactions };
         threads[key] = next;
+        threadsChanged = true;
       }
-      return { channels: ch ? { ...s.channels } : s.channels, threads };
+      if (!channelChanged && !threadsChanged) {
+        return s;
+      }
+      return { channels, threads };
+    });
+  },
+  setPinned(channelId, messageId, pinned) {
+    set((s) => {
+      const ch = s.channels[channelId];
+      let channels = s.channels;
+      let channelChanged = false;
+      if (ch) {
+        let nextBySeq: Map<number, StoreMessage> | null = null;
+        for (const [seq, m] of ch.bySeq) {
+          if (m.id === messageId) {
+            nextBySeq ??= new Map(ch.bySeq);
+            nextBySeq.set(seq, { ...m, isPinned: pinned });
+            channelChanged = true;
+          }
+        }
+        if (nextBySeq) {
+          channels = { ...channels, [channelId]: { ...ch, bySeq: nextBySeq } };
+        }
+      }
+      let threadsChanged = false;
+      const threads = { ...s.threads };
+      const prefix = `${channelId}:`;
+      for (const [key, arr] of Object.entries(threads)) {
+        if (!key.startsWith(prefix)) {
+          continue;
+        }
+        const next = arr.map((m) => (m.id === messageId ? { ...m, isPinned: pinned } : m));
+        if (next.some((m, i) => m !== arr[i])) {
+          threads[key] = next;
+          threadsChanged = true;
+        }
+      }
+      if (!channelChanged && !threadsChanged) {
+        return s;
+      }
+      return { channels, threads };
     });
   },
   ingestThread(channelId, message) {

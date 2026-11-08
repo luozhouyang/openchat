@@ -4,6 +4,12 @@ import { channelEventSchema, messageSchema } from "./events.ts";
 import { ChannelSummary } from "./rest.ts";
 
 const clientFrameSchema = z.discriminatedUnion("type", [
+  /**
+   * Dead frame kept for wire-bisect compatibility: no client (web/mobile/
+   * desktop) ever sends `echo`; the UserDO still answers it (user.ts:728) and
+   * a worker test pins that behavior. The worker-side echo handler is not yet
+   * retired — remove this branch only together with that handler.
+   */
   z.object({ type: z.literal("echo"), data: z.string().max(4096) }),
   z.object({ type: z.literal("activity") }),
   z.object({
@@ -22,6 +28,13 @@ const clientFrameSchema = z.discriminatedUnion("type", [
     channelId: z.string().min(1),
     messageSeq: z.number().int().positive(),
     emoji: z.string().min(1).max(8),
+    /**
+     * Local idempotency/correlation token (protocol id generator). When the
+     * react is rejected (rate limit, gate) the UserDO's error frame echoes it
+     * back with the channelId so the dispatcher can surface the failure —
+     * see user.ts:837-846 and the error server event below.
+     */
+    clientToken: z.string().optional(),
   }),
   z.object({
     type: z.literal("typing"),
@@ -94,6 +107,12 @@ export type TeamMemberRemovedEvent = z.infer<typeof teamMemberRemovedEvent>;
 export const serverEventSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("hello"), userId: z.string(), serverTime: z.number() }),
   z.object({ type: z.literal("channel.event"), channelId: z.string(), event: channelEventSchema }),
+  /**
+   * Optional ack frame: no worker code sends `ack` today — the optimistic
+   * message is confirmed from the REST POST response (services/messages.ts).
+   * The dispatcher still honors it so a future worker-side ack (or an
+   * external client) keeps end-to-end semantics; treat as reserved.
+   */
   z.object({
     type: z.literal("ack"),
     clientToken: z.string(),
@@ -101,6 +120,11 @@ export const serverEventSchema = z.discriminatedUnion("type", [
     messageId: z.string(),
     seq: z.number(),
   }),
+  /**
+   * `clientToken`/`channelId` are the contract for optimistic-send failures
+   * and rate-limit rejects (e.g. the `react` frame path in user.ts). The
+   * dispatcher fails the matching pending message and surfaces the rest.
+   */
   z.object({
     type: z.literal("error"),
     clientToken: z.string().optional(),

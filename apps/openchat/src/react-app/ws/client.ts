@@ -1,4 +1,4 @@
-import type { ClientFrame } from "protocol";
+import type { ClientFrame, ServerEvent } from "protocol";
 import { appClient } from "@/app-client";
 import { platform } from "@/lib/platform";
 
@@ -10,13 +10,37 @@ import { platform } from "@/lib/platform";
 class WsClient {
   private deviceId: string | null = null;
   private selfUserId: string | null = null;
+  /** Subscribers for server `error` frames (reaction rate limits, …). */
+  private errorListeners = new Set<(ev: Extract<ServerEvent, { type: "error" }>) => void>();
   private connection = appClient.createRealtime({
     onMessageNew: (channelId, message) => this.notifyBackground(channelId, message),
     onAuthMissing: () => {
       window.location.href = "/auth/login";
     },
     selfUserId: () => this.selfUserId,
+    onLocal: (ev) => {
+      if (ev.type !== "error") {
+        return;
+      }
+      // Minimal surfacing — no new UI system (review round 2 P1-3).
+      console.warn(`[openchat] server rejected a client frame (${ev.code}): ${ev.message}`, ev);
+      for (const listener of this.errorListeners) {
+        listener(ev);
+      }
+    },
   });
+
+  /**
+   * Optional hook: components may observe server error frames (e.g. an
+   * attributed react failure via {@link ClientFrame.clientToken}). Always
+   * returns an unregister function.
+   */
+  onError(listener: (ev: Extract<ServerEvent, { type: "error" }>) => void): () => void {
+    this.errorListeners.add(listener);
+    return () => {
+      this.errorListeners.delete(listener);
+    };
+  }
 
   /**
    * App-level connection entry (root layout): idempotent, one socket per

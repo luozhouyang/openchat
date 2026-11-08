@@ -1,3 +1,4 @@
+import { id } from "protocol";
 import { wsClient } from "@/ws/client";
 
 export function ReactionBar({
@@ -15,7 +16,17 @@ export function ReactionBar({
         <button
           key={emoji}
           className="rounded-full border px-2 py-0.5 text-xs hover:bg-zinc-100"
-          onClick={() => wsClient.send({ type: "react", channelId, messageSeq, emoji })}
+          // No optimistic UI — the server's reaction.update is the source of
+          // truth; clientToken lets an error frame attribute the failure.
+          onClick={() =>
+            wsClient.send({
+              type: "react",
+              channelId,
+              messageSeq,
+              emoji,
+              clientToken: id("int"),
+            })
+          }
         >
           {emoji} {users.length}
         </button>

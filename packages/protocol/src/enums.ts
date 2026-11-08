@@ -31,7 +31,8 @@ export const NOTIF_PREFS = ["all", "mention", "none"] as const;
 export type NotifPref = (typeof NOTIF_PREFS)[number];
 export const NotifPrefSchema = z.enum(NOTIF_PREFS);
 
-export const PUSH_KINDS = ["webpush", "fcm", "apns"] as const;
+/** Single source for the push kind wire enum (rest.ts PushSubscribeInput reuses it). */
+export const PUSH_KINDS = ["webpush", "fcm", "apns", "expo"] as const;
 export type PushKind = (typeof PUSH_KINDS)[number];
 export const PushKindSchema = z.enum(PUSH_KINDS);
 

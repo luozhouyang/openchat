@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useParams } from "@tanstack/react-router";
+import { id } from "protocol";
 import { wsClient } from "@/ws/client";
 import { api } from "@/lib/api";
 import { ReactionBar } from "./ReactionBar";
@@ -57,7 +58,13 @@ export function MessageRow({ message, channelId }: { message: StoreMessage; chan
         <div className="hidden shrink-0 gap-2 text-xs text-zinc-500 group-hover:flex">
           <button
             onClick={() =>
-              wsClient.send({ type: "react", channelId, messageSeq: message.seq, emoji: "👍" })
+              wsClient.send({
+                type: "react",
+                channelId,
+                messageSeq: message.seq,
+                emoji: "👍",
+                clientToken: id("int"),
+              })
             }
           >
             👍

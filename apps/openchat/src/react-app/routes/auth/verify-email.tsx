@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { z } from "zod";
-import { authClient } from "@/lib/auth-client";
+import { appClient } from "@/app-client";
 import { LanguageSwitcher } from "@/components/auth/LanguageSwitcher";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -35,17 +35,16 @@ function VerifyEmailPage() {
       return;
     }
     startedRef.current = true;
-    authClient
-      .verifyEmail({ query: { token: search.token, callbackURL: "/auth/verify-email" } })
-      .then((res) => {
-        if (res.error) {
-          throw new Error(res.error.message ?? t("auth.verifyEmail.failTitle"));
-        }
+    appClient.auth
+      .verifyEmail(search.token)
+      .then(() => {
         setState("success");
         void navigate({ to: "/auth/verify-email", search: {}, replace: true });
       })
       .catch((err) => {
-        setVerifyError(err instanceof Error ? err.message : t("auth.verifyEmail.failTitle"));
+        setVerifyError(
+          err instanceof Error && err.message ? err.message : t("auth.verifyEmail.failTitle"),
+        );
         setState("error");
       });
   }, [search.token, t, navigate]);
@@ -58,16 +57,12 @@ function VerifyEmailPage() {
     setSendError(null);
     setSent(false);
     try {
-      const res = await authClient.sendVerificationEmail({
-        email: search.email,
-        callbackURL: "/auth/verify-email",
-      });
-      if (res.error) {
-        throw new Error(res.error.message ?? t("auth.verifyEmail.sendFailed"));
-      }
+      await appClient.auth.sendVerificationEmail(search.email);
       setSent(true);
     } catch (err) {
-      setSendError(err instanceof Error ? err.message : t("auth.verifyEmail.sendFailed"));
+      setSendError(
+        err instanceof Error && err.message ? err.message : t("auth.verifyEmail.sendFailed"),
+      );
     } finally {
       setSending(false);
     }

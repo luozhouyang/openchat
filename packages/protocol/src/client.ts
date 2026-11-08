@@ -79,11 +79,16 @@ export function createApiFetch(opts: ApiFetchOptions = {}) {
         headers.set("authorization", `Bearer ${token}`);
       }
     }
-    const res = await fetch(`${opts.baseUrl ?? ""}${path}`, {
+    // `credentials` is a DOM spec field not declared by workers-types' narrowed
+    // RequestInit (it is harmless-and-ignored on Workers at runtime). Build the
+    // options then widen through an assertion so both DOM and Workers tsconfigs
+    // accept it without type holes elsewhere.
+    const requestInit = {
       credentials: opts.credentials ?? "include",
       ...init,
       headers,
-    });
+    } as RequestInit;
+    const res = await fetch(`${opts.baseUrl ?? ""}${path}`, requestInit);
     if (!res.ok) {
       const body = (await res.json().catch(() => null)) as unknown;
       throw new ApiError(res.status, body);
@@ -197,6 +202,13 @@ export function createApi(opts: ApiFetchOptions = {}) {
         f<{ ok: true }>(`/api/v1/posts/${postId}/patch`, json("PUT", input)),
       remove: (postId: string, input: DeletePostInput) =>
         f<{ ok: true }>(`/api/v1/posts/${postId}`, json("DELETE", input)),
+      // Pin routes live under POST /api/v1/posts/:id/pin|unpin with the channel
+      // in the body (PinPostInput) — the DO broadcast then reaches clients as
+      // message.pinned (events.ts).
+      pin: (channelId: string, postId: string) =>
+        f<{ ok: true }>(`/api/v1/posts/${postId}/pin`, json("POST", { channelId })),
+      unpin: (channelId: string, postId: string) =>
+        f<{ ok: true }>(`/api/v1/posts/${postId}/unpin`, json("POST", { channelId })),
     },
 
     push: {

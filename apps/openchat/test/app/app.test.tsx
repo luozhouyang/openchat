@@ -6,9 +6,8 @@ import { describe, expect, it, vi } from "vite-plus/test";
 import { render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider, createRouter, createMemoryHistory } from "@tanstack/react-router";
-import { createMemoryDatabase } from "state";
+import { createChannelsService, createMemoryDatabase } from "state";
 import { routeTree } from "@/routeTree.gen";
-import { hydrateChannel } from "@/lib/message-db";
 import { useMessageStore } from "@/stores/messages";
 import { api } from "@/lib/api";
 import "@/i18n";
@@ -115,7 +114,13 @@ describe("channel view hydration", () => {
       deletedAt: null,
     });
     useMessageStore.getState().reset("c1");
-    const n = await hydrateChannel("c1", db);
+    // The shared ChannelsService hydrate() replaced the deleted lib/message-db
+    // duplicate layer (same store seeding semantics, one implementation).
+    const channels = createChannelsService({
+      getDb: async () => db,
+      fetchHistory: async () => [],
+    });
+    const n = await channels.hydrate("c1");
     expect(n).toBe(1);
     expect(useMessageStore.getState().list("c1")[0].content).toBe("cached");
     expect(useMessageStore.getState().maxSeq("c1")).toBe(1);

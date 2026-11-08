@@ -43,7 +43,7 @@ export interface AppClient {
   createRealtime(
     hooks?: Pick<
       RealtimeConnectionDeps,
-      "onMessageNew" | "onAuthMissing" | "createSocket" | "selfUserId"
+      "onMessageNew" | "onAuthMissing" | "createSocket" | "selfUserId" | "onLocal"
     >,
   ): RealtimeConnection;
 }
@@ -68,8 +68,8 @@ export function createAppClient(opts: CreateAppClientOptions): AppClient {
     setSessionToken: platform.setSessionToken,
   });
 
-  const fetchHistory = async (channelId: string, beforeSeq?: number) => {
-    const res = await api.posts.list(channelId, { limit: pageSize, beforeSeq });
+  const fetchHistory = async (channelId: string, beforeSeq?: number, limit?: number) => {
+    const res = await api.posts.list(channelId, { limit: limit ?? pageSize, beforeSeq });
     // The REST list output omits attachments; normalize to the protocol shape.
     return res.messages.map((m) => ({
       ...m,

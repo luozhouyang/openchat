@@ -55,11 +55,45 @@ test("upgrade path: v1 database with data migrates in place, rows preserved", as
   expect(rows[0].content).toBe("old");
 });
 
+test("upgrade path: v2 database with data migrates in place, rows preserved, is_pinned appended", async () => {
+  const d = makeDriver();
+  // Simulate a database created by build 1/2: migrations 1 + 2 actually applied.
+  await runMigrations(d, MIGRATIONS.slice(0, 2));
+  await d.run(
+    "INSERT INTO messages (channel_id, seq, message_id, user_id, parent_id, type, content, attachments, mentions, edited_at, deleted_at, created_at) VALUES ('c1', 1, 'm1', 'u1', NULL, 'text', 'old', NULL, NULL, NULL, NULL, 1)",
+  );
+
+  const db = createSqliteDatabase(d);
+  await db.migrate();
+
+  expect(await appliedVersion(d)).toBe(MIGRATIONS.length); // v3 landed
+  await d.run("UPDATE messages SET is_pinned = 1 WHERE message_id = 'm1'"); // column exists
+  const { rows } = await db.messages.query("c1", { limit: 10 });
+  expect(rows).toHaveLength(1); // pre-upgrade data preserved
+  expect(rows[0].content).toBe("old");
+  expect(rows[0].isPinned).toBe(true); // ADD COLUMN + round-trip through the repo
+  await db.close();
+});
+
+test("upgrade path: exiting the migration leaves the fresh-database default unpinned", async () => {
+  const db = createSqliteDatabase(makeDriver());
+  await db.migrate();
+  await db.messages.append("c1", makeMessage(1));
+  await db.messages.append("c1", { ...makeMessage(2), isPinned: true });
+  const { rows } = await db.messages.query("c1", { limit: 10 });
+  expect(rows.map((r) => r.isPinned)).toEqual([false, true]);
+  // Gap re-pull (UPSERT refresh) keeps the flag instead of resetting it.
+  await db.messages.applyGap("c1", [{ ...makeMessage(2) }]);
+  const { rows: again } = await db.messages.query("c1", { limit: 10 });
+  expect(again[1].isPinned).toBe(false); // latest server truth wins, default false
+  await db.close();
+});
+
 test("future-version database is wiped and rebuilt (cache semantics)", async () => {
   const d = makeDriver();
   await runMigrations(d, MIGRATIONS);
   await d.run(
-    `INSERT INTO messages VALUES ('c1', 1, 'm1', 'u1', NULL, 'text', 'x', NULL, NULL, NULL, NULL, 1)`,
+    `INSERT INTO messages VALUES ('c1', 1, 'm1', 'u1', NULL, 'text', 'x', NULL, NULL, NULL, NULL, 1, 0)`,
   );
   // Simulate a newer build having migrated further.
   await d.run(`INSERT INTO ${MIGRATIONS_TABLE} VALUES (99, '0099_future', 0)`);

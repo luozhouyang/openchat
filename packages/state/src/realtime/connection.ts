@@ -1,5 +1,5 @@
 import { RealtimeClient, type WebSocketLike } from "realtime";
-import type { ClientFrame, Message } from "protocol";
+import type { ClientFrame, Message, ServerEvent } from "protocol";
 import type { LocalDatabase } from "../db/database.ts";
 import { useConnectionStore } from "../stores/connection.ts";
 import { createDispatcher, type DispatcherDeps } from "./dispatch.ts";
@@ -10,12 +10,18 @@ export interface RealtimeConnectionDeps {
   /** WS upgrade token (short-lived JWT — see the auth service). */
   getToken(): Promise<string | null>;
   getDb(): Promise<LocalDatabase>;
-  fetchHistory(channelId: string, beforeSeq?: number): Promise<Message[]>;
+  /** One page of history; `limit` overrides the caller's default page size (gap backfill uses it). */
+  fetchHistory(channelId: string, beforeSeq?: number, limit?: number): Promise<Message[]>;
   onAuthMissing?(): void;
   /** Current user id for self-targeted events (team.member_removed). */
   selfUserId?: () => string | null;
   /** UI hooks: notifications, self-message filtering, sidebar extras. */
   onMessageNew?(channelId: string, message: Message): void;
+  /**
+   * Verbatim passthrough for events the UI still consumes; apps surface
+   * `error` frames themselves (see ws/client.ts).
+   */
+  onLocal?(ev: ServerEvent): void;
   /** Test seam for a fake socket. */
   createSocket?(url: string): WebSocketLike;
 }
@@ -40,11 +46,27 @@ export function createRealtimeConnection(deps: RealtimeConnectionDeps): Realtime
     getDb: deps.getDb,
     fetchHistory: deps.fetchHistory,
   });
+  // Per-channel in-flight guard (review round 2 P1-1b): sync.gap retries fire
+  // on every new sync frame while a walk may already be paging (up to 10 × 500
+  // messages); overlapping walks would redo the same work on the same channel.
+  // Deduplicate until the current walk finishes (its inner retry/backoff loop
+  // is part of one invocation), and let a frame that arrives during the final
+  // refill schedule the next run.
+  const activeWalks = new Set<string>();
   const dispatch = createDispatcher({
     getDb: deps.getDb,
     selfUserId: deps.selfUserId,
     onMessageNew: deps.onMessageNew,
-    onSyncGap: (channelId) => void handleSyncGap(channelId),
+    onLocal: deps.onLocal,
+    onSyncGap: (channelId) => {
+      if (activeWalks.has(channelId)) {
+        return;
+      }
+      activeWalks.add(channelId);
+      void handleSyncGap(channelId)
+        .catch(() => {}) // the handler is self-contained; never crash the pipeline
+        .finally(() => activeWalks.delete(channelId));
+    },
   } satisfies Partial<DispatcherDeps> & Pick<DispatcherDeps, "getDb">);
 
   const client = new RealtimeClient({

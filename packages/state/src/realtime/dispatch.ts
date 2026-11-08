@@ -84,6 +84,15 @@ export function createDispatcher(deps: DispatcherDeps) {
             .catch(() => {});
         } else if (inner.type === "reaction.update") {
           useMessageStore.getState().setReactions(ev.channelId, inner.messageSeq, inner.reactions);
+        } else if (inner.type === "message.pinned") {
+          // Store-side merge + local DB sync (review round 2 P1-2): the REST
+          // PostOutput and the DO broadcasts now carry isPinned, and hydrate
+          // reloads it from the DB after a full restart.
+          useMessageStore.getState().setPinned(ev.channelId, inner.messageId, inner.pinned);
+          void deps
+            .getDb()
+            .then((db) => db.messages.setPinned(ev.channelId, inner.messageId, inner.pinned))
+            .catch(() => {});
         } else if (inner.type === "typing.start") {
           useTypingStore.getState().mark(ev.channelId, inner.userId, inner.expiresAt);
         }

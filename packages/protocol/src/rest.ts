@@ -4,6 +4,7 @@ import {
   TeamTypeSchema,
   MessageTypeSchema,
   NotifPrefSchema,
+  PushKindSchema,
   UserStatusSchema,
   SortOrderSchema,
   RoleNameSchema,
@@ -162,6 +163,8 @@ export const PostOutput = z.object({
   editedAt: z.number().nullable(),
   deletedAt: z.number().nullable(),
   createdAt: z.number(),
+  /** Mirrors HistoryMessage/DO rowToMessage (`isPinned` column is NOT NULL default false). */
+  isPinned: z.boolean(),
 });
 export type PostOutput = z.infer<typeof PostOutput>;
 export const ListPostsOutput = z.object({
@@ -324,7 +327,7 @@ export type SchemesOutput = z.infer<typeof SchemesOutput>;
 // ---- push ----
 export const PushSubscribeInput = z.object({
   deviceId: idSchema,
-  kind: z.enum(["webpush", "fcm", "apns", "expo"]),
+  kind: PushKindSchema,
   endpoint: z.string().url(),
   p256dh: z.string().optional(),
   auth: z.string().optional(),
