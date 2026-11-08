@@ -16,10 +16,12 @@ import type { Db } from "@worker/db/types";
 import { listTeamsForUser } from "@worker/db/repos/teams";
 import { searchUsers } from "@worker/db/repos/user-search";
 import {
-  listChannelsForTeam,
   listChannelsForUser,
-  listChannelMemberIds,
+  listChannelsForTeams,
+  listChannelMembersWithNames,
+  type ChannelMemberWithName,
 } from "@worker/db/repos/channels";
+import type { Channel } from "@worker/db/types";
 import { syncUserChannels } from "@worker/user-do-sync";
 import { apiError } from "@worker/lib/errors";
 import { zodValidator } from "@worker/lib/validation";
@@ -65,33 +67,57 @@ usersV1.get("/users/me/workspaces", requireSession, async (c) => {
     member,
     archivedAt: ch.archivedAt,
   });
-  const teams = await Promise.all(
-    teamsRows.map(async (t) => {
-      const chs = await listChannelsForTeam(db, t.team.id);
-      return {
-        id: t.team.id,
-        name: t.team.name,
-        displayName: t.team.displayName,
-        type: t.team.type as TeamType,
-        roles: t.roles,
-        archivedAt: t.team.archivedAt,
-        channels: chs.map((ch) => toSummary(ch, myChannels.has(ch.id))),
-      };
-    }),
+  // N+1 fix: team channels and DM/GM member names (the previous per-team
+  // `listChannelsForTeam` + per-direct `listChannelMemberIds`/`memberNames`
+  // round trips) are replaced by two batched queries. Same aggregation shape —
+  // teams keep their order, channels/directs keep their member/summary shape.
+  const teamChannelRows = await listChannelsForTeams(
+    db,
+    teamsRows.map((t) => t.team.id),
   );
-  const directs = await Promise.all(
-    allChannels
-      .filter((r) => r.channel.teamId === null)
-      .map(async (r) => {
-        const summary = toSummary(r.channel, true);
-        const allMemberIds = await listChannelMemberIds(db, r.channel.id);
-        const memberIds = allMemberIds.filter((id) => id !== userId);
-        summary.displayName = directDisplayName(r.channel.type, await memberNames(db, memberIds));
-        return summary;
-      }),
+  const channelsByTeam = new Map<string, Channel[]>();
+  for (const ch of teamChannelRows) {
+    const list = channelsByTeam.get(ch.teamId!) ?? [];
+    list.push(ch);
+    channelsByTeam.set(ch.teamId!, list);
+  }
+  const directs = allChannels.filter((r) => r.channel.teamId === null);
+  const directMemberRows = await listChannelMembersWithNames(
+    db,
+    directs.map((r) => r.channel.id),
   );
-  await syncUserChannels(c.env, userId);
-  const out: WorkspaceResponse = { teams, directs };
+  const membersByChannel = new Map<string, ChannelMemberWithName[]>();
+  for (const row of directMemberRows) {
+    const list = membersByChannel.get(row.channelId) ?? [];
+    list.push(row);
+    membersByChannel.set(row.channelId, list);
+  }
+  const teams = teamsRows.map((t) => ({
+    id: t.team.id,
+    name: t.team.name,
+    displayName: t.team.displayName,
+    type: t.team.type as TeamType,
+    roles: t.roles,
+    archivedAt: t.team.archivedAt,
+    channels: (channelsByTeam.get(t.team.id) ?? []).map((ch) =>
+      toSummary(ch, myChannels.has(ch.id)),
+    ),
+  }));
+  const directSummaries = directs.map((r) => {
+    const summary = toSummary(r.channel, true);
+    // Each member sees the OTHER members' names (same rule as the
+    // personalized channel.created delivery).
+    const names = (membersByChannel.get(r.channel.id) ?? [])
+      .filter((m) => m.userId !== userId)
+      .map((m) => m.nickname ?? m.name ?? m.email ?? "");
+    summary.displayName = directDisplayName(r.channel.type, names);
+    return summary;
+  });
+  // Diff-then-write: the UserDO diffs this cached set internally and only
+  // rewrites when the membership actually changed, so the hot sidebar GET no
+  // longer pays an unconditional UserDO cache write every time.
+  await syncUserChannels(c.env, userId, [...myChannels]);
+  const out: WorkspaceResponse = { teams, directs: directSummaries };
   return c.json(out);
 });
 

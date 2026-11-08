@@ -60,6 +60,11 @@ export class UserDO extends DurableObject<Env> {
   private awayNotified = false;
   private recentPush = new Map<string, number>();
 
+  /** Hard cap so a busy channel history can't grow the map unbounded. */
+  private static readonly RECENT_PUSH_LIMIT = 1000;
+  /** Entries older than this can never suppress a push; sweep them lazily. */
+  private static readonly RECENT_PUSH_WINDOW_MS = 60_000;
+
   get userId(): string {
     return this.ctx.id.name?.replace(/^user:/, "") ?? "";
   }
@@ -203,9 +208,12 @@ export class UserDO extends DurableObject<Env> {
           .limit(1);
         const row = existingRows[0];
         const unread = row ? Math.max(0, e.message.seq - row.lastReadSeq) : e.message.seq;
-        const mentions = e.message.mentions?.includes(this.userId)
-          ? (row?.mentionCount ?? 0) + 1
-          : (row?.mentionCount ?? 0);
+        // A broadcast mention (@[channel]/@[all]) highlights everyone, mirroring
+        // the ChannelDO mention_count semantics (postMessage increments all
+        // members on broadcast keywords).
+        const highlighted =
+          e.message.mentions?.includes(this.userId) || this.isBroadcastMention(e.message);
+        const mentions = highlighted ? (row?.mentionCount ?? 0) + 1 : (row?.mentionCount ?? 0);
         await this.db
           .insert(schema.sidebarCache)
           .values({
@@ -269,7 +277,9 @@ export class UserDO extends DurableObject<Env> {
         continue;
       }
 
-      const pref = e.notifPref ?? "all";
+      // The per-channel notif preference travels at the push body level
+      // (ChannelDO broadcaster), not per event; fall back defensively.
+      const pref = body.notifPref ?? e.notifPref ?? "all";
       if (pref === "none") {
         continue;
       }
@@ -288,10 +298,10 @@ export class UserDO extends DurableObject<Env> {
       }
 
       const dedupeKey = `${body.channelId}:${e.message.id}`;
-      if ((this.recentPush.get(dedupeKey) ?? 0) > Date.now() - 60_000) {
+      if ((this.recentPush.get(dedupeKey) ?? 0) > Date.now() - UserDO.RECENT_PUSH_WINDOW_MS) {
         continue;
       }
-      this.recentPush.set(dedupeKey, Date.now());
+      this.rememberRecentPush(dedupeKey);
 
       const payload = {
         type: "push-notification",
@@ -309,6 +319,30 @@ export class UserDO extends DurableObject<Env> {
         console.error("push enqueue failed", err);
       }
     }
+  }
+
+  /**
+   * Bounded dedupe memory: sweep expired entries, then evict the oldest
+   * (insertion-order) entries while at capacity. Values are timestamps so the
+   * sweep can decide staleness.
+   */
+  private rememberRecentPush(key: string): void {
+    const now = Date.now();
+    if (this.recentPush.size >= UserDO.RECENT_PUSH_LIMIT) {
+      for (const [k, t] of this.recentPush) {
+        if (now - t >= UserDO.RECENT_PUSH_WINDOW_MS) {
+          this.recentPush.delete(k);
+        }
+      }
+      while (this.recentPush.size >= UserDO.RECENT_PUSH_LIMIT) {
+        const oldest = this.recentPush.keys().next().value;
+        if (oldest === undefined) {
+          break;
+        }
+        this.recentPush.delete(oldest);
+      }
+    }
+    this.recentPush.set(key, now);
   }
 
   private isBroadcastMention(message: { content?: string }): boolean {
@@ -682,7 +716,16 @@ export class UserDO extends DurableObject<Env> {
         return new Response("banned", { status: 403 });
       }
       const token = request.headers.get("x-internal-token") ?? "";
-      if (!(await verifyInternalToken(token, this.env.INTERNAL_TOKEN_KEY))) {
+      const verified = await verifyInternalToken(token, this.env.INTERNAL_TOKEN_KEY);
+      // The internal token must be issued FOR this very DO's user: a valid HMAC
+      // for any other subject must not open this gateway (no cross-user forgery).
+      if (!verified || verified.subject !== `user:${this.userId}`) {
+        return new Response("forbidden", { status: 403 });
+      }
+      const requestedUserId = url.searchParams.get("sub");
+      // The issuer always passes `sub`; a mismatching one means the request was
+      // tampered with. Elevated actions use this identity, so bind it strictly.
+      if (requestedUserId !== null && requestedUserId !== this.userId) {
         return new Response("forbidden", { status: 403 });
       }
       const deviceId = url.searchParams.get("deviceId") ?? "unknown";
@@ -695,7 +738,8 @@ export class UserDO extends DurableObject<Env> {
         deviceId,
         platform: url.searchParams.get("platform") ?? "web",
         connectedAt: Date.now(),
-        userId: url.searchParams.get("sub") ?? null,
+        // Identity comes from the verified DO name, never from the URL alone.
+        userId: this.userId,
         // A fresh connection is itself activity: push suppression sees the
         // device as foreground for the first 30s without waiting for a frame.
         lastActivity: Date.now(),
@@ -790,7 +834,19 @@ export class UserDO extends DurableObject<Env> {
         emoji: frame.emoji,
       });
       if (res && "error" in res) {
-        ws.send(JSON.stringify({ type: "error", code: `http_${res.status}`, message: res.error }));
+        // Context (clientToken/channelId) rides along so the client dispatcher
+        // can attribute the failure to the in-flight request (protocol: the
+        // error server event allows both fields optional).
+        const withToken = frame as { clientToken?: string };
+        ws.send(
+          JSON.stringify({
+            type: "error",
+            code: `http_${res.status}`,
+            message: res.error,
+            clientToken: withToken.clientToken,
+            channelId: frame.channelId,
+          }),
+        );
       }
     }
     if (frame.type === "subscribe_thread") {

@@ -8,6 +8,56 @@ interface PushEnv {
   INTERNAL_TOKEN_KEY: string;
 }
 
+/**
+ * Short-lived HMAC bearer token for the worker's /internal/* endpoints.
+ *
+ * The worker side (apps/openchat routes/internal.ts) verifies via
+ * `verifyInternalToken` from packages/protocol and only accepts subjects in
+ * the `internal:*` namespace, so push uses subject "internal:push". This app
+ * does not depend on the protocol package, so the signer (byte-for-byte the
+ * same format as `issueInternalToken` in packages/protocol/src/internal.ts)
+ * is inlined here — keep the two in sync.
+ */
+export async function issueInternalTokenForPush(
+  subject: string,
+  ttlSeconds: number,
+  secret: string,
+): Promise<string> {
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    enc.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const b64url = (data: Uint8Array): string => {
+    let s = "";
+    for (const b of data) {
+      s += String.fromCharCode(b);
+    }
+    return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  };
+  const now = Math.floor(Date.now() / 1000);
+  const header = b64url(enc.encode(JSON.stringify({ alg: "HS256", typ: "JWT" })));
+  const payload = b64url(
+    enc.encode(JSON.stringify({ sub: subject, iat: now, exp: now + ttlSeconds })),
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, enc.encode(`${header}.${payload}`));
+  return `${header}.${payload}.${b64url(new Uint8Array(sig))}`;
+}
+
+const INTERNAL_TOKEN_TTL_SECONDS = 60;
+
+async function internalHeaders(env: PushEnv): Promise<Record<string, string>> {
+  const token = await issueInternalTokenForPush(
+    "internal:push",
+    INTERNAL_TOKEN_TTL_SECONDS,
+    env.INTERNAL_TOKEN_KEY,
+  );
+  return { "x-internal-token": token };
+}
+
 interface PushTask {
   type: "push-notification";
   userId: string;
@@ -88,7 +138,7 @@ async function sendExpo(sub: Subscription, payload: string): Promise<void> {
 
 async function fetchSubscriptions(env: PushEnv, userId: string): Promise<Subscription[]> {
   const res = await fetch(`${env.API_BASE}/internal/push-user/${userId}/subscriptions`, {
-    headers: { "x-internal-token": env.INTERNAL_TOKEN_KEY },
+    headers: await internalHeaders(env),
   });
   if (!res.ok) {
     return [];
@@ -100,7 +150,7 @@ async function fetchSubscriptions(env: PushEnv, userId: string): Promise<Subscri
 async function unregister(env: PushEnv, userId: string, deviceId: string): Promise<void> {
   await fetch(`${env.API_BASE}/internal/push-user/${userId}/subscriptions`, {
     method: "DELETE",
-    headers: { "x-internal-token": env.INTERNAL_TOKEN_KEY, "content-type": "application/json" },
+    headers: { ...(await internalHeaders(env)), "content-type": "application/json" },
     body: JSON.stringify({ deviceId }),
   });
 }

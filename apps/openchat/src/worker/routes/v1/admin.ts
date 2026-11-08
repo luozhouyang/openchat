@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { z } from "zod";
 import { eq, and } from "drizzle-orm";
 import { channelDoName } from "protocol";
 import {
@@ -7,7 +8,6 @@ import {
   PatchTeamInput,
   RolesInput,
   channelUpdatedEvent,
-  channelMemberRemovedEvent,
   channelDeletedEvent,
   teamUpdatedEvent,
   teamMemberRemovedEvent,
@@ -23,7 +23,7 @@ import { getDb } from "@worker/db/client";
 import { users, teams, channels, teamMembers, channelMembers } from "@worker/db/schema-d1";
 import { listChannelsForTeam, listChannelMemberIds, getChannel } from "@worker/db/repos/channels";
 import { getTeam, getTeamMember, countTeamAdmins } from "@worker/db/repos/teams";
-import { removeChannelMemberFromDo, syncUserChannels } from "@worker/user-do-sync";
+import { syncUserChannels } from "@worker/user-do-sync";
 import {
   createChannelBroadcaster,
   createTeamBroadcaster,
@@ -34,6 +34,7 @@ import { zodValidator } from "@worker/lib/validation";
 import { apiError } from "@worker/lib/errors";
 import { updateTeam } from "@worker/services/team.service";
 import { createInvite } from "@worker/services/invite.service";
+import { getRegistrationMode, setRegistrationMode } from "@worker/db/repos/settings";
 
 export const adminV1 = new Hono<{
   Bindings: Env;
@@ -41,8 +42,33 @@ export const adminV1 = new Hono<{
 }>();
 adminV1.use("*", requireAdmin);
 
+// Settings shapes stay local (packages/protocol is not extended for admin-only
+// config; the wire shape is `{ registrationMode, openRegistration }`).
+const RegistrationModeInput = z.object({
+  registrationMode: z.enum(["open", "invite", "closed"]),
+});
+
 adminV1.get("/settings", async (c) => {
-  return c.json({ openRegistration: true });
+  const mode = await getRegistrationMode(getDb(c.env.DB));
+  // openRegistration kept for the pre-existing consumer contract; it is now
+  // derived from the stored mode instead of the hardcoded `true`.
+  return c.json({ registrationMode: mode, openRegistration: mode === "open" });
+});
+
+adminV1.put("/settings", zodValidator("json", RegistrationModeInput), async (c) => {
+  const body = c.req.valid("json");
+  const db = getDb(c.env.DB);
+  await setRegistrationMode(db, body.registrationMode);
+  auditLog({
+    actor: c.get("adminUserId"),
+    action: "settings.registration_mode",
+    target: body.registrationMode,
+    status: "ok",
+  });
+  return c.json({
+    registrationMode: body.registrationMode,
+    openRegistration: body.registrationMode === "open",
+  });
 });
 adminV1.get("/stats", async (c) => {
   const db = getDb(c.env.DB);
@@ -167,14 +193,13 @@ adminV1.post(
         await db
           .delete(channelMembers)
           .where(and(eq(channelMembers.channelId, ch.id), eq(channelMembers.userId, userId)));
-        await removeChannelMemberFromDo(c.env, ch.id, userId);
-        const removed = channelMemberRemovedEvent.parse({
-          type: "channel.member_removed",
-          channelId: ch.id,
+        // ChannelDO.removeMember covers member_state + thread
+        // subscriptions/memberships cleanup AND broadcasts
+        // channel.member_removed to remaining structure targets plus the
+        // removed user — no additional broadcast needed here.
+        await c.env.CHANNEL_DO.get(c.env.CHANNEL_DO.idFromName(channelDoName(ch.id))).removeMember(
           userId,
-        });
-        await createChannelBroadcaster(c.env, ch.id).broadcast(removed);
-        await deliverStructure(c.env, userId, removed);
+        );
       }
     }
     await db

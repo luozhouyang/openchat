@@ -20,6 +20,7 @@ import {
 } from "protocol";
 import { requireSession } from "@worker/auth/session";
 import { requireTeamRole, requireChannelRole } from "@worker/auth/guards";
+import { PERMISSIONS, resolvePermissions } from "@worker/auth/rbac";
 import { getDb } from "@worker/db/client";
 import { channelMembers } from "@worker/db/schema-d1";
 import { listChannelsForTeam, getChannel, listChannelMemberIds } from "@worker/db/repos/channels";
@@ -33,13 +34,10 @@ import {
   archiveChannel,
   restoreChannel,
 } from "@worker/services/channel.service";
+import { getChannelMember } from "@worker/db/repos/channels";
 import { zodValidator } from "@worker/lib/validation";
 import { apiError } from "@worker/lib/errors";
-import {
-  syncChannelMember,
-  syncUserChannels,
-  removeChannelMemberFromDo,
-} from "@worker/user-do-sync";
+import { syncChannelMember, syncUserChannels } from "@worker/user-do-sync";
 import { createChannelBroadcaster, deliverStructure } from "@worker/structure-broadcast";
 import type { Channel, Db } from "@worker/db/types";
 import { directDisplayName, memberNames } from "@worker/routes/v1/users";
@@ -92,6 +90,21 @@ channelsV1.post(
     const me = c.get("session")!.user.id;
     const teamMember = await getTeamMember(db, body.teamId, me);
     if (!teamMember) {
+      throw apiError("forbidden", "forbidden", 403);
+    }
+    // Channel creation used to accept any team member. It now goes through
+    // the modeled RBAC permission the same way requirePermission does — the
+    // required permission depends on the channel type in the body, which the
+    // path-param-driven guard middleware can't express for this route, so the
+    // permission check runs against the resolved permission set after the
+    // membership check above (non-members resolve to system_user-scoped
+    // roles; the create permissions only come from team/channel roles).
+    const createPerm =
+      body.type === "public"
+        ? PERMISSIONS.CREATE_PUBLIC_CHANNEL
+        : PERMISSIONS.CREATE_PRIVATE_CHANNEL;
+    const perms = await resolvePermissions(db, me, { teamId: body.teamId });
+    if (!perms.has(createPerm)) {
       throw apiError("forbidden", "forbidden", 403);
     }
     const ch = await createChannel(db, {
@@ -179,23 +192,73 @@ channelsV1.delete(
   requireSession,
   requireChannelRole("member"),
   async (c) => {
-    const userId = c.req.param("userId");
+    // Self-leave for everyone; admins may kick others. Permission is evaluated
+    // through the same RBAC system used by requirePermission (guards.ts):
+    // channel_admin / team_admin carry
+    // MANAGE_{PUBLIC,PRIVATE}_CHANNEL_MEMBERS in the seeded role sets
+    // (auth/rbac.ts SEED_ROLES). DM/GM have no admin semantics, so only the
+    // member themself may leave those.
+    const userIdParam = c.req.param("userId");
     const me = c.get("session")!.user.id;
-    if (userId !== me) {
-      throw apiError("forbidden", "forbidden", 403);
-    }
-    const db = getDb(c.env.DB);
+    const db0 = getDb(c.env.DB);
     const channelId = c.req.param("channelId");
-    await leaveChannel(db, { channelId, userId });
-    await removeChannelMemberFromDo(c.env, channelId, userId);
-    await syncUserChannels(c.env, userId);
-    const removed = channelMemberRemovedEvent.parse({
-      type: "channel.member_removed",
-      channelId,
-      userId,
+    const ch = (await getChannel(db0, channelId))!; // requireChannelRole already 404s for missing channels
+    const target = userIdParam === "me" ? me : userIdParam;
+    if (target !== me) {
+      if (ch.type !== "public" && ch.type !== "private") {
+        throw apiError("forbidden", "forbidden", 403);
+      }
+      const perms = await resolvePermissions(db0, me, {
+        ...(ch.teamId ? { teamId: ch.teamId } : {}),
+        channelId,
+      });
+      const manage =
+        ch.type === "private"
+          ? PERMISSIONS.MANAGE_PRIVATE_CHANNEL_MEMBERS
+          : PERMISSIONS.MANAGE_PUBLIC_CHANNEL_MEMBERS;
+      if (!perms.has(manage)) {
+        throw apiError("forbidden", "forbidden", 403);
+      }
+    }
+    // D1 row first read for rollback semantics: if the DO call or the final
+    // D1 write fails after the DO-side removal, we can put the membership back.
+    const membership = await getChannelMember(db0, channelId, target);
+    // Remove DO-side membership + thread subscriptions via the ChannelDO
+    // contract member removal (idempotent). It broadcasts channel.member_removed
+    // to remaining structure targets plus the removed user itself — no extra
+    // broadcast here (the previous double/triple broadcast was redundant).
+    const stub = c.env.CHANNEL_DO.get(c.env.CHANNEL_DO.idFromName(channelDoName(channelId)));
+    const doRemoved = await stub.removeMember(target);
+    if (membership && !doRemoved) {
+      // D1 had the membership but the DO row was already gone (drift): the DO
+      // broadcast didn't fire, so at least unstick the removed user's own
+      // caches (their UserDO channelsCache/sidebar would keep the ghost).
+      await deliverStructure(
+        c.env,
+        target,
+        channelMemberRemovedEvent.parse({
+          type: "channel.member_removed",
+          channelId,
+          userId: target,
+        }),
+      );
+    }
+    try {
+      await leaveChannel(db0, { channelId, userId: target });
+    } catch (err) {
+      // Compensate: a half-applied kick (DO removed, D1 kept) would leave a
+      // member who sees broadcasts but cannot act — undo the DO side best
+      // effort, then surface the failure for a clean client retry.
+      if (membership) {
+        await stub
+          .membersAdd({ userId: target, role: membership.roles ?? "member" })
+          .catch(() => {});
+      }
+      throw err;
+    }
+    await syncUserChannels(c.env, target).catch(() => {
+      // Deletion already succeeded both sides; cache sync is read-repairable.
     });
-    await createChannelBroadcaster(c.env, channelId).broadcast(removed);
-    await deliverStructure(c.env, userId, removed);
     return c.json({ ok: true });
   },
 );

@@ -210,7 +210,9 @@ test("internal subscriptions endpoint requires token", async () => {
 test("internal subscriptions list and delete via token", async () => {
   await registerInternalSubscription();
 
-  const list = await internalGet(env.INTERNAL_TOKEN_KEY);
+  const list = await internalGet(
+    await issueInternalToken({ subject: "internal:push", secret: env.INTERNAL_TOKEN_KEY }),
+  );
   expect(list.status).toBe(200);
   const body = (await list.json()) as {
     subscriptions: { deviceId: string; kind: string; endpoint: string }[];
@@ -228,7 +230,10 @@ test("internal subscriptions list and delete via token", async () => {
     {
       method: "DELETE",
       headers: {
-        "x-internal-token": env.INTERNAL_TOKEN_KEY,
+        "x-internal-token": await issueInternalToken({
+          subject: "internal:push",
+          secret: env.INTERNAL_TOKEN_KEY,
+        }),
         "content-type": "application/json",
       },
       body: JSON.stringify({ deviceId: "ip1" }),
@@ -237,7 +242,9 @@ test("internal subscriptions list and delete via token", async () => {
   expect(del.status).toBe(200);
   expect(await del.json()).toEqual({ ok: true });
 
-  const after = await internalGet(env.INTERNAL_TOKEN_KEY);
+  const after = await internalGet(
+    await issueInternalToken({ subject: "internal:push", secret: env.INTERNAL_TOKEN_KEY }),
+  );
   const afterBody = (await after.json()) as { subscriptions: { deviceId: string }[] };
   expect(afterBody.subscriptions).not.toContainEqual(expect.objectContaining({ deviceId: "ip1" }));
 });

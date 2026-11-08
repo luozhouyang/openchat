@@ -1,4 +1,4 @@
-import { handleR2Event } from "./thumbnail.ts";
+import { handleR2Event, fromR2Notification } from "./thumbnail.ts";
 import { handlePushTask } from "./push.ts";
 
 export default {
@@ -8,7 +8,12 @@ export default {
         type?: string;
         event?: { key: string; contentType?: string; size: number };
       };
-      if (body.type === "r2-thumbnail" && body.event) {
+      // R2 event-notification envelope (bucket notification rule points the
+      // openchat-files queue consumer here).
+      const r2Event = fromR2Notification(message.body);
+      if (r2Event) {
+        await handleR2Event(r2Event, env as Env);
+      } else if (body.type === "r2-thumbnail" && body.event) {
         await handleR2Event(body.event, env as Env);
       } else if (body.type === "push-notification") {
         await handlePushTask(message.body as never, env as never);

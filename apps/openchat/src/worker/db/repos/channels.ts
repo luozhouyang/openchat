@@ -6,7 +6,7 @@ import type {
   ChannelMemberInsert,
   Db,
 } from "@worker/db/types";
-import { channels, channelMembers } from "@worker/db/schema-d1";
+import { channels, channelMembers, users } from "@worker/db/schema-d1";
 
 export async function createChannel(
   db: Db,
@@ -36,6 +36,49 @@ export async function getChannelByDedupKey(db: Db, key: string): Promise<Channel
 
 export async function listChannelsForTeam(db: Db, teamId: string): Promise<Channel[]> {
   return db.select().from(channels).where(eq(channels.teamId, teamId));
+}
+
+/** One query for a set of teams (workspaces endpoint replaces the N×1 scan). */
+export async function listChannelsForTeams(db: Db, teamIds: string[]): Promise<Channel[]> {
+  if (teamIds.length === 0) {
+    return [];
+  }
+  return db.select().from(channels).where(inArray(channels.teamId, teamIds));
+}
+
+export interface ChannelMemberWithName {
+  channelId: string;
+  userId: string;
+  nickname: string | null;
+  name: string | null;
+  email: string | null;
+}
+
+/**
+ * One JOIN for the member list (plus display-name source columns) of many
+ * channels — replaces the per-DM/GM `listChannelMemberIds` + `memberNames`
+ * double round trip on hot read paths. Rows come in channel_members order;
+ * group by channelId client-side. `email` is only a display fallback here,
+ * never returned to the client (see the reaction of user-search on email).
+ */
+export async function listChannelMembersWithNames(
+  db: Db,
+  channelIds: string[],
+): Promise<ChannelMemberWithName[]> {
+  if (channelIds.length === 0) {
+    return [];
+  }
+  return db
+    .select({
+      channelId: channelMembers.channelId,
+      userId: channelMembers.userId,
+      nickname: users.nickname,
+      name: users.name,
+      email: users.email,
+    })
+    .from(channelMembers)
+    .innerJoin(users, eq(users.id, channelMembers.userId))
+    .where(inArray(channelMembers.channelId, channelIds));
 }
 
 export async function listChannelsForUser(db: Db, userId: string) {

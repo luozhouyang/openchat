@@ -7,7 +7,9 @@ import {
   index,
 } from "drizzle-orm/sqlite-core";
 
-export * from "@worker/db/schema-auth";
+// Relative import: drizzle-kit (esbuild-register) cannot resolve the
+// `@worker/*` tsconfig alias, and `vp run openchat#db:generate` depends on it.
+export * from "./schema-auth";
 
 export const teams = sqliteTable("teams", {
   id: text("id").primaryKey(),

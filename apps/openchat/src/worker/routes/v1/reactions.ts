@@ -92,6 +92,9 @@ reactionsV1.delete(
       throw apiError("invalid emoji", "invalid emoji", 422);
     }
     const stub = channelStub(c.env, body.channelId);
+    // Keep the current 404-on-missing semantics of this endpoint (the delete
+    // route has always 404'd when the target has no such reaction, unlike the
+    // plain toggle on POST /reactions which is 200/idempotent for the caller).
     const snapshot = await stub.reactionSnapshotByMessageId(c.req.param("postId"));
     if ("error" in snapshot) {
       const err = snapshot as { error: string; status: number };
@@ -100,12 +103,18 @@ reactionsV1.delete(
     if (!(snapshot[emoji] ?? []).includes(target)) {
       throw apiError("not found", "not found", 404);
     }
-    const res = await stub.toggleReactionByMessageId(me, {
-      messageId: c.req.param("postId"),
-      emoji,
-    });
-    if (res && "error" in res) {
-      throw apiError(res.error, res.error, res.status);
+    // Remove the TARGET user's reaction — the old code toggled the caller's
+    // own reaction here (admin deleting someone else's emoji deleted their
+    // own instead). removeReactionByMessageId is the ChannelDO contract for
+    // admin-semantic targeted removal; it is validated (message + emoji) and
+    // no-ops when the (target, emoji) pair has nothing to remove.
+    const removed = await stub.removeReactionByMessageId(target, c.req.param("postId"), emoji);
+    if (!removed) {
+      // Same 404 the snapshot check reports: the (target, emoji) pair vanished
+      // between the snapshot read and the removal (rare race), or the DO
+      // refused (message/emoji invalidation). Never a "success that removed
+      // the caller's own row".
+      throw apiError("not found", "not found", 404);
     }
     return c.json({ ok: true });
   },

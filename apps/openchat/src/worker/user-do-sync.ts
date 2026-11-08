@@ -2,12 +2,18 @@ import { channelDoName, userDoName } from "protocol";
 import { getDb } from "@worker/db/client";
 import { listChannelsForUser } from "@worker/db/repos/channels";
 
-export async function syncUserChannels(env: Env, userId: string) {
-  const db = getDb(env.DB);
-  const rows = await listChannelsForUser(db, userId);
-  const channelIds = rows.map((r) => r.channel.id);
+/**
+ * Reconcile the UserDO channels cache. channelIds may be omitted; when the
+ * caller already holds the user's channel set (e.g. the workspaces endpoint),
+ * pass it to skip the duplicate D1 membership scan. The DO diffs internally
+ * (channelsSubscribe -> {changed}) and only writes when the set actually
+ * changed, so this is no longer an unconditional cache rewrite per request.
+ */
+export async function syncUserChannels(env: Env, userId: string, channelIds?: string[]) {
+  const ids =
+    channelIds ?? (await listChannelsForUser(getDb(env.DB), userId)).map((r) => r.channel.id);
   const id = env.USER_DO.idFromName(userDoName(userId));
-  await env.USER_DO.get(id).channelsSubscribe(channelIds);
+  return env.USER_DO.get(id).channelsSubscribe(ids);
 }
 
 export async function syncChannelMember(

@@ -55,6 +55,9 @@ postsV1.post(
           editedAt: null,
           deletedAt: null,
           createdAt: Date.now(),
+          // Fallback only runs when the DO history round trip missed; a fresh
+          // post is never pinned.
+          isPinned: false,
         };
     return c.json(out, 201);
   },

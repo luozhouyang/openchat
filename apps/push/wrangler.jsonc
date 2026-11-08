@@ -21,6 +21,18 @@
     ],
   },
   "r2_buckets": [
+    // NOTE: R2 event notifications are not declarable in wrangler.jsonc
+    // (config schema has no r2_buckets[].notifications field). They are set up
+    // once via CLI/Dashboard and deliver to the "openchat-thumbnails" queue
+    // consumed above:
+    //
+    //   wrangler r2 bucket notification create openchat-files \
+    //     --event-type object-create --queue openchat-thumbnails \
+    //     --prefix "uploads/"
+    //
+    // The consumer accepts both this notification shape (mapped in
+    // src/thumbnail.ts fromR2Notification) and the legacy
+    // {type:"r2-thumbnail",event:{key,contentType,size}} body.
     {
       "binding": "FILES",
       "bucket_name": "openchat-files",

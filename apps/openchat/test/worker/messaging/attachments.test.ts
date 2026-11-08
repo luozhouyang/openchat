@@ -1,6 +1,6 @@
 import { env, exports } from "cloudflare:workers";
 import { expect, test } from "vite-plus/test";
-import { channelDoName } from "protocol";
+import { channelDoName, issueInternalToken } from "protocol";
 import { getDb } from "@worker/db/client";
 import { uploadsessions } from "@worker/db/schema-d1";
 
@@ -104,7 +104,13 @@ test("internal thumbnail endpoint rejects missing token", async () => {
 test("internal thumbnail endpoint rejects upload not complete", async () => {
   const res = await exports.default.fetch("http://localhost/internal/thumbnail", {
     method: "POST",
-    headers: { "content-type": "application/json", "x-internal-token": env.INTERNAL_TOKEN_KEY },
+    headers: {
+      "content-type": "application/json",
+      "x-internal-token": await issueInternalToken({
+        subject: "internal:thumbnail",
+        secret: env.INTERNAL_TOKEN_KEY,
+      }),
+    },
     body: JSON.stringify({
       channelId: "c-file",
       uploadId: "ghost-upload",
@@ -134,7 +140,13 @@ test("internal thumbnail endpoint writes thumbUrl for complete upload", async ()
 
   const res = await exports.default.fetch("http://localhost/internal/thumbnail", {
     method: "POST",
-    headers: { "content-type": "application/json", "x-internal-token": env.INTERNAL_TOKEN_KEY },
+    headers: {
+      "content-type": "application/json",
+      "x-internal-token": await issueInternalToken({
+        subject: "internal:thumbnail",
+        secret: env.INTERNAL_TOKEN_KEY,
+      }),
+    },
     body: JSON.stringify({
       channelId: "c-file",
       uploadId,

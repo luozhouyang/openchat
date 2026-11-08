@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { id, type ChannelType } from "protocol";
 import { channels, channelMembers } from "@worker/db/schema-d1";
 import type { Db } from "@worker/db/types";
@@ -22,6 +22,14 @@ export async function dedupKeyFor(kind: ChannelType, ids: string[]): Promise<str
   return `${kind}:${hex}`;
 }
 
+/**
+ * Unique-index race on `channels.dedup_key` (uq_channel_dedup): two concurrent
+ * opens of the same pair used to end in an uncaught 500. On insert failure
+ * re-read the channel by dedup key and degrade to the idempotent
+ * `existing: true` response; a non-dedup failure is rethrown untouched (the
+ * batch is transactional, so no partial rows survive).
+ */
+
 export async function createChannel(
   db: Db,
   input: {
@@ -36,26 +44,66 @@ export async function createChannel(
 ): Promise<Channel> {
   const channelId = id("chn");
   const now = Date.now();
-  await db
-    .insert(channels)
-    .values({
-      id: channelId,
-      teamId: input.teamId,
-      name: input.name ?? null,
-      displayName: input.displayName,
-      type: input.type,
-      dedupKey: null,
-      purpose: input.purpose ?? null,
-      header: input.header ?? null,
-      creatorId: input.creatorId,
-      createdAt: now,
-    })
-    .onConflictDoNothing();
+  // D1 has no transactional interface — the only atomicity primitive is
+  // `db.batch`. The channel row and its creator membership therefore go into
+  // one batch (all-or-nothing), instead of the previous two sequential writes
+  // that could strand a channel with no membership.
+  if (input.name) {
+    // Pre-check (teamId, name) uniqueness so the documented 409 wording is kept
+    // without having to translate a mid-batch constraint failure.
+    const existing = await db
+      .select({ id: channels.id })
+      .from(channels)
+      .where(and(eq(channels.teamId, input.teamId), eq(channels.name, input.name)))
+      .limit(1);
+    if (existing[0]) {
+      throw apiError("name_taken", "name taken", 409);
+    }
+  }
+  const inserts = [
+    db
+      .insert(channels)
+      .values({
+        id: channelId,
+        teamId: input.teamId,
+        name: input.name ?? null,
+        displayName: input.displayName,
+        type: input.type,
+        dedupKey: null,
+        purpose: input.purpose ?? null,
+        header: input.header ?? null,
+        creatorId: input.creatorId,
+        createdAt: now,
+      })
+      .onConflictDoNothing(),
+    db.insert(channelMembers).values({
+      channelId,
+      userId: input.creatorId,
+      roles: "channel_admin",
+      joinedAt: now,
+    }),
+  ];
+  try {
+    await db.batch(inserts as [(typeof inserts)[number], ...(typeof inserts)[number][]]);
+  } catch (err) {
+    // Race window: name taken between pre-check and batch. The batch rolls
+    // back atomically, so re-reading decides between conflict and real error.
+    const stillThere = input.name
+      ? await db
+          .select({ id: channels.id })
+          .from(channels)
+          .where(and(eq(channels.teamId, input.teamId), eq(channels.name, input.name)))
+          .limit(1)
+      : [];
+    if (stillThere[0]) {
+      throw apiError("name_taken", "name taken", 409);
+    }
+    throw err;
+  }
   const ch = await getChannel(db, channelId);
   if (!ch) {
     throw apiError("name_taken", "name taken", 409);
   }
-  await addChannelMember(db, { channelId, userId: input.creatorId, roles: "channel_admin" });
   return ch;
 }
 
@@ -86,7 +134,19 @@ export async function openDirect(
       db.insert(channelMembers).values({ channelId, userId, roles: "channel_user", joinedAt: now }),
     ),
   ];
-  await db.batch(inserts as [(typeof inserts)[number], ...(typeof inserts)[number][]]);
+  try {
+    await db.batch(inserts as [(typeof inserts)[number], ...(typeof inserts)[number][]]);
+  } catch (err) {
+    // Dedup-key race (uq_channel_dedup): another request opened the same pair
+    // first — degrade to the idempotent existing:true the concurrent request
+    // would have gotten. Non-dedup failures are rethrown untouched (the batch
+    // is transactional, so no partial rows survive).
+    const raced = await getChannelByDedupKey(db, key);
+    if (!raced) {
+      throw err;
+    }
+    return { id: raced.id, existing: true };
+  }
   return { id: channelId, existing: false };
 }
 
@@ -117,7 +177,16 @@ export async function openGroup(
       db.insert(channelMembers).values({ channelId, userId, roles: "channel_user", joinedAt: now }),
     ),
   ];
-  await db.batch(inserts as [(typeof inserts)[number], ...(typeof inserts)[number][]]);
+  try {
+    await db.batch(inserts as [(typeof inserts)[number], ...(typeof inserts)[number][]]);
+  } catch (err) {
+    // Same dedup-key race handling as openDirect above.
+    const raced = await getChannelByDedupKey(db, key);
+    if (!raced) {
+      throw err;
+    }
+    return { id: raced.id, existing: true };
+  }
   return { id: channelId, existing: false };
 }
 
