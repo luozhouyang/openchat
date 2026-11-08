@@ -188,6 +188,12 @@ with 150 ids returned HTTP 500 before this change.
   (提及/回复/私信) live in `apps/mobile/src/lib/notifications.ts` with a jest
   test.
 
+### Channel search
+
+- The channel header has a 搜索 button opening a modal with a debounced (250 ms)
+  query against `GET /channels/:id/posts/search`; results show author id and
+  content with empty/loading states.
+
 ## Deferred — backend
 
 1. Distributed rate limiting: the current limiter is per isolate; move to a
@@ -196,8 +202,8 @@ with 150 ids returned HTTP 500 before this change.
 
 ## Deferred — frontend / UI
 
-1. Mobile parity: search, settings (theme/language/push), threads and presence
-   display are still missing from `apps/mobile`.
+1. Mobile parity: settings (theme/language/push), threads and presence display
+   are still missing from `apps/mobile`.
 2. E2E coverage for channel settings saves (the team settings path is covered).
 
 > Note: `docs/` is listed in `.gitignore`; this file was committed explicitly

@@ -12,7 +12,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import type { NotificationItem } from "protocol";
+import type { NotificationItem, PostOutput } from "protocol";
 import type { StoreMessage } from "state";
 import { useSidebarStore, useTeamsStore } from "state";
 import { appClient } from "./src/app-client";
@@ -340,6 +340,10 @@ function ChannelScreen({
   const [draft, setDraft] = useState("");
   const [hasOlder, setHasOlder] = useState(true);
   const [loadingOlder, setLoadingOlder] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [searchResults, setSearchResults] = useState<PostOutput[]>([]);
+  const [searching, setSearching] = useState(false);
   const maxSeq = useMessages((s) => s.maxSeq(channelId));
 
   const refresh = useCallback(() => {
@@ -400,6 +404,36 @@ function ChannelScreen({
     }
   }, [channelId, hasOlder, loadingOlder, refresh]);
 
+  useEffect(() => {
+    const query = searchTerm.trim();
+    if (!searchOpen || query.length === 0) {
+      setSearchResults([]);
+      return;
+    }
+    let active = true;
+    setSearching(true);
+    const handle = setTimeout(async () => {
+      try {
+        const res = await appClient.api.posts.search(channelId, query);
+        if (active) {
+          setSearchResults(res.messages);
+        }
+      } catch {
+        if (active) {
+          setSearchResults([]);
+        }
+      } finally {
+        if (active) {
+          setSearching(false);
+        }
+      }
+    }, 250);
+    return () => {
+      active = false;
+      clearTimeout(handle);
+    };
+  }, [searchTerm, searchOpen, channelId]);
+
   // Mark read whenever the channel head advances.
   useEffect(() => {
     if (maxSeq > 0) {
@@ -432,6 +466,7 @@ function ChannelScreen({
       <View style={styles.channelHeader}>
         <Button title="←" onPress={onBack} />
         <Text style={styles.header}>{title}</Text>
+        <Button title="搜索" onPress={() => setSearchOpen(true)} testID="open-search" />
       </View>
       <FlatList
         style={styles.flex}
@@ -464,6 +499,41 @@ function ChannelScreen({
         />
         <Button title="发送" onPress={() => void send()} testID="composer-send" />
       </View>
+      <Modal visible={searchOpen} animationType="slide" onRequestClose={() => setSearchOpen(false)}>
+        <View style={styles.flex}>
+          <View style={styles.channelHeader}>
+            <Button title="关闭" onPress={() => setSearchOpen(false)} />
+            <Text style={styles.header}>搜索</Text>
+          </View>
+          <TextInput
+            style={[styles.input, styles.searchInput]}
+            placeholder="搜索本频道…"
+            value={searchTerm}
+            onChangeText={setSearchTerm}
+            autoFocus
+            testID="search-input"
+          />
+          <FlatList
+            data={searchResults}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <View style={styles.message} testID={`search-result-${item.id}`}>
+                <Text style={styles.messageUser}>{item.userId}</Text>
+                <Text numberOfLines={3}>{item.content}</Text>
+              </View>
+            )}
+            ListEmptyComponent={
+              <Text style={styles.empty}>
+                {searchTerm.trim().length === 0
+                  ? "输入关键词搜索"
+                  : searching
+                    ? "搜索中…"
+                    : "无结果"}
+              </Text>
+            }
+          />
+        </View>
+      </Modal>
       <Text style={styles.footnote}>{teamId ? "" : ""}</Text>
     </KeyboardAvoidingView>
   );
@@ -519,5 +589,6 @@ const styles = StyleSheet.create({
   message: { paddingHorizontal: 12, paddingVertical: 6 },
   messageUser: { fontSize: 12, color: "#666" },
   composer: { flexDirection: "row", gap: 8, padding: 8 },
+  searchInput: { marginHorizontal: 12, marginVertical: 8 },
   footnote: { fontSize: 10, color: "#bbb", textAlign: "center", paddingBottom: 4 },
 });
