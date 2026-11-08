@@ -52,6 +52,21 @@ export function MessageList({ channelId }: { channelId: string }) {
     prevMaxSeq.current = maxSeq;
   }, [maxSeq, items.length, virtualizer]);
 
+  useEffect(() => {
+    function onJump(event: Event) {
+      const detail = (event as CustomEvent<{ channelId: string; seq: number }>).detail;
+      if (!detail || detail.channelId !== channelId) {
+        return;
+      }
+      const index = items.findIndex((item) => item.message.seq === detail.seq);
+      if (index >= 0) {
+        virtualizer.scrollToIndex(index, { align: "center" });
+      }
+    }
+    window.addEventListener("openchat:jump-to-seq", onJump);
+    return () => window.removeEventListener("openchat:jump-to-seq", onJump);
+  }, [channelId, items, virtualizer]);
+
   const loadOlder = useCallback(async () => {
     if (loadingOlder.current || items.length === 0) {
       return;

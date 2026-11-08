@@ -1,17 +1,22 @@
 import { useQuery } from "@tanstack/react-query";
 import { Outlet } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { appClient } from "@/app-client";
 import { api } from "@/lib/api";
 import { wsClient } from "@/ws/client";
 import { useMessageStore } from "@/stores/messages";
 import { useSidebarStore } from "@/stores/sidebar";
+import { ChannelHeader } from "./ChannelHeader";
+import { MembersDialog } from "./MembersDialog";
 import { MessageList } from "./MessageList";
+import { PinnedDialog } from "./PinnedDialog";
+import { SearchDialog } from "./SearchDialog";
 import { Composer } from "./Composer";
 import { TypingIndicator } from "./TypingIndicator";
 
 export function ChannelView({ channelId }: { channelId: string }) {
   const maxSeq = useMessageStore((s) => s.maxSeq(channelId));
+  const [panel, setPanel] = useState<"members" | "pinned" | "search" | null>(null);
 
   useQuery({
     queryKey: ["history", channelId],
@@ -36,11 +41,32 @@ export function ChannelView({ channelId }: { channelId: string }) {
   return (
     <div className="flex h-full">
       <div className="flex min-w-0 flex-1 flex-col">
+        <ChannelHeader
+          channelId={channelId}
+          onOpenMembers={() => setPanel("members")}
+          onOpenPinned={() => setPanel("pinned")}
+          onOpenSearch={() => setPanel("search")}
+        />
         <MessageList channelId={channelId} />
         <TypingIndicator channelId={channelId} />
         <Composer channelId={channelId} />
       </div>
       <Outlet />
+      <MembersDialog
+        channelId={channelId}
+        open={panel === "members"}
+        onOpenChange={(open) => setPanel(open ? "members" : null)}
+      />
+      <PinnedDialog
+        channelId={channelId}
+        open={panel === "pinned"}
+        onOpenChange={(open) => setPanel(open ? "pinned" : null)}
+      />
+      <SearchDialog
+        channelId={channelId}
+        open={panel === "search"}
+        onOpenChange={(open) => setPanel(open ? "search" : null)}
+      />
     </div>
   );
 }

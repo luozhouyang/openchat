@@ -2,9 +2,11 @@ import { useRef, useState } from "react";
 import { Link, useLocation, useParams } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { id } from "protocol";
+import { PinIcon } from "lucide-react";
 import { wsClient } from "@/ws/client";
 import { api } from "@/lib/api";
 import { useMe } from "@/hooks/use-me";
+import { useMessageStore } from "@/stores/messages";
 import { displayNameOf, initialsOf, useUser } from "@/stores/users";
 import { MentionText } from "./MentionText";
 import { ReactionBar } from "./ReactionBar";
@@ -89,6 +91,19 @@ export function MessageRow({
     requestAnimationFrame(() => editRef.current?.focus());
   }
 
+  async function togglePin() {
+    try {
+      if (message.isPinned) {
+        await api.posts.unpin(channelId, message.id);
+      } else {
+        await api.posts.pin(channelId, message.id);
+      }
+      useMessageStore.getState().setPinned(channelId, message.id, !message.isPinned);
+    } catch {
+      // Pin rights are enforced server-side; a rejected call leaves the row.
+    }
+  }
+
   function toggleReaction() {
     wsClient.send({
       type: "react",
@@ -128,6 +143,15 @@ export function MessageRow({
       >
         👍
       </button>
+      {!pending && (
+        <button
+          type="button"
+          onClick={() => void togglePin()}
+          className="rounded px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
+        >
+          {message.isPinned ? t("messages.unpin") : t("messages.pin")}
+        </button>
+      )}
       {!pending && mine && (
         <>
           <button
@@ -223,6 +247,9 @@ export function MessageRow({
             </time>
             {edited && (
               <span className="text-xs text-muted-foreground">{t("messages.edited")}</span>
+            )}
+            {message.isPinned && (
+              <PinIcon className="size-3 text-muted-foreground" aria-label={t("messages.pinned")} />
             )}
           </div>
         )}

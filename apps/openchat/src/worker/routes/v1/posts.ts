@@ -8,6 +8,9 @@ import {
   ListPostsQuery,
   type PostOutput,
   type ListPostsOutput,
+  type PinnedPostsOutput,
+  SearchPostsQuery,
+  type SearchPostsOutput,
 } from "protocol";
 import { requireSession } from "@worker/auth/session";
 import { requireChannelRole } from "@worker/auth/guards";
@@ -85,6 +88,34 @@ postsV1.get(
     return c.json(out);
   },
 );
+postsV1.get(
+  "/channels/:channelId/posts/search",
+  requireSession,
+  requireChannelRole("member"),
+  zodValidator("query", SearchPostsQuery),
+  async (c) => {
+    const { q, limit } = c.req.valid("query");
+    const channelId = c.req.param("channelId");
+    const stub = c.env.CHANNEL_DO.get(c.env.CHANNEL_DO.idFromName(channelDoName(channelId)));
+    const res = await stub.searchMessages({ query: q, limit });
+    const out: SearchPostsOutput = { messages: res.messages as PostOutput[] };
+    return c.json(out);
+  },
+);
+
+postsV1.get(
+  "/channels/:channelId/pinned",
+  requireSession,
+  requireChannelRole("member"),
+  async (c) => {
+    const channelId = c.req.param("channelId");
+    const stub = c.env.CHANNEL_DO.get(c.env.CHANNEL_DO.idFromName(channelDoName(channelId)));
+    const res = await stub.pinnedMessages({ limit: 100 });
+    const out: PinnedPostsOutput = { messages: res.messages as PostOutput[] };
+    return c.json(out);
+  },
+);
+
 postsV1.put(
   "/posts/:postId/patch",
   requireSession,

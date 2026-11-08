@@ -893,6 +893,42 @@ export class ChannelDO extends DurableObject<Env> {
     return { ok: true };
   }
 
+  /** Case-insensitive substring search over top-level message content. */
+  async searchMessages(params: {
+    query: string;
+    limit?: number;
+  }): Promise<{ messages: HistoryMessage[] }> {
+    const term = params.query.trim();
+    if (term.length === 0) {
+      return { messages: [] };
+    }
+    const limit = Math.min(params.limit ?? 50, 100);
+    const rows = await this.db
+      .select()
+      .from(schema.messages)
+      .where(
+        and(
+          isNull(schema.messages.parentId),
+          sql`instr(lower(${schema.messages.content}), lower(${term})) > 0`,
+        ),
+      )
+      .orderBy(desc(schema.messages.seq))
+      .limit(limit);
+    return { messages: rows.map((r) => this.rowToMessage(r)) };
+  }
+
+  /** Pinned top-level messages, newest pin first (channel pin panel). */
+  async pinnedMessages(params: { limit?: number } = {}): Promise<{ messages: HistoryMessage[] }> {
+    const limit = Math.min(params.limit ?? 50, 200);
+    const rows = await this.db
+      .select()
+      .from(schema.messages)
+      .where(and(eq(schema.messages.isPinned, true), isNull(schema.messages.parentId)))
+      .orderBy(desc(schema.messages.seq))
+      .limit(limit);
+    return { messages: rows.map((r) => this.rowToMessage(r)) };
+  }
+
   async history(params: {
     limit?: number;
     beforeSeq?: number;

@@ -27,7 +27,9 @@ import type {
   PatchTeamInput,
   PermissionsOutput,
   PostOutput,
+  PinnedPostsOutput,
   PushSubscribeInput,
+  SearchPostsOutput,
   PutStatusInput,
   RoleOutput,
   RolesListOutput,
@@ -214,6 +216,12 @@ export function createApi(opts: ApiFetchOptions = {}) {
         f<{ ok: true }>(`/api/v1/posts/${postId}/pin`, json("POST", { channelId })),
       unpin: (channelId: string, postId: string) =>
         f<{ ok: true }>(`/api/v1/posts/${postId}/unpin`, json("POST", { channelId })),
+      listPinned: (channelId: string) =>
+        f<PinnedPostsOutput>(`/api/v1/channels/${channelId}/pinned`),
+      search: (channelId: string, query: string, limit = 50) =>
+        f<SearchPostsOutput>(
+          `/api/v1/channels/${channelId}/posts/search?q=${encodeURIComponent(query)}&limit=${limit}`,
+        ),
     },
 
     push: {

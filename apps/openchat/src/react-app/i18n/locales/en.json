@@ -115,6 +115,9 @@
   "messages": {
     "deleted": "This message was deleted",
     "edited": "edited",
+    "pin": "Pin",
+    "unpin": "Unpin",
+    "pinned": "Pinned",
     "reply": "Reply",
     "react": "Add reaction",
     "edit": "Edit",
@@ -139,6 +142,18 @@
     "typing": "{{names}} is typing…",
     "image": "Image",
     "file": "File"
+  },
+  "channel": {
+    "members": "Members",
+    "noMembers": "No members yet",
+    "pinned": "Pinned messages",
+    "noPinned": "No pinned messages yet",
+    "search": "Search messages",
+    "searchPlaceholder": "Search this channel",
+    "searchHint": "Type a keyword to search this channel's history.",
+    "searching": "Searching…",
+    "noResults": "No matching messages",
+    "unpin": "Unpin"
   },
   "admin": {
     "title": "Admin console",

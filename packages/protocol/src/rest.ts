@@ -201,6 +201,15 @@ export const ListPostsOutput = z.object({
   messages: z.array(PostOutput),
   oldestSeq: z.number().nullable(),
 });
+export const PinnedPostsOutput = z.object({ messages: z.array(PostOutput) });
+export type PinnedPostsOutput = z.infer<typeof PinnedPostsOutput>;
+export const SearchPostsQuery = z.object({
+  q: z.string().min(1).max(200),
+  limit: z.coerce.number().int().positive().max(100).optional(),
+});
+export type SearchPostsQuery = z.infer<typeof SearchPostsQuery>;
+export const SearchPostsOutput = z.object({ messages: z.array(PostOutput) });
+export type SearchPostsOutput = z.infer<typeof SearchPostsOutput>;
 export type ListPostsOutput = z.infer<typeof ListPostsOutput>;
 
 // ---- threads ----

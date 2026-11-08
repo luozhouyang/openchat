@@ -86,6 +86,16 @@ test("author pin returns ok and history shows isPinned true", async () => {
   expect(target.isPinned).toBe(true);
 });
 
+test("pinned list returns the pinned message for members", async () => {
+  const res = await exports.default.fetch(`http://localhost/api/v1/channels/${channelId}/pinned`, {
+    headers: { cookie: userB },
+  });
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as { messages: { id: string; isPinned: boolean }[] };
+  expect(body.messages.map((m) => m.id)).toEqual([messageId]);
+  expect(body.messages[0]?.isPinned).toBe(true);
+});
+
 test("author unpin returns ok", async () => {
   const res = await exports.default.fetch(`http://localhost/api/v1/posts/${messageId}/unpin`, {
     method: "POST",
@@ -94,4 +104,13 @@ test("author unpin returns ok", async () => {
   });
   expect(res.status).toBe(200);
   expect(await res.json()).toEqual({ ok: true });
+});
+
+test("pinned list is empty after unpin", async () => {
+  const res = await exports.default.fetch(`http://localhost/api/v1/channels/${channelId}/pinned`, {
+    headers: { cookie: userA },
+  });
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as { messages: unknown[] };
+  expect(body.messages).toHaveLength(0);
 });
