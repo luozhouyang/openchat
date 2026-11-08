@@ -19,6 +19,9 @@ export const tanStackRouterPlugin = (): ReturnType<typeof TanStackRouterVite> =>
   TanStackRouterVite({
     routesDirectory: "./src/react-app/routes",
     generatedRouteTree: "./src/react-app/routeTree.gen.ts",
+    // Route-level chunks keep the initial bundle small (the workspace shell,
+    // chat, admin and settings no longer ship together).
+    autoCodeSplitting: true,
   });
 
 /** React SPA plugins, without the Cloudflare Worker pieces (fresh instances). */
