@@ -280,6 +280,14 @@ export function createApi(opts: ApiFetchOptions = {}) {
       vapidPublicKey: () => f<{ publicKey: string }>("/api/v1/users/me/vapid_public_key"),
       subscribe: (input: PushSubscribeInput) =>
         f<{ ok: true }>("/api/v1/users/me/push_subscriptions", json("POST", input)),
+      list: () =>
+        f<{ subscriptions: Array<{ deviceId: string; kind: string }> }>(
+          "/api/v1/users/me/push_subscriptions",
+        ),
+      unsubscribe: (deviceId: string) =>
+        f<{ ok: boolean }>(`/api/v1/users/me/push_subscriptions/${deviceId}`, {
+          method: "DELETE",
+        }),
     },
 
     admin: {

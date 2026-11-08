@@ -194,6 +194,13 @@ with 150 ids returned HTTP 500 before this change.
   query against `GET /channels/:id/posts/search`; results show author id and
   content with empty/loading states.
 
+### Settings (push toggle)
+
+- The workspace header has a 设置 button opening a modal with a push-notification
+  switch backed by `GET/POST/DELETE /users/me/push_subscriptions` (client
+  methods added) and the existing Expo registration helper.
+- Theme/language remain web-only for now; the modal says so.
+
 ## Deferred — backend
 
 1. Distributed rate limiting: the current limiter is per isolate; move to a
@@ -202,8 +209,8 @@ with 150 ids returned HTTP 500 before this change.
 
 ## Deferred — frontend / UI
 
-1. Mobile parity: settings (theme/language/push), threads and presence display
-   are still missing from `apps/mobile`.
+1. Mobile parity: theme/language settings, threads and presence display are
+   still missing from `apps/mobile`.
 2. E2E coverage for channel settings saves (the team settings path is covered).
 
 > Note: `docs/` is listed in `.gitignore`; this file was committed explicitly

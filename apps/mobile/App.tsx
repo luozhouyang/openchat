@@ -7,6 +7,7 @@ import {
   Modal,
   Platform,
   Pressable,
+  Switch,
   StyleSheet,
   Text,
   TextInput,
@@ -17,6 +18,7 @@ import type { StoreMessage } from "state";
 import { useSidebarStore, useTeamsStore } from "state";
 import { appClient } from "./src/app-client";
 import { consumeDeepLink, registerPush } from "./src/lib/push";
+import { getDeviceId } from "./src/lib/secure";
 
 import { createMobilePlatform } from "./src/platform";
 import { notificationLabel } from "./src/lib/notifications";
@@ -167,6 +169,9 @@ function WorkspaceScreen({
   const [error, setError] = useState<string | null>(null);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [inboxOpen, setInboxOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [pushEnabled, setPushEnabled] = useState(false);
+  const [deviceId, setDeviceId] = useState<string | null>(null);
   const teams = useTeamsStore((s) => s.teams);
   const loaded = useTeamsStore((s) => s.loaded);
   const unread = notifications.filter((item) => item.readAt === null).length;
@@ -185,6 +190,37 @@ function WorkspaceScreen({
     const timer = setInterval(() => void loadInbox(), 60_000);
     return () => clearInterval(timer);
   }, [loadInbox]);
+
+  useEffect(() => {
+    if (!settingsOpen) {
+      return;
+    }
+    void (async () => {
+      const id = await getDeviceId();
+      setDeviceId(id);
+      try {
+        const res = await appClient.api.push.list();
+        setPushEnabled(res.subscriptions.some((sub) => sub.deviceId === id));
+      } catch {
+        setPushEnabled(false);
+      }
+    })();
+  }, [settingsOpen]);
+
+  async function togglePush(next: boolean) {
+    setPushEnabled(next);
+    try {
+      if (next) {
+        await registerPush();
+        const res = await appClient.api.push.list();
+        setPushEnabled(res.subscriptions.some((sub) => sub.deviceId === deviceId));
+      } else if (deviceId) {
+        await appClient.api.push.unsubscribe(deviceId);
+      }
+    } catch {
+      setPushEnabled(!next);
+    }
+  }
 
   async function openNotification(item: NotificationItem) {
     setInboxOpen(false);
@@ -246,11 +282,14 @@ function WorkspaceScreen({
     <View style={styles.flex}>
       <View style={styles.workspaceHeader}>
         <Text style={styles.header}>频道</Text>
-        <Button
-          title={unread > 0 ? `通知 (${unread})` : "通知"}
-          onPress={() => setInboxOpen(true)}
-          testID="open-inbox"
-        />
+        <View style={styles.headerActions}>
+          <Button
+            title={unread > 0 ? `通知 (${unread})` : "通知"}
+            onPress={() => setInboxOpen(true)}
+            testID="open-inbox"
+          />
+          <Button title="设置" onPress={() => setSettingsOpen(true)} testID="open-settings" />
+        </View>
       </View>
       {error ? <Text style={styles.error}>{error}</Text> : null}
       <FlatList
@@ -289,6 +328,23 @@ function WorkspaceScreen({
             )}
             ListEmptyComponent={<Text style={styles.empty}>暂无通知</Text>}
           />
+        </View>
+      </Modal>
+      <Modal
+        visible={settingsOpen}
+        animationType="slide"
+        onRequestClose={() => setSettingsOpen(false)}
+      >
+        <View style={styles.flex}>
+          <View style={styles.workspaceHeader}>
+            <Button title="关闭" onPress={() => setSettingsOpen(false)} />
+            <Text style={styles.header}>设置</Text>
+          </View>
+          <View style={styles.settingRow}>
+            <Text style={styles.settingLabel}>推送通知</Text>
+            <Switch value={pushEnabled} onValueChange={(next) => void togglePush(next)} />
+          </View>
+          <Text style={styles.empty}>主题与语言设置将在后续版本提供。</Text>
         </View>
       </Modal>
     </View>
@@ -590,5 +646,14 @@ const styles = StyleSheet.create({
   messageUser: { fontSize: 12, color: "#666" },
   composer: { flexDirection: "row", gap: 8, padding: 8 },
   searchInput: { marginHorizontal: 12, marginVertical: 8 },
+  headerActions: { flexDirection: "row", gap: 8 },
+  settingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  settingLabel: { fontSize: 15 },
   footnote: { fontSize: 10, color: "#bbb", textAlign: "center", paddingBottom: 4 },
 });
