@@ -109,5 +109,10 @@ jobs:
           cache-dependency-path: apps/mobile/pnpm-lock.yaml
       # The Expo app is a standalone workspace with its own lockfile.
       - run: pnpm install --frozen-lockfile
+      # The hoisted mobile install prunes the shared packages' isolated
+      # node_modules; a forced root install restores them so the shared
+      # packages' imports (zod/zustand/better-auth) resolve for tsc and jest.
+      - run: pnpm install --frozen-lockfile --force
+        working-directory: .
       - run: pnpm typecheck
       - run: pnpm test
