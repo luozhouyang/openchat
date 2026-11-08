@@ -177,6 +177,17 @@ with 150 ids returned HTTP 500 before this change.
   leaving a channel, and browsing/joining a public channel (the join flow now
   reloads the workspace payload so the sidebar cannot stay stale).
 
+## Implemented — round 6 (mobile)
+
+### Notification inbox
+
+- The workspace screen header shows a 通知 button with the unread count; tapping
+  it opens a modal inbox fed by `GET /users/me/notifications` (loaded on mount
+  and refreshed every 60 seconds).
+- Tapping an entry marks it read and opens the owning channel; kind labels
+  (提及/回复/私信) live in `apps/mobile/src/lib/notifications.ts` with a jest
+  test.
+
 ## Deferred — backend
 
 1. Distributed rate limiting: the current limiter is per isolate; move to a
@@ -185,7 +196,8 @@ with 150 ids returned HTTP 500 before this change.
 
 ## Deferred — frontend / UI
 
-1. Mobile app parity with the new notifications/search/settings features.
+1. Mobile parity: search, settings (theme/language/push), threads and presence
+   display are still missing from `apps/mobile`.
 2. E2E coverage for channel settings saves (the team settings path is covered).
 
 > Note: `docs/` is listed in `.gitignore`; this file was committed explicitly

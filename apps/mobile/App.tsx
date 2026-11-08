@@ -4,18 +4,22 @@ import {
   Button,
   FlatList,
   KeyboardAvoidingView,
+  Modal,
   Platform,
+  Pressable,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
+import type { NotificationItem } from "protocol";
 import type { StoreMessage } from "state";
 import { useSidebarStore, useTeamsStore } from "state";
 import { appClient } from "./src/app-client";
 import { consumeDeepLink, registerPush } from "./src/lib/push";
 
 import { createMobilePlatform } from "./src/platform";
+import { notificationLabel } from "./src/lib/notifications";
 import { useMessages } from "./src/stores/messages";
 import { closeRealtime, connectRealtime, sendActivity, sendFrame } from "./src/ws/client";
 
@@ -161,8 +165,42 @@ function WorkspaceScreen({
   onOpenChannel: (teamId: string, channelId: string, title: string) => void;
 }) {
   const [error, setError] = useState<string | null>(null);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [inboxOpen, setInboxOpen] = useState(false);
   const teams = useTeamsStore((s) => s.teams);
   const loaded = useTeamsStore((s) => s.loaded);
+  const unread = notifications.filter((item) => item.readAt === null).length;
+
+  const loadInbox = useCallback(async () => {
+    try {
+      const res = await appClient.api.notifications.list(50);
+      setNotifications(res.notifications);
+    } catch {
+      // offline: keep the last snapshot
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadInbox();
+    const timer = setInterval(() => void loadInbox(), 60_000);
+    return () => clearInterval(timer);
+  }, [loadInbox]);
+
+  async function openNotification(item: NotificationItem) {
+    setInboxOpen(false);
+    if (item.readAt === null) {
+      setNotifications((rows) =>
+        rows.map((row) => (row.id === item.id ? { ...row, readAt: Date.now() } : row)),
+      );
+      void appClient.api.notifications.markRead([item.id]).catch(() => {});
+    }
+    try {
+      const detail = await appClient.api.channels.get(item.channelId);
+      onOpenChannel(detail.channel.teamId ?? "", item.channelId, `# ${detail.channel.displayName}`);
+    } catch {
+      // the channel may have been deleted since the notification
+    }
+  }
 
   useEffect(() => {
     (async () => {
@@ -206,7 +244,14 @@ function WorkspaceScreen({
 
   return (
     <View style={styles.flex}>
-      <Text style={styles.header}>频道</Text>
+      <View style={styles.workspaceHeader}>
+        <Text style={styles.header}>频道</Text>
+        <Button
+          title={unread > 0 ? `通知 (${unread})` : "通知"}
+          onPress={() => setInboxOpen(true)}
+          testID="open-inbox"
+        />
+      </View>
       {error ? <Text style={styles.error}>{error}</Text> : null}
       <FlatList
         data={rows}
@@ -223,6 +268,29 @@ function WorkspaceScreen({
         )}
         ListEmptyComponent={<Text style={styles.empty}>尚未加入任何频道</Text>}
       />
+      <Modal visible={inboxOpen} animationType="slide" onRequestClose={() => setInboxOpen(false)}>
+        <View style={styles.flex}>
+          <View style={styles.workspaceHeader}>
+            <Button title="关闭" onPress={() => setInboxOpen(false)} />
+            <Text style={styles.header}>通知</Text>
+          </View>
+          <FlatList
+            data={notifications}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <Pressable
+                onPress={() => void openNotification(item)}
+                style={styles.message}
+                testID={`notification-${item.id}`}
+              >
+                <Text style={styles.messageUser}>{notificationLabel(item.kind)}</Text>
+                <Text numberOfLines={2}>{item.preview}</Text>
+              </Pressable>
+            )}
+            ListEmptyComponent={<Text style={styles.empty}>暂无通知</Text>}
+          />
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -409,6 +477,12 @@ const styles = StyleSheet.create({
   title: { fontSize: 20, fontWeight: "600", marginBottom: 8 },
   header: { fontSize: 17, fontWeight: "600", padding: 12 },
   channelHeader: { flexDirection: "row", alignItems: "center", gap: 8 },
+  workspaceHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingRight: 12,
+  },
   input: {
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: "#ccc",
