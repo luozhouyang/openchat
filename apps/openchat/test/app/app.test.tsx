@@ -69,7 +69,7 @@ describe("root redirect", () => {
       directs: [],
     });
     renderApp();
-    expect(await screen.findByText("尚未加入任何频道")).toBeInTheDocument();
+    expect(await screen.findByText("You have not joined any channel yet")).toBeInTheDocument();
   });
 
   it("renders the dm home with resolved direct display names", async () => {

@@ -1,17 +1,19 @@
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 
 import { api } from "@/lib/api";
 
 export function StatsCards() {
+  const { t } = useTranslation();
   const stats = useQuery({
     queryKey: ["admin-stats"],
     queryFn: () => api.admin.stats(),
   });
   const items = [
-    ["用户", stats.data?.users],
-    ["团队", stats.data?.teams],
-    ["频道", stats.data?.channels],
-    ["消息", stats.data?.messages],
+    [t("admin.statsUsers"), stats.data?.users],
+    [t("admin.statsTeams"), stats.data?.teams],
+    [t("admin.statsChannels"), stats.data?.channels],
+    [t("admin.statsMessages"), stats.data?.messages],
   ] as const;
   return (
     <div className="grid grid-cols-4 gap-4">

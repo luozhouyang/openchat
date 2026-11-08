@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useMatchRoute } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import type { ChannelSummary } from "protocol";
 import { useSidebarStore } from "@/stores/sidebar";
+import { useMe } from "@/hooks/use-me";
+import { usePresenceStore, useStatus } from "@/stores/presence";
 import {
   SidebarContent,
   SidebarGroup,
@@ -13,9 +15,23 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
+import { StatusDot } from "@/components/presence/StatusDot";
 import { HashIcon, MessagesSquareIcon, PlusIcon } from "lucide-react";
 import { NewChannelDialog } from "./NewChannelDialog";
 import { NewDmDialog } from "./NewDmDialog";
+
+/** Refresh direct-message presence while the sidebar is mounted. */
+const PRESENCE_REFRESH_MS = 45_000;
+
+function unreadBadge(unread: number, mentions: number) {
+  if (mentions > 0) {
+    return { label: `@${mentions}`, className: "bg-destructive text-destructive-foreground" };
+  }
+  if (unread > 0) {
+    return { label: String(unread), className: "" };
+  }
+  return null;
+}
 
 export function WorkspaceMenu({
   teamId,
@@ -27,10 +43,29 @@ export function WorkspaceMenu({
   directs: ChannelSummary[];
 }) {
   const { t } = useTranslation();
+  const me = useMe();
   const entries = useSidebarStore((s) => s.entries);
   const match = useMatchRoute();
   const [channelOpen, setChannelOpen] = useState(false);
   const [dmOpen, setDmOpen] = useState(false);
+
+  const partnerIds = directs
+    .map((direct) => direct.memberIds?.find((id) => id !== me?.id))
+    .filter((id): id is string => typeof id === "string");
+  const partnerKey = partnerIds.join(",");
+
+  useEffect(() => {
+    if (partnerIds.length === 0) {
+      return;
+    }
+    usePresenceStore.getState().ensure(partnerIds);
+    const timer = setInterval(() => {
+      usePresenceStore.getState().ensure(partnerIds);
+    }, PRESENCE_REFRESH_MS);
+    return () => clearInterval(timer);
+    // partnerIds is derived from the workspace payload; key by contents.
+  }, [partnerKey]);
+
   return (
     <SidebarContent>
       {teamId && (
@@ -45,6 +80,7 @@ export function WorkspaceMenu({
           <SidebarMenu>
             {channels.map((c) => {
               const e = entries[c.id];
+              const badge = e ? unreadBadge(e.unread, e.mentions) : null;
               const active = !!match({
                 to: "/$teamId/c/$channelId",
                 params: { teamId, channelId: c.id },
@@ -62,12 +98,8 @@ export function WorkspaceMenu({
                     <span aria-hidden># </span>
                     <span>{c.displayName}</span>
                   </SidebarMenuButton>
-                  {e && (e.unread > 0 || e.mentions > 0) && (
-                    <SidebarMenuBadge
-                      className={e.mentions > 0 ? "bg-destructive text-destructive-foreground" : ""}
-                    >
-                      {e.mentions > 0 ? `@${e.mentions}` : e.unread}
-                    </SidebarMenuBadge>
+                  {badge && (
+                    <SidebarMenuBadge className={badge.className}>{badge.label}</SidebarMenuBadge>
                   )}
                 </SidebarMenuItem>
               );
@@ -81,25 +113,40 @@ export function WorkspaceMenu({
           <PlusIcon />
         </SidebarGroupAction>
         <SidebarMenu>
-          {directs.map((c) => {
-            const active = !!match({ to: "/dm/$channelId", params: { channelId: c.id } });
-            return (
-              <SidebarMenuItem key={c.id}>
-                <SidebarMenuButton
-                  render={<Link to="/dm/$channelId" params={{ channelId: c.id }} />}
-                  isActive={active}
-                  tooltip={c.displayName}
-                >
-                  <MessagesSquareIcon />
-                  <span>{c.displayName}</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            );
-          })}
+          {directs.map((c) => (
+            <DirectMenuItem key={c.id} channel={c} />
+          ))}
         </SidebarMenu>
       </SidebarGroup>
       {channelOpen && <NewChannelDialog teamId={teamId!} open onOpenChange={setChannelOpen} />}
       {dmOpen && <NewDmDialog open onOpenChange={setDmOpen} />}
     </SidebarContent>
+  );
+}
+
+function DirectMenuItem({ channel }: { channel: ChannelSummary }) {
+  const me = useMe();
+  const match = useMatchRoute();
+  const entry = useSidebarStore((s) => s.entries[channel.id]);
+  const partnerId = channel.memberIds?.find((id) => id !== me?.id);
+  const status = useStatus(partnerId);
+  const badge = entry ? unreadBadge(entry.unread, entry.mentions) : null;
+  const active = !!match({ to: "/dm/$channelId", params: { channelId: channel.id } });
+
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton
+        render={<Link to="/dm/$channelId" params={{ channelId: channel.id }} />}
+        isActive={active}
+        tooltip={channel.displayName}
+      >
+        <span className="relative inline-flex">
+          <MessagesSquareIcon />
+          <StatusDot status={status} className="absolute -right-1 -bottom-1 ring-2 ring-sidebar" />
+        </span>
+        <span>{channel.displayName}</span>
+      </SidebarMenuButton>
+      {badge && <SidebarMenuBadge className={badge.className}>{badge.label}</SidebarMenuBadge>}
+    </SidebarMenuItem>
   );
 }

@@ -12,6 +12,7 @@ import {
   ListMembersQuery,
   ChannelsListOutput,
   NotifyPropsInput,
+  type NotifyPropsOutput,
   channelCreatedEvent,
   channelUpdatedEvent,
   channelMemberAddedEvent,
@@ -366,6 +367,19 @@ channelsV1.get(
     const all = await listChannelMemberIds(db, c.req.param("channelId"));
     const start = page * perPage;
     const out: ChannelsListOutput = { memberIds: all.slice(start, start + perPage) };
+    return c.json(out);
+  },
+);
+
+channelsV1.get(
+  "/channels/:channelId/notifyProps",
+  requireSession,
+  requireChannelRole("member"),
+  async (c) => {
+    const channelId = c.req.param("channelId");
+    const stub = c.env.CHANNEL_DO.get(c.env.CHANNEL_DO.idFromName(channelDoName(channelId)));
+    const res = await stub.getNotifPref(c.get("session")!.user.id);
+    const out: NotifyPropsOutput = { notifyProps: { pref: res.pref } };
     return c.json(out);
   },
 );

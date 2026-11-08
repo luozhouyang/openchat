@@ -1,6 +1,10 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import {
+  BellIcon,
+  BellOffIcon,
+  CheckIcon,
   HashIcon,
   LockIcon,
   MessagesSquareIcon,
@@ -10,6 +14,8 @@ import {
 } from "lucide-react";
 import { useTeamsStore } from "state";
 import { api } from "@/lib/api";
+
+const NOTIFY_OPTIONS = ["all", "mention", "none"] as const;
 
 export function ChannelHeader({
   channelId,
@@ -23,6 +29,8 @@ export function ChannelHeader({
   onOpenSearch: () => void;
 }) {
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const [notifyOpen, setNotifyOpen] = useState(false);
   const { data } = useQuery({
     queryKey: ["channel", channelId],
     queryFn: () => api.channels.get(channelId),
@@ -32,10 +40,26 @@ export function ChannelHeader({
   const isDirect = channel?.type === "dm" || channel?.type === "gm";
   // Direct/group names are personalized in the workspace payload (the channel
   // row only stores a generic display name).
+  const { data: notify } = useQuery({
+    queryKey: ["notify", channelId],
+    queryFn: () => api.channels.getNotifyProps(channelId),
+    staleTime: 60_000,
+  });
+  const pref = notify?.notifyProps.pref ?? "all";
   const direct = useTeamsStore((s) => s.directs.find((entry) => entry.id === channelId));
   const title = isDirect
     ? (direct?.displayName ?? channel?.displayName ?? "")
     : (channel?.displayName ?? "");
+
+  async function setPref(next: (typeof NOTIFY_OPTIONS)[number]) {
+    try {
+      await api.channels.setNotifyProps(channelId, { notifyProps: { pref: next } });
+      queryClient.setQueryData(["notify", channelId], { notifyProps: { pref: next } });
+    } catch {
+      // The current pref stays when the write is rejected.
+    }
+    setNotifyOpen(false);
+  }
 
   return (
     <header className="flex h-12 shrink-0 items-center gap-2 border-b px-4">
@@ -53,6 +77,40 @@ export function ChannelHeader({
         </span>
       )}
       <div className="ml-auto flex items-center gap-1">
+        <div className="relative">
+          <button
+            type="button"
+            aria-label={t("channel.notifications")}
+            title={t("channel.notifications")}
+            className="rounded p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+            onClick={() => setNotifyOpen((open) => !open)}
+          >
+            {pref === "none" ? <BellOffIcon className="size-4" /> : <BellIcon className="size-4" />}
+          </button>
+          {notifyOpen && (
+            <>
+              <button
+                type="button"
+                aria-label={t("messages.closeEmoji")}
+                className="fixed inset-0 z-10 cursor-default"
+                onClick={() => setNotifyOpen(false)}
+              />
+              <div className="absolute top-full right-0 z-20 mt-1 w-48 overflow-hidden rounded-md border bg-popover p-1 shadow-md">
+                {NOTIFY_OPTIONS.map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent"
+                    onClick={() => void setPref(option)}
+                  >
+                    <span className="flex-1">{t(`channel.notify_${option}`)}</span>
+                    {pref === option && <CheckIcon className="size-3.5" />}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
         <button
           type="button"
           aria-label={t("channel.search")}

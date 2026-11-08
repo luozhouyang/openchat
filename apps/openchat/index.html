@@ -7,10 +7,20 @@
     <title>openchat</title>
     <script>
       (() => {
+        const KEY = "openchat.theme";
         const mq = window.matchMedia("(prefers-color-scheme: dark)");
-        const apply = () => document.documentElement.classList.toggle("dark", mq.matches);
+        const read = () => localStorage.getItem(KEY) || "system";
+        const apply = () => {
+          const theme = read();
+          document.documentElement.classList.toggle(
+            "dark",
+            theme === "dark" || (theme === "system" && mq.matches),
+          );
+        };
         apply();
-        mq.addEventListener("change", apply);
+        mq.addEventListener("change", () => {
+          if (read() === "system") apply();
+        });
       })();
     </script>
   </head>

@@ -107,6 +107,7 @@ usersV1.get("/users/me/workspaces", requireSession, async (c) => {
   }));
   const directSummaries = directs.map((r) => {
     const summary = toSummary(r.channel, true);
+    summary.memberIds = (membersByChannel.get(r.channel.id) ?? []).map((m) => m.userId);
     // Each member sees the OTHER members' names (same rule as the
     // personalized channel.created delivery).
     const names = (membersByChannel.get(r.channel.id) ?? [])

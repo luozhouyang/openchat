@@ -1,8 +1,10 @@
 import { useState } from "react";
-import { useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { appClient } from "@/app-client";
+import { api } from "@/lib/api";
+import { usePresenceStore, useStatus } from "@/stores/presence";
 import { useMe } from "@/hooks/use-me";
 import { resetSessionProbe } from "@/lib/session-guard";
 import {
@@ -17,10 +19,18 @@ import {
   DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ChevronsUpDownIcon, LogOutIcon } from "lucide-react";
+import { ChevronsUpDownIcon, CircleIcon, LogOutIcon, SettingsIcon } from "lucide-react";
+
+const STATUSES = ["online", "away", "dnd", "offline"] as const;
+type PresenceStatus = (typeof STATUSES)[number];
 
 export function UserMenu() {
   const { t } = useTranslation();
@@ -28,9 +38,21 @@ export function UserMenu() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
+  const status = useStatus(user?.id);
 
   if (!user) {
     return null;
+  }
+
+  async function setStatus(next: PresenceStatus) {
+    try {
+      await api.status.put(user!.id, { status: next });
+      usePresenceStore.setState((state) => ({
+        byId: { ...state.byId, [user!.id]: { status: next, at: Date.now() } },
+      }));
+    } catch {
+      // Status is cosmetic; a failed write keeps the previous value.
+    }
   }
   const displayName = user.nickname ?? user.username ?? user.email;
   const initials = displayName.slice(0, 2).toUpperCase();
@@ -88,6 +110,29 @@ export function UserMenu() {
                   </div>
                 </DropdownMenuLabel>
               </DropdownMenuGroup>
+              <DropdownMenuSeparator />
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger>
+                  <CircleIcon className="size-2 fill-current" />
+                  {t("workspace.status")}
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent>
+                  <DropdownMenuRadioGroup
+                    value={status}
+                    onValueChange={(value) => void setStatus(value as PresenceStatus)}
+                  >
+                    {STATUSES.map((value) => (
+                      <DropdownMenuRadioItem key={value} value={value}>
+                        {t(`presence.${value}`)}
+                      </DropdownMenuRadioItem>
+                    ))}
+                  </DropdownMenuRadioGroup>
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+              <DropdownMenuItem render={<Link to="/settings" />}>
+                <SettingsIcon />
+                {t("workspace.settings")}
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => void signOut()}>
                 <LogOutIcon />

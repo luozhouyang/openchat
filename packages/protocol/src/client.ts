@@ -20,6 +20,7 @@ import type {
   ListPostsQuery,
   MyTeamsOutput,
   NotifyPropsInput,
+  NotifyPropsOutput,
   OpenChannelOutput,
   OpenDirectInput,
   OpenGroupInput,
@@ -196,6 +197,8 @@ export function createApi(opts: ApiFetchOptions = {}) {
         f<OpenChannelOutput>("/api/v1/channels/group", json("POST", input)),
       setNotifyProps: (channelId: string, input: NotifyPropsInput) =>
         f<{ ok: true }>(`/api/v1/channels/${channelId}/members/me/notifyProps`, json("PUT", input)),
+      getNotifyProps: (channelId: string) =>
+        f<NotifyPropsOutput>(`/api/v1/channels/${channelId}/notifyProps`),
     },
 
     posts: {

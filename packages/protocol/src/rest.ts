@@ -93,6 +93,8 @@ export const ChannelSummary = z.object({
   type: ChannelTypeSchema,
   member: z.boolean(),
   archivedAt: z.number().nullable(),
+  /** Direct/group channels only: participants, for presence and naming. */
+  memberIds: z.array(idSchema).optional(),
 });
 export type ChannelSummary = z.infer<typeof ChannelSummary>;
 export const ChannelsForTeamOutput = z.object({ channels: z.array(ChannelSummary) });
@@ -123,6 +125,8 @@ export const NotifyPropsInput = z.object({
   notifyProps: z.object({ pref: NotifPrefSchema }),
 });
 export type NotifyPropsInput = z.infer<typeof NotifyPropsInput>;
+export const NotifyPropsOutput = NotifyPropsInput;
+export type NotifyPropsOutput = z.infer<typeof NotifyPropsOutput>;
 
 // ---- posts ----
 /**

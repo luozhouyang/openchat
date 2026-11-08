@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { api } from "@/lib/api";
 import { useSidebarStore, useTeamsStore } from "state";
+import { useTranslation } from "react-i18next";
 import { WorkspaceShell } from "@/components/workspace/WorkspaceShell";
 
 export const Route = createFileRoute("/$teamId")({
@@ -18,6 +19,7 @@ export const Route = createFileRoute("/$teamId")({
 });
 
 function WorkspaceLayout() {
+  const { t } = useTranslation();
   const { teamId } = Route.useParams();
   const teams = useTeamsStore((s) => s.teams);
   const directs = useTeamsStore((s) => s.directs);
@@ -31,7 +33,7 @@ function WorkspaceLayout() {
   }, [sidebar.data]);
 
   if (!team) {
-    return <div className="p-8">团队不存在</div>;
+    return <div className="p-8">{t("workspace.teamNotFound")}</div>;
   }
 
   return (

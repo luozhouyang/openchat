@@ -358,6 +358,16 @@ export class ChannelDO extends DurableObject<Env> {
     return { lastReadSeq: newRead };
   }
 
+  /** Per-user notification preference for this channel (defaults to "all"). */
+  async getNotifPref(userId: string): Promise<{ pref: "all" | "mention" | "none" }> {
+    const rows = await this.db
+      .select({ notifPref: schema.memberState.notifPref })
+      .from(schema.memberState)
+      .where(eq(schema.memberState.userId, userId))
+      .limit(1);
+    return { pref: (rows[0]?.notifPref as "all" | "mention" | "none" | undefined) ?? "all" };
+  }
+
   async setNotifPref(body: {
     userId: string;
     pref: "all" | "mention" | "none";

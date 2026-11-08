@@ -1,9 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 
 import { authClient } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
 
 export function UserTable() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const users = useQuery({
     queryKey: ["admin-users"],
@@ -13,7 +15,8 @@ export function UserTable() {
     },
   });
   const ban = useMutation({
-    mutationFn: (userId: string) => authClient.admin.banUser({ userId, banReason: "管理员操作" }),
+    mutationFn: (userId: string) =>
+      authClient.admin.banUser({ userId, banReason: t("admin.banReason") }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-users"] }),
   });
   const unban = useMutation({
@@ -25,9 +28,9 @@ export function UserTable() {
     <table className="w-full text-sm">
       <thead>
         <tr className="border-b text-left">
-          <th className="py-2">邮箱</th>
-          <th>角色</th>
-          <th>状态</th>
+          <th className="py-2">{t("admin.email")}</th>
+          <th>{t("admin.role")}</th>
+          <th>{t("admin.status")}</th>
           <th />
         </tr>
       </thead>
@@ -36,15 +39,15 @@ export function UserTable() {
           <tr key={u.id} className="border-b">
             <td className="py-2">{u.email}</td>
             <td>{u.role}</td>
-            <td>{u.banned ? "已封禁" : "正常"}</td>
+            <td>{u.banned ? t("admin.banned") : t("admin.active")}</td>
             <td className="py-2">
               {u.banned ? (
                 <Button size="sm" variant="outline" onClick={() => unban.mutate(u.id)}>
-                  解封
+                  {t("admin.unban")}
                 </Button>
               ) : (
                 <Button size="sm" variant="destructive" onClick={() => ban.mutate(u.id)}>
-                  封禁
+                  {t("admin.ban")}
                 </Button>
               )}
             </td>
