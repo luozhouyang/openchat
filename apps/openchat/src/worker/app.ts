@@ -5,8 +5,36 @@ import { v1Router } from "@worker/routes/v1/index";
 import { makeAuth } from "@worker/auth";
 import { isHttpError, toErrorBody } from "@worker/lib/errors";
 
+type AppEnv = { Bindings: Env; Variables: { requestId: string } };
+
 export function createApp() {
-  const app = new Hono<{ Bindings: Env }>();
+  const app = new Hono<AppEnv>();
+
+  // One request id per call, echoed to the client and attached to every log
+  // line and error body so support can correlate a report with the logs.
+  app.use("*", async (c, next) => {
+    const requestId = c.req.header("x-request-id") ?? crypto.randomUUID();
+    c.set("requestId", requestId);
+    c.header("x-request-id", requestId);
+    const startedAt = Date.now();
+    try {
+      await next();
+    } finally {
+      // The query string is intentionally omitted: it can carry search terms
+      // and invite tokens.
+      console.info(
+        JSON.stringify({
+          type: "request",
+          requestId,
+          method: c.req.method,
+          path: new URL(c.req.url).pathname,
+          status: (c.res as Response | undefined)?.status ?? 500,
+          durationMs: Date.now() - startedAt,
+        }),
+      );
+    }
+  });
+
   app.route("/", health);
   app.route("/api/v1", v1Router);
   app.route("/", internalRoutes);
@@ -15,11 +43,29 @@ export function createApp() {
     return auth.handler(c.req.raw);
   });
   app.onError((err, c) => {
+    const requestId = c.get("requestId") ?? "";
     if (isHttpError(err)) {
-      return c.json(toErrorBody(err), err.status as 400 | 403 | 404 | 409 | 422 | 429 | 500);
+      console.error(
+        JSON.stringify({
+          type: "request.error",
+          requestId,
+          code: err.code,
+          status: err.status,
+        }),
+      );
+      return c.json(
+        { ...toErrorBody(err), requestId },
+        err.status as 400 | 403 | 404 | 409 | 422 | 429 | 500,
+      );
     }
-    console.error(`[${c.req.method}] ${c.req.path}:`, err);
-    return c.json({ error: "internal server error", code: "internal" }, 500);
+    console.error(
+      JSON.stringify({
+        type: "request.error",
+        requestId,
+        error: err instanceof Error ? err.message : String(err),
+      }),
+    );
+    return c.json({ error: "internal server error", code: "internal", requestId }, 500);
   });
   return app;
 }

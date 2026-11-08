@@ -57,12 +57,14 @@ review. Local docs only (see the note at the end).
 - R2: rely on bucket lifecycle/versioning as needed; message attachments are the
   only irreplaceable objects.
 
-## Observability (next)
+## Observability
 
-- Request id + structured request logs (method, path, status, duration).
-- Workers Logs / Logpush shipping and alerts on 5xx, DO errors and queue DLQ
-  depth (`openchat-push-dlq`).
-- Analytics: messages/day, active channels, WS connections, push failures.
+- Done: every request gets an `x-request-id` (caller-supplied or generated),
+  echoed on the response and attached to `request` / `request.error` log lines
+  and error bodies. The query string is omitted from logs.
+- Next: ship logs (Workers Logs / Logpush), alert on 5xx, DO errors and
+  `openchat-push-dlq` depth; analytics for messages/day, active channels, WS
+  connections and push failures.
 
 ## Security checklist
 
