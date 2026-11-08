@@ -200,6 +200,12 @@ with 150 ids returned HTTP 500 before this change.
   nickname/name/username plus a presence dot from the batch status endpoint;
   helpers live in `apps/mobile/src/lib/people.ts` with a jest test.
 
+### Threads
+
+- Every message row has a 回复 action that opens a thread modal with the parent
+  message, the reply list (`GET /channels/:id/posts?parentId=…`) and a reply
+  composer that posts through `POST /channels/:id/posts` with `parentId`.
+
 ### Settings (push toggle)
 
 - The workspace header has a 设置 button opening a modal with a push-notification
@@ -215,8 +221,8 @@ with 150 ids returned HTTP 500 before this change.
 
 ## Deferred — frontend / UI
 
-1. Mobile parity: theme/language settings and threads are still missing from
-   `apps/mobile`.
+1. Mobile parity: theme and language settings are still missing from
+   `apps/mobile` (they need mobile i18n and theme infrastructure).
 2. E2E coverage for channel settings saves (the team settings path is covered).
 
 > Note: `docs/` is listed in `.gitignore`; this file was committed explicitly

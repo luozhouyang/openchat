@@ -403,6 +403,10 @@ function ChannelScreen({
   const [searching, setSearching] = useState(false);
   const [people, setPeople] = useState<Record<string, UserAutocompleteItem>>({});
   const [statuses, setStatuses] = useState<Record<string, string>>({});
+  const [threadParent, setThreadParent] = useState<StoreMessage | null>(null);
+  const [threadReplies, setThreadReplies] = useState<PostOutput[]>([]);
+  const [threadDraft, setThreadDraft] = useState("");
+  const [threadSending, setThreadSending] = useState(false);
   const maxSeq = useMessages((s) => s.maxSeq(channelId));
 
   const refresh = useCallback(() => {
@@ -462,6 +466,45 @@ function ChannelScreen({
       setLoadingOlder(false);
     }
   }, [channelId, hasOlder, loadingOlder, refresh]);
+
+  async function openThread(message: StoreMessage) {
+    setThreadParent(message);
+    setThreadDraft("");
+    try {
+      const res = await appClient.api.posts.list(channelId, {
+        parentId: message.id,
+        limit: 50,
+      });
+      setThreadReplies(res.messages);
+    } catch {
+      setThreadReplies([]);
+    }
+  }
+
+  async function sendThreadReply() {
+    const content = threadDraft.trim();
+    if (!content || !threadParent) {
+      return;
+    }
+    setThreadDraft("");
+    setThreadSending(true);
+    try {
+      await appClient.api.posts.create(channelId, {
+        message: content,
+        parentId: threadParent.id,
+        clientToken: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      });
+      const res = await appClient.api.posts.list(channelId, {
+        parentId: threadParent.id,
+        limit: 50,
+      });
+      setThreadReplies(res.messages);
+    } catch {
+      setThreadDraft(content);
+    } finally {
+      setThreadSending(false);
+    }
+  }
 
   const authorIds = [...new Set(messages.map((m) => m.userId))].filter(Boolean).slice(0, 100);
   const authorKey = authorIds.join(",");
@@ -582,6 +625,13 @@ function ChannelScreen({
               </Text>
             </View>
             <Text>{item.content}</Text>
+            <Pressable
+              onPress={() => void openThread(item)}
+              testID={`open-thread-${item.id}`}
+              hitSlop={8}
+            >
+              <Text style={styles.replyLink}>回复</Text>
+            </Pressable>
           </View>
         )}
         ListEmptyComponent={<Text style={styles.empty}>暂无消息</Text>}
@@ -684,6 +734,8 @@ const styles = StyleSheet.create({
   error: { color: "#c0392b", paddingHorizontal: 12 },
   empty: { color: "#888", padding: 12 },
   message: { paddingHorizontal: 12, paddingVertical: 6 },
+  replyLink: { color: "#2563eb", fontSize: 12, marginTop: 2 },
+  threadParent: { padding: 12, backgroundColor: "#f3f4f6" },
   messageUserRow: { flexDirection: "row", alignItems: "center", gap: 4 },
   statusDot: { width: 6, height: 6, borderRadius: 3 },
   messageUser: { fontSize: 12, color: "#666" },
