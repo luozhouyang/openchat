@@ -40,7 +40,15 @@ export default defineConfig({
     ],
   },
   lint: {
-    ignorePatterns: ["**/routeTree.gen.ts", "**/.vite/**", "**/release/**", "**/web-dist/**"],
+    // The Expo app is a standalone workspace with its own toolchain; it is
+    // typechecked and linted by its own CI job (root install has no expo).
+    ignorePatterns: [
+      "**/routeTree.gen.ts",
+      "**/.vite/**",
+      "**/release/**",
+      "**/web-dist/**",
+      "apps/mobile/**",
+    ],
     jsPlugins: [{ name: "vite-plus", specifier: "vite-plus/oxlint-plugin" }],
     rules: {
       "vite-plus/prefer-vite-plus-imports": "error",

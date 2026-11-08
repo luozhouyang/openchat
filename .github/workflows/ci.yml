@@ -22,6 +22,19 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # Worker tests load secrets from .dev.vars (gitignored); write throwaway
+      # CI values before running the suites.
+      - name: local secrets
+        working-directory: apps/openchat
+        run: |
+          cat > .dev.vars <<'VARS'
+          BETTER_AUTH_SECRET=ci-test-secret-ci-test-secret-ci-test-secret
+          INTERNAL_TOKEN_KEY=ci-test-internal-token-key-ci-test-internal-key
+          R2_ACCOUNT_ID=ci
+          R2_ACCESS_KEY_ID=ci
+          R2_SECRET_ACCESS_KEY=ci
+          R2_BUCKET_NAME=openchat-files
+          VARS
       - run: pnpm exec vp check
       - run: pnpm exec vp run -r test
 
