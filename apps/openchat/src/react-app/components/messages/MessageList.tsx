@@ -38,7 +38,8 @@ export function MessageList({ channelId }: { channelId: string }) {
     const scrollTop = parentRef.current?.scrollTop ?? 0;
     try {
       // Shared service: fetch page + apply history to store and local DB in
-      // one call (no service-layer duplication, review P2 死代码段).
+      // one call (no service-layer duplication — the message-db dead layer
+      // flagged in the review's P2 dead-code list).
       await appClient.channels.loadOlder(channelId);
       const idx = useMessageStore
         .getState()

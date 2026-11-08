@@ -72,3 +72,14 @@ openchat#e2e` / `vp run desktop#e2e`.
 - New dependencies belong in `pnpm-workspace.yaml` `catalog:` (project convention)
   unless the package is used only once (then a direct pinned version is acceptable,
   matching how `better-auth` is handled).
+
+## Language conventions (project rules)
+
+1. **Commit messages are always in English.** Conventional-commit subject
+   (`fix(worker): ...`, `chore(repo): ...`) plus English bullets in the body.
+2. **Code comments are always in English.** Applies to all comments in source,
+   tests, and config files (`//`, `/* */`, docblocks, JSONC notes). Do not
+   comment by stating the obvious; when a comment is needed, write it in plain
+   English. Exemptions: user-facing UI strings and i18n locale data follow the
+   product's UI language (`apps/*/src/**/i18n/locales`, Chinese-first) and test
+   assertions that assert rendered Chinese text — those are data, not comments.
