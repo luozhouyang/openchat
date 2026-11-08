@@ -1,23 +1,14 @@
 import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { PostAttachment } from "protocol";
-import { api } from "@/lib/api";
+import { uploadAttachment } from "@/lib/upload";
 
 export function UploadButton({
   channelId,
-  mode = "message",
-  onUploaded,
   onAttached,
 }: {
   channelId: string;
-  /**
-   * "message" posts the file as its own message (legacy flow);
-   * "attach" finishes the upload and hands the descriptor back to the
-   * composer so it can be sent together with the text draft.
-   */
-  mode?: "message" | "attach";
-  onUploaded?: () => void;
-  onAttached?: (attachment: PostAttachment) => void;
+  onAttached: (attachment: PostAttachment) => void;
 }) {
   const { t } = useTranslation();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -28,28 +19,8 @@ export function UploadButton({
     setFailed(false);
     setProgress(0);
     try {
-      const res = await api.uploads.create({
-        channelId,
-        filename: file.name,
-        size: file.size,
-        contentType: file.type || "application/octet-stream",
-      });
-      const put = await fetch(res.putUrl, {
-        method: "PUT",
-        body: file,
-        headers: { "content-type": file.type || "application/octet-stream" },
-      });
-      if (!put.ok) {
-        throw new Error(`upload failed: ${put.status}`);
-      }
-      setProgress(100);
-      if (mode === "attach") {
-        const attached = await api.uploads.attach(res.uploadId);
-        onAttached?.(attached.attachment);
-      } else {
-        await api.uploads.complete(res.uploadId);
-        onUploaded?.();
-      }
+      const attachment = await uploadAttachment(channelId, file, setProgress);
+      onAttached(attachment);
     } catch {
       setFailed(true);
     } finally {

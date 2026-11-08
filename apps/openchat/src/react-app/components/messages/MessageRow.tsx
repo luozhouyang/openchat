@@ -6,6 +6,7 @@ import { wsClient } from "@/ws/client";
 import { api } from "@/lib/api";
 import { useMe } from "@/hooks/use-me";
 import { displayNameOf, initialsOf, useUser } from "@/stores/users";
+import { MentionText } from "./MentionText";
 import { ReactionBar } from "./ReactionBar";
 import { AttachmentView } from "@/components/upload/AttachmentView";
 import type { StoreMessage } from "@/stores/messages";
@@ -187,7 +188,7 @@ export function MessageRow({
       </div>
     </div>
   ) : (
-    <div className="whitespace-pre-wrap break-words text-sm">{message.content}</div>
+    <MentionText content={message.content} className="whitespace-pre-wrap break-words text-sm" />
   );
 
   return (
