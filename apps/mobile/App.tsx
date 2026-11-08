@@ -24,6 +24,7 @@ import { createMobilePlatform } from "./src/platform";
 import { notificationKindKey } from "./src/lib/notifications";
 import { personLabel, presenceColor } from "./src/lib/people";
 import { loadLanguage, useLanguageStore, useT } from "./src/lib/i18n";
+import { loadTheme, usePalette, useThemeStore } from "./src/lib/theme";
 import { useMessages } from "./src/stores/messages";
 import { closeRealtime, connectRealtime, sendActivity, sendFrame } from "./src/ws/client";
 
@@ -49,6 +50,7 @@ export default function App() {
 
   useEffect(() => {
     void loadLanguage();
+    void loadTheme();
   }, []);
 
   useEffect(() => {
@@ -119,6 +121,12 @@ export default function App() {
 
 function LoginScreen({ onLoggedIn }: { onLoggedIn: () => void }) {
   const t = useT();
+  const palette = usePalette();
+  const inputStyle = {
+    backgroundColor: palette.inputBg,
+    borderColor: palette.border,
+    color: palette.text,
+  };
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -142,10 +150,10 @@ function LoginScreen({ onLoggedIn }: { onLoggedIn: () => void }) {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
       style={styles.flex}
     >
-      <View style={[styles.flex, styles.center, styles.pad]}>
-        <Text style={styles.title}>{t("loginTitle")}</Text>
+      <View style={[styles.flex, styles.center, styles.pad, { backgroundColor: palette.bg }]}>
+        <Text style={[styles.title, { color: palette.text }]}>{t("loginTitle")}</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, inputStyle]}
           placeholder={t("email")}
           autoCapitalize="none"
           keyboardType="email-address"
@@ -154,7 +162,7 @@ function LoginScreen({ onLoggedIn }: { onLoggedIn: () => void }) {
           testID="login-email"
         />
         <TextInput
-          style={styles.input}
+          style={[styles.input, inputStyle]}
           placeholder={t("password")}
           secureTextEntry
           value={password}
@@ -174,6 +182,7 @@ function WorkspaceScreen({
   onOpenChannel: (teamId: string, channelId: string, title: string) => void;
 }) {
   const t = useT();
+  const palette = usePalette();
   const [error, setError] = useState<string | null>(null);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [inboxOpen, setInboxOpen] = useState(false);
@@ -287,9 +296,9 @@ function WorkspaceScreen({
   );
 
   return (
-    <View style={styles.flex}>
+    <View style={[styles.flex, { backgroundColor: palette.bg }]}>
       <View style={styles.workspaceHeader}>
-        <Text style={styles.header}>{t("channels")}</Text>
+        <Text style={[styles.header, { color: palette.text }]}>{t("channels")}</Text>
         <View style={styles.headerActions}>
           <Button
             title={unread > 0 ? `${t("notifications")} (${unread})` : t("notifications")}
@@ -317,13 +326,15 @@ function WorkspaceScreen({
             }
           />
         )}
-        ListEmptyComponent={<Text style={styles.empty}>{t("noChannels")}</Text>}
+        ListEmptyComponent={
+          <Text style={[styles.empty, { color: palette.muted }]}>{t("noChannels")}</Text>
+        }
       />
       <Modal visible={inboxOpen} animationType="slide" onRequestClose={() => setInboxOpen(false)}>
-        <View style={styles.flex}>
+        <View style={[styles.flex, { backgroundColor: palette.bg }]}>
           <View style={styles.workspaceHeader}>
             <Button title={t("close")} onPress={() => setInboxOpen(false)} />
-            <Text style={styles.header}>{t("notifications")}</Text>
+            <Text style={[styles.header, { color: palette.text }]}>{t("notifications")}</Text>
           </View>
           <FlatList
             data={notifications}
@@ -334,11 +345,15 @@ function WorkspaceScreen({
                 style={styles.message}
                 testID={`notification-${item.id}`}
               >
-                <Text style={styles.messageUser}>{t(notificationKindKey(item.kind))}</Text>
+                <Text style={[styles.messageUser, { color: palette.muted }]}>
+                  {t(notificationKindKey(item.kind))}
+                </Text>
                 <Text numberOfLines={2}>{item.preview}</Text>
               </Pressable>
             )}
-            ListEmptyComponent={<Text style={styles.empty}>{t("noNotifications")}</Text>}
+            ListEmptyComponent={
+              <Text style={[styles.empty, { color: palette.muted }]}>{t("noNotifications")}</Text>
+            }
           />
         </View>
       </Modal>
@@ -347,23 +362,41 @@ function WorkspaceScreen({
         animationType="slide"
         onRequestClose={() => setSettingsOpen(false)}
       >
-        <View style={styles.flex}>
+        <View style={[styles.flex, { backgroundColor: palette.bg }]}>
           <View style={styles.workspaceHeader}>
             <Button title={t("close")} onPress={() => setSettingsOpen(false)} />
-            <Text style={styles.header}>{t("settings")}</Text>
+            <Text style={[styles.header, { color: palette.text }]}>{t("settings")}</Text>
           </View>
           <View style={styles.settingRow}>
-            <Text style={styles.settingLabel}>{t("pushNotifications")}</Text>
+            <Text style={[styles.settingLabel, { color: palette.text }]}>
+              {t("pushNotifications")}
+            </Text>
             <Switch value={pushEnabled} onValueChange={(next) => void togglePush(next)} />
           </View>
           <View style={styles.settingRow}>
-            <Text style={styles.settingLabel}>{t("language")}</Text>
+            <Text style={[styles.settingLabel, { color: palette.text }]}>{t("language")}</Text>
             <View style={styles.headerActions}>
               <Button title="中文" onPress={() => useLanguageStore.getState().setLang("zh")} />
               <Button title="English" onPress={() => useLanguageStore.getState().setLang("en")} />
             </View>
           </View>
-          <Text style={styles.empty}>{t("themeLater")}</Text>
+          <View style={styles.settingRow}>
+            <Text style={[styles.settingLabel, { color: palette.text }]}>{t("theme")}</Text>
+            <View style={styles.headerActions}>
+              <Button
+                title={t("themeLight")}
+                onPress={() => useThemeStore.getState().setMode("light")}
+              />
+              <Button
+                title={t("themeDark")}
+                onPress={() => useThemeStore.getState().setMode("dark")}
+              />
+              <Button
+                title={t("themeSystem")}
+                onPress={() => useThemeStore.getState().setMode("system")}
+              />
+            </View>
+          </View>
         </View>
       </Modal>
     </View>
@@ -412,6 +445,12 @@ function ChannelScreen({
   onBack: () => void;
 }) {
   const t = useT();
+  const palette = usePalette();
+  const inputStyle = {
+    backgroundColor: palette.inputBg,
+    borderColor: palette.border,
+    color: palette.text,
+  };
   const [messages, setMessages] = useState<StoreMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [hasOlder, setHasOlder] = useState(true);
@@ -614,11 +653,11 @@ function ChannelScreen({
     >
       <View style={styles.channelHeader}>
         <Button title="←" onPress={onBack} />
-        <Text style={styles.header}>{title}</Text>
+        <Text style={[styles.header, { color: palette.text }]}>{title}</Text>
         <Button title={t("search")} onPress={() => setSearchOpen(true)} testID="open-search" />
       </View>
       <FlatList
-        style={styles.flex}
+        style={[styles.flex, { backgroundColor: palette.bg }]}
         data={messages}
         keyExtractor={(m) => m.id}
         ListHeaderComponent={
@@ -639,25 +678,27 @@ function ChannelScreen({
                   { backgroundColor: presenceColor(statuses[item.userId]) },
                 ]}
               />
-              <Text style={styles.messageUser}>
+              <Text style={[styles.messageUser, { color: palette.muted }]}>
                 {personLabel(people[item.userId], item.userId)}
               </Text>
             </View>
-            <Text>{item.content}</Text>
+            <Text style={{ color: palette.text }}>{item.content}</Text>
             <Pressable
               onPress={() => void openThread(item)}
               testID={`open-thread-${item.id}`}
               hitSlop={8}
             >
-              <Text style={styles.replyLink}>{t("reply")}</Text>
+              <Text style={[styles.replyLink, { color: palette.primary }]}>{t("reply")}</Text>
             </Pressable>
           </View>
         )}
-        ListEmptyComponent={<Text style={styles.empty}>{t("noMessages")}</Text>}
+        ListEmptyComponent={
+          <Text style={[styles.empty, { color: palette.muted }]}>{t("noMessages")}</Text>
+        }
       />
       <View style={styles.composer}>
         <TextInput
-          style={[styles.input, styles.flex]}
+          style={[styles.input, styles.flex, inputStyle]}
           placeholder={t("composer")}
           value={draft}
           onChangeText={setDraft}
@@ -670,36 +711,38 @@ function ChannelScreen({
         animationType="slide"
         onRequestClose={() => setThreadParent(null)}
       >
-        <View style={styles.flex}>
+        <View style={[styles.flex, { backgroundColor: palette.bg }]}>
           <View style={styles.channelHeader}>
             <Button title={t("close")} onPress={() => setThreadParent(null)} />
-            <Text style={styles.header}>{t("thread")}</Text>
+            <Text style={[styles.header, { color: palette.text }]}>{t("thread")}</Text>
           </View>
           {threadParent ? (
-            <View style={styles.threadParent}>
-              <Text style={styles.messageUser}>
+            <View style={[styles.threadParent, { backgroundColor: palette.panel }]}>
+              <Text style={[styles.messageUser, { color: palette.muted }]}>
                 {personLabel(people[threadParent.userId], threadParent.userId)}
               </Text>
-              <Text>{threadParent.content}</Text>
+              <Text style={{ color: palette.text }}>{threadParent.content}</Text>
             </View>
           ) : null}
           <FlatList
-            style={styles.flex}
+            style={[styles.flex, { backgroundColor: palette.bg }]}
             data={threadReplies}
             keyExtractor={(item) => item.id}
             renderItem={({ item }) => (
               <View style={styles.message} testID={`thread-reply-${item.id}`}>
-                <Text style={styles.messageUser}>
+                <Text style={[styles.messageUser, { color: palette.muted }]}>
                   {personLabel(people[item.userId], item.userId)}
                 </Text>
-                <Text>{item.content}</Text>
+                <Text style={{ color: palette.text }}>{item.content}</Text>
               </View>
             )}
-            ListEmptyComponent={<Text style={styles.empty}>{t("noReplies")}</Text>}
+            ListEmptyComponent={
+              <Text style={[styles.empty, { color: palette.muted }]}>{t("noReplies")}</Text>
+            }
           />
           <View style={styles.composer}>
             <TextInput
-              style={[styles.input, styles.flex]}
+              style={[styles.input, styles.flex, inputStyle]}
               placeholder={t("threadPlaceholder")}
               value={threadDraft}
               onChangeText={setThreadDraft}
@@ -715,13 +758,13 @@ function ChannelScreen({
         </View>
       </Modal>
       <Modal visible={searchOpen} animationType="slide" onRequestClose={() => setSearchOpen(false)}>
-        <View style={styles.flex}>
+        <View style={[styles.flex, { backgroundColor: palette.bg }]}>
           <View style={styles.channelHeader}>
             <Button title={t("close")} onPress={() => setSearchOpen(false)} />
-            <Text style={styles.header}>{t("search")}</Text>
+            <Text style={[styles.header, { color: palette.text }]}>{t("search")}</Text>
           </View>
           <TextInput
-            style={[styles.input, styles.searchInput]}
+            style={[styles.input, styles.searchInput, inputStyle]}
             placeholder={t("searchPlaceholder")}
             value={searchTerm}
             onChangeText={setSearchTerm}
@@ -733,12 +776,12 @@ function ChannelScreen({
             keyExtractor={(item) => item.id}
             renderItem={({ item }) => (
               <View style={styles.message} testID={`search-result-${item.id}`}>
-                <Text style={styles.messageUser}>{item.userId}</Text>
+                <Text style={[styles.messageUser, { color: palette.muted }]}>{item.userId}</Text>
                 <Text numberOfLines={3}>{item.content}</Text>
               </View>
             )}
             ListEmptyComponent={
-              <Text style={styles.empty}>
+              <Text style={[styles.empty, { color: palette.muted }]}>
                 {searchTerm.trim().length === 0
                   ? t("searchHint")
                   : searching

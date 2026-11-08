@@ -213,8 +213,16 @@ with 150 ids returned HTTP 500 before this change.
 - `apps/mobile/src/lib/i18n.ts` holds zh/en dictionaries, a persisted language
   store (SecureStore) and `useT()`; every user-facing string in `App.tsx` now
   goes through it, and the settings sheet has 中文/English buttons.
-- Jest tests cover translations and key parity. Theme switching remains the
-  last mobile parity item.
+- Jest tests cover translations and key parity.
+
+### Theme
+
+- `apps/mobile/src/lib/theme.ts` resolves light/dark palettes from an explicit
+  mode or the device scheme, persists the choice in SecureStore, and exposes
+  `usePalette()`; screens apply background, text, input and panel colors from
+  it.
+- The settings sheet has 浅色/深色/跟随系统 buttons. This completes the mobile
+  parity scope.
 
 ### Settings (push toggle)
 
@@ -231,8 +239,7 @@ with 150 ids returned HTTP 500 before this change.
 
 ## Deferred — frontend / UI
 
-1. Mobile parity: theme switching is still missing from `apps/mobile` (needs a
-   mobile palette; language is done).
+1. E2E coverage for channel settings saves (the team settings path is covered).
 2. E2E coverage for channel settings saves (the team settings path is covered).
 
 > Note: `docs/` is listed in `.gitignore`; this file was committed explicitly
