@@ -25,7 +25,7 @@ uploadsV1.post("/uploads", requireSession, zodValidator("json", UploadRequest), 
   return c.json(out, 201);
 });
 uploadsV1.post("/uploads/:uploadId/attach", requireSession, async (c) => {
-  const { attachment } = await attachUpload(getDb(c.env.DB), {
+  const { attachment } = await attachUpload(getDb(c.env.DB), c.env, {
     uploadId: c.req.param("uploadId"),
     userId: c.get("session")!.user.id,
   });

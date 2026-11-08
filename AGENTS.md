@@ -69,6 +69,10 @@ openchat#e2e` / `vp run desktop#e2e`.
 - jsdom-dependent test files declare `// @vitest-environment jsdom` themselves
   (docblock) so they pass under both the per-package and root runners — keep
   that convention for new DOM-touching tests.
+- Worker tests pin `SQLITE_TMPDIR` to `os.tmpdir()` in
+  `apps/openchat/vitest.config.worker.ts`. SQLite probes `/var/tmp` before
+  `/tmp`; sandboxes that deny `/var/tmp` surface the failure as
+  `D1_ERROR ... SQLITE_CANTOPEN` from `applyD1Migrations`.
 - New dependencies belong in `pnpm-workspace.yaml` `catalog:` (project convention)
   unless the package is used only once (then a direct pinned version is acceptable,
   matching how `better-auth` is handled).

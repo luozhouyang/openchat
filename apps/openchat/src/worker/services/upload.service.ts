@@ -145,6 +145,7 @@ export async function completeUpload(
  */
 export async function attachUpload(
   db: Db,
+  env: Env,
   { uploadId, userId }: { uploadId: string; userId: string },
 ) {
   const session = await getUploadSession(db, uploadId);
@@ -157,9 +158,21 @@ export async function attachUpload(
   if (!session.path) {
     throw apiError("not found", "not found", 404);
   }
-  if (session.fileOffset !== session.fileSize) {
-    throw apiError("upload incomplete", "upload incomplete", 409);
+  if (session.fileOffset === session.fileSize) {
+    throw apiError("already processed", "already processed", 409);
   }
+  // Same integrity checks as the file-message completion path, minus the post.
+  const object = await headObject(env.FILES, session.path);
+  if (!object) {
+    throw apiError("object missing", "object missing", 404);
+  }
+  if (object.size !== session.fileSize) {
+    throw apiError("size mismatch", "size mismatch", 422);
+  }
+  if (object.contentType !== session.type) {
+    throw apiError("type mismatch", "type mismatch", 422);
+  }
+  await completeUploadSession(db, { id: session.id, fileOffset: session.fileSize ?? 0 });
   if (!(await getFileInfo(db, uploadId))) {
     await createFileInfo(db, {
       id: session.id,
