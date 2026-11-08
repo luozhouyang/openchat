@@ -33,6 +33,7 @@ import type {
   PinnedPostsOutput,
   PushSubscribeInput,
   SearchPostsOutput,
+  MyThreadsOutput,
   PutStatusInput,
   RoleOutput,
   RolesListOutput,
@@ -231,6 +232,10 @@ export function createApi(opts: ApiFetchOptions = {}) {
         f<SearchPostsOutput>(
           `/api/v1/channels/${channelId}/posts/search?q=${encodeURIComponent(query)}&limit=${limit}`,
         ),
+    },
+
+    threads: {
+      mine: (teamId: string) => f<MyThreadsOutput>(`/api/v1/users/me/teams/${teamId}/threads`),
     },
 
     push: {

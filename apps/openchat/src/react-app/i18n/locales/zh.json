@@ -105,7 +105,10 @@
     "noBrowseChannels": "没有可浏览的频道",
     "joinChannelFailed": "加入频道失败",
     "reconnecting": "连接中断，正在重连…",
-    "disconnected": "连接已断开"
+    "disconnected": "连接已断开",
+    "threads": "线程",
+    "noThreads": "还没有线程",
+    "replyCount": "{{count}} 条回复"
   },
   "teams": {
     "title": "团队",

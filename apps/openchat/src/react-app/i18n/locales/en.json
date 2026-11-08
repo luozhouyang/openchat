@@ -105,7 +105,10 @@
     "noBrowseChannels": "No channels to browse",
     "joinChannelFailed": "Could not join the channel",
     "reconnecting": "Connection lost, reconnecting…",
-    "disconnected": "Disconnected"
+    "disconnected": "Disconnected",
+    "threads": "Threads",
+    "noThreads": "No threads yet",
+    "replyCount": "{{count}} replies"
   },
   "teams": {
     "title": "Teams",
