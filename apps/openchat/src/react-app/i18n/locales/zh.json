@@ -255,6 +255,7 @@
     "markAllRead": "全部已读",
     "unread": "{{count}} 条未读",
     "mention": "@提及",
-    "reply": "线程回复"
+    "reply": "线程回复",
+    "dm": "私信"
   }
 }

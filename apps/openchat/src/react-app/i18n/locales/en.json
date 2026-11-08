@@ -255,6 +255,7 @@
     "markAllRead": "Mark all read",
     "unread": "{{count}} unread",
     "mention": "Mention",
-    "reply": "Thread reply"
+    "reply": "Thread reply",
+    "dm": "Direct message"
   }
 }

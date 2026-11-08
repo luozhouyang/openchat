@@ -107,13 +107,22 @@ with 150 ids returned HTTP 500 before this change.
   the thumbnail queue (R2 notifications cannot be declared in `wrangler.jsonc`).
 - `makeAuth` captures `env` in its closures instead of a module-level variable.
 
+## Implemented — round 3
+
+### DM notifications
+
+- `NotificationKindSchema` gains `dm`; DM/GM channels now create an inbox row
+  for every member except the sender (mention/reply still win over `dm`).
+- The channel type is cached in DO storage for 5 minutes, mirroring the display
+  name cache (`test/worker/notifications/dm-notifications.test.ts`).
+- `notifications.dm` labels added to the en/zh locales, so the existing inbox
+  dialog renders DM entries without further UI work.
+
 ## Deferred — backend
 
 1. Distributed rate limiting: the current limiter is per isolate; move to a
    Durable Object or Cloudflare Rate Limiting binding if abuse needs hard limits.
-2. Cross-device notification read state (needs a WS event plus client handling).
-3. DM notifications in the inbox (server kinds are `mention`/`reply` only).
-4. Search indexing/ranking (current search is a bounded substring scan).
+2. Search indexing/ranking (current search is a bounded substring scan).
 
 ## Deferred — frontend / UI
 
@@ -123,10 +132,9 @@ with 150 ids returned HTTP 500 before this change.
    self-join and admin removal).
 4. Admin entry point in the UI and registration-mode control (the API exists;
    `/admin` currently shows static copy). Audit log viewer also missing.
-5. DM notifications in the inbox.
-6. Cross-device notification read state.
-7. Mobile app parity with the new notifications/search/settings features.
-8. E2E coverage for presence, theme switching, notification read, channel
+5. Cross-device notification read state (needs a WS event plus client handling).
+6. Mobile app parity with the new notifications/search/settings features.
+7. E2E coverage for presence, theme switching, notification read, channel
    settings, pins, threads, leave/browse/join flows.
 
 > Note: `docs/` is listed in `.gitignore`; this file was committed explicitly

@@ -728,7 +728,7 @@ export class ChannelDO extends DurableObject<Env> {
     mentions: string[];
     parentId: string | null;
   }): Promise<void> {
-    const recipients = new Map<string, "mention" | "reply">();
+    const recipients = new Map<string, "mention" | "reply" | "dm">();
     for (const userId of input.mentions) {
       if (userId !== input.actorId) {
         recipients.set(userId, "mention");
@@ -751,6 +751,17 @@ export class ChannelDO extends DurableObject<Env> {
       for (const userId of candidates) {
         if (userId !== input.actorId && !recipients.has(userId)) {
           recipients.set(userId, "reply");
+        }
+      }
+    }
+    const channelType = await this.channelType();
+    if (channelType === "dm" || channelType === "gm") {
+      const members = await this.db
+        .select({ userId: schema.memberState.userId })
+        .from(schema.memberState);
+      for (const member of members) {
+        if (member.userId !== input.actorId && !recipients.has(member.userId)) {
+          recipients.set(member.userId, "dm");
         }
       }
     }
@@ -1549,6 +1560,28 @@ export class ChannelDO extends DurableObject<Env> {
         ? { ...event, channelDisplayName: await this.channelDisplayName() }
         : event;
     await this.broadcaster.broadcast(outgoing, prefs, targets);
+  }
+
+  /** Cached channel type; DM/GM channels notify every member on each message. */
+  private async channelType(): Promise<string | undefined> {
+    const cached = await this.ctx.storage.get<{ type: string; at: number }>("channelType");
+    if (cached && Date.now() - cached.at < 5 * 60_000) {
+      return cached.type;
+    }
+    try {
+      const rows = await getDb(this.env.DB)
+        .select({ type: schemaD1.channels.type })
+        .from(schemaD1.channels)
+        .where(eq(schemaD1.channels.id, this.channelId))
+        .limit(1);
+      const type = rows[0]?.type;
+      if (type) {
+        await this.ctx.storage.put("channelType", { type, at: Date.now() });
+      }
+      return type;
+    } catch {
+      return cached?.type;
+    }
   }
 
   /**

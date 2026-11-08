@@ -308,7 +308,7 @@ export const StatusesOutput = z.object({ statuses: z.record(z.string(), z.string
 export type StatusesOutput = z.infer<typeof StatusesOutput>;
 
 // ---- notifications ----
-export const NotificationKindSchema = z.enum(["mention", "reply"]);
+export const NotificationKindSchema = z.enum(["mention", "reply", "dm"]);
 export type NotificationKind = z.infer<typeof NotificationKindSchema>;
 export const NotificationItem = z.object({
   id: idSchema,
