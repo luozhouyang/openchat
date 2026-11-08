@@ -157,5 +157,5 @@ test("internal thumbnail endpoint writes thumbUrl for complete upload", async ()
   expect(await res.json()).toEqual({ ok: true });
 
   const { messages } = await stub.history({ limit: 5 });
-  expect(messages[0].attachments?.[0].thumbUrl).toBe(`/files/c-file/${uploadId}?thumb=1`);
+  expect(messages[0].attachments?.[0].thumbUrl).toBe(`/api/v1/files/${uploadId}/thumbnail`);
 });

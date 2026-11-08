@@ -38,6 +38,8 @@ import type {
   TeamOutput,
   UploadRequest,
   UserAutocompleteOutput,
+  ListUsersOutput,
+  AttachUploadOutput,
   WorkspaceResponse,
 } from "./rest.ts";
 
@@ -148,6 +150,9 @@ export function createApi(opts: ApiFetchOptions = {}) {
         f<UserAutocompleteOutput>(
           `/api/v1/users/autocomplete?term=${encodeURIComponent(term)}&limit=${limit}`,
         ),
+      /** Batch profile lookup (max 100 ids) for author names/avatars. */
+      list: (ids: string[]) =>
+        f<ListUsersOutput>(`/api/v1/users?ids=${encodeURIComponent(ids.slice(0, 100).join(","))}`),
     },
 
     teams: {
@@ -243,6 +248,9 @@ export function createApi(opts: ApiFetchOptions = {}) {
         f<CreateUploadOutput>("/api/v1/uploads", json("POST", input)),
       complete: (uploadId: string) =>
         f<CompleteUploadOutput>(`/api/v1/uploads/${uploadId}/complete`, json("POST", { uploadId })),
+      /** Finish the upload without posting a message; the file is attached later. */
+      attach: (uploadId: string) =>
+        f<AttachUploadOutput>(`/api/v1/uploads/${uploadId}/attach`, json("POST", { uploadId })),
     },
 
     status: {

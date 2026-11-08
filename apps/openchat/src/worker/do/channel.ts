@@ -11,6 +11,19 @@ import { setThumbnail } from "@worker/db/repos/uploads";
 import { createBroadcaster } from "@worker/do/broadcast";
 import { createReactionBatcher } from "@worker/do/reaction-batch";
 
+/**
+ * Attachment payload as persisted on the message row. Kept structural (no
+ * index signature) so the DO RPC type stays serializable.
+ */
+interface MessageAttachment {
+  fileId: string;
+  key?: string;
+  name?: string;
+  mime?: string;
+  size?: number;
+  thumbUrl?: string;
+}
+
 interface HistoryMessage {
   id: string;
   seq: number;
@@ -18,7 +31,7 @@ interface HistoryMessage {
   parentId: string | null;
   type: MessageType;
   content: string;
-  attachments: Record<string, string | number | boolean>[] | null;
+  attachments: MessageAttachment[] | null;
   mentions: string[] | null;
   isPinned: boolean;
   hasReactions: boolean;

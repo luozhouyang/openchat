@@ -5,6 +5,7 @@ import {
   getUploadSession,
   completeUploadSession,
   createFileInfo,
+  getFileInfo,
   linkFileToPost,
 } from "@worker/db/repos/uploads";
 import { apiError } from "@worker/lib/errors";
@@ -135,4 +136,50 @@ export async function completeUpload(
   });
   await linkFileToPost(db, { fileId: session.id, postId: messageId });
   return { messageId };
+}
+
+/**
+ * Completes an upload without posting a message, so the caller can attach the
+ * file to a text post (the composer's draft-attachment path). The regular
+ * `completeUpload` keeps the "upload = file message" behavior.
+ */
+export async function attachUpload(
+  db: Db,
+  { uploadId, userId }: { uploadId: string; userId: string },
+) {
+  const session = await getUploadSession(db, uploadId);
+  if (!session) {
+    throw apiError("not found", "not found", 404);
+  }
+  if (session.userId !== userId) {
+    throw apiError("forbidden", "not your upload", 403);
+  }
+  if (!session.path) {
+    throw apiError("not found", "not found", 404);
+  }
+  if (session.fileOffset !== session.fileSize) {
+    throw apiError("upload incomplete", "upload incomplete", 409);
+  }
+  if (!(await getFileInfo(db, uploadId))) {
+    await createFileInfo(db, {
+      id: session.id,
+      creatorId: session.userId,
+      postId: null,
+      path: session.path,
+      name: session.filename,
+      extension: session.filename ? extensionOf(session.filename) : null,
+      size: session.fileSize,
+      mimeType: session.type,
+      createdAt: Date.now(),
+    });
+  }
+  return {
+    attachment: {
+      fileId: session.id,
+      key: session.path,
+      name: session.filename ?? "file",
+      size: session.fileSize ?? 0,
+      mime: session.type ?? "application/octet-stream",
+    },
+  };
 }

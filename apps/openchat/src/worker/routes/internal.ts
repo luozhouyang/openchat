@@ -63,7 +63,9 @@ internalRoutes.post(
     const id = c.env.CHANNEL_DO.idFromName(channelDoName(body.channelId));
     await c.env.CHANNEL_DO.get(id).updateThumbByUpload({
       uploadId: body.uploadId,
-      thumbUrl: `/files/${body.channelId}/${body.uploadId}?thumb=1`,
+      // Canonical, same-origin URL: the client renders this directly in
+      // <img src>, so it must match the files route, not the legacy shape.
+      thumbUrl: `/api/v1/files/${body.uploadId}/thumbnail`,
       thumbKey: body.thumbKey,
     });
     return c.json({ ok: true });

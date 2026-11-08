@@ -7,6 +7,8 @@ import {
   type TeamType,
   UserAutocompleteOutput,
   UserAutocompleteQuery,
+  ListUsersOutput,
+  ListUsersQuery,
 } from "protocol";
 import { requireSession } from "@worker/auth/session";
 import { resolvePermissions } from "@worker/auth/rbac";
@@ -118,6 +120,43 @@ usersV1.get("/users/me/workspaces", requireSession, async (c) => {
   // longer pays an unconditional UserDO cache write every time.
   await syncUserChannels(c.env, userId, [...myChannels]);
   const out: WorkspaceResponse = { teams, directs: directSummaries };
+  return c.json(out);
+});
+
+usersV1.get("/users", requireSession, zodValidator("query", ListUsersQuery), async (c) => {
+  const ids = [
+    ...new Set(
+      c.req
+        .valid("query")
+        .ids.split(",")
+        .map((id) => id.trim())
+        .filter(Boolean),
+    ),
+  ].slice(0, 100);
+  if (ids.length === 0) {
+    return c.json({ users: [] } satisfies ListUsersOutput);
+  }
+  const db = getDb(c.env.DB);
+  const rows = await db
+    .select({
+      id: users.id,
+      username: users.username,
+      nickname: users.nickname,
+      name: users.name,
+      avatarUrl: users.avatarUrl,
+      image: users.image,
+    })
+    .from(users)
+    .where(inArray(users.id, ids));
+  const out: ListUsersOutput = {
+    users: rows.map((r) => ({
+      id: r.id,
+      username: r.username,
+      nickname: r.nickname,
+      name: r.name,
+      avatarUrl: r.avatarUrl ?? r.image ?? null,
+    })),
+  };
   return c.json(out);
 });
 

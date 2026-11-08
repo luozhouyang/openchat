@@ -125,11 +125,39 @@ export const NotifyPropsInput = z.object({
 export type NotifyPropsInput = z.infer<typeof NotifyPropsInput>;
 
 // ---- posts ----
-export const CreatePostInput = z.object({
-  message: z.string().min(1).max(16384),
-  parentId: idSchema.optional(),
-  clientToken: z.string().min(1).max(64).optional(),
-});
+/**
+ * Attachment descriptor as stored on the message row (ChannelDO writes the
+ * upload session's fileId/key/name/size/mime verbatim). Loose on purpose:
+ * the thumbnail pipeline may add fields without a protocol bump.
+ */
+export const PostAttachment = z
+  .object({
+    fileId: idSchema,
+    key: z.string().optional(),
+    name: z.string().optional(),
+    mime: z.string().optional(),
+    size: z.number().optional(),
+    thumbUrl: z.string().optional(),
+  })
+  .passthrough();
+export type PostAttachment = z.infer<typeof PostAttachment>;
+
+/** Response of the draft-upload endpoint: attach now, post later. */
+export const AttachUploadOutput = z.object({ attachment: PostAttachment });
+export type AttachUploadOutput = z.infer<typeof AttachUploadOutput>;
+
+export const CreatePostInput = z
+  .object({
+    // Empty only when the post carries attachments (file-only messages).
+    message: z.string().max(16384),
+    parentId: idSchema.optional(),
+    clientToken: z.string().min(1).max(64).optional(),
+    /** Attach already-uploaded files to this post (max 10 per message). */
+    attachments: z.array(PostAttachment).max(10).optional(),
+  })
+  .refine((v) => v.message.trim().length > 0 || (v.attachments?.length ?? 0) > 0, {
+    message: "message or attachments required",
+  });
 export type CreatePostInput = z.infer<typeof CreatePostInput>;
 
 export const PatchPostInput = z.object({
@@ -159,6 +187,8 @@ export const PostOutput = z.object({
   parentId: z.string().nullable(),
   type: MessageTypeSchema,
   content: z.string(),
+  /** Present on file messages and any post created with attachments. */
+  attachments: z.array(PostAttachment).nullable().optional(),
   mentions: z.array(z.string()).nullable(),
   editedAt: z.number().nullable(),
   deletedAt: z.number().nullable(),
@@ -372,6 +402,19 @@ export const UserAutocompleteQuery = z.object({
   limit: z.coerce.number().int().min(1).max(50).optional(),
 });
 export type UserAutocompleteQuery = z.infer<typeof UserAutocompleteQuery>;
+
+/**
+ * Batch profile lookup used to render author names/avatars in message lists.
+ * `ids` is a comma-separated list capped at 100 entries; unknown ids are
+ * omitted rather than reported, so callers must tolerate short results.
+ */
+export const ListUsersQuery = z.object({
+  // 100 ids × ~41 chars (prefix + uuidv7 + separator) with headroom.
+  ids: z.string().min(1).max(8192),
+});
+export type ListUsersQuery = z.infer<typeof ListUsersQuery>;
+export const ListUsersOutput = z.object({ users: z.array(UserAutocompleteItem) });
+export type ListUsersOutput = z.infer<typeof ListUsersOutput>;
 
 // ---- workspaces (kept, now derived from TeamSummary) ----
 export const WorkspaceResponse = z.object({

@@ -38,6 +38,7 @@ postsV1.post(
       content: body.message,
       parentId: body.parentId,
       clientToken: body.clientToken,
+      attachments: body.attachments,
     });
     const stub = c.env.CHANNEL_DO.get(c.env.CHANNEL_DO.idFromName(channelDoName(channelId)));
     const res = await stub.history({ afterSeq: seq - 1, limit: 1 });
