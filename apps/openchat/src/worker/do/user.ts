@@ -177,6 +177,13 @@ export class UserDO extends DurableObject<Env> {
           createdAt?: number;
         };
       };
+      if (e.type === "notifications.read") {
+        const payload = JSON.stringify({ type: "notifications.read" });
+        for (const ws of sockets) {
+          ws.send(payload);
+        }
+        continue;
+      }
       if (e.type === "channel.read") {
         const readEvent = e as { channelId: string; lastReadSeq: number };
         await this.db

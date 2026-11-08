@@ -146,6 +146,8 @@ export const serverEventSchema = z.discriminatedUnion("type", [
     lastMessage: z.object({ preview: z.string(), userId: z.string(), at: z.number() }),
   }),
   z.object({ type: z.literal("channel.read"), channelId: z.string(), lastReadSeq: z.number() }),
+  /** Another device marked inbox entries read; refresh the local bell. */
+  z.object({ type: z.literal("notifications.read") }),
   channelCreatedEvent,
   channelUpdatedEvent,
   channelDeletedEvent,

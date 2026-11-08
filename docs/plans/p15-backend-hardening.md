@@ -150,6 +150,31 @@ with 150 ids returned HTTP 500 before this change.
 - Worker tests cover admin add, duplicate add, non-team targets and 403 for
   non-admins.
 
+## Implemented — round 5
+
+### Admin console
+
+- The user menu shows an "Admin console" entry when `role === "admin"`;
+  `GET /users/me` now returns `role`.
+- Admin page: a registration-mode control backed by `GET/PUT /admin/settings`
+  and an audit-log tab backed by `GET /admin/audit` (protocol types and client
+  methods added).
+- App tests cover the registration control and the audit table; a worker test
+  covers the settings roundtrip, 403 and 422 paths.
+
+### Cross-device notification read
+
+- `POST /users/me/notifications/read` now pushes a `notifications.read` frame to
+  the user's DO, so other tabs/devices clear the bell immediately instead of
+  waiting for the poll.
+- Covered by a worker test that reads the frame from a live websocket.
+
+### E2E coverage
+
+- New specs: theme persistence across reloads, pinning a message and finding it
+  in the pinned dialog, replying in the thread panel, and the notification bell
+  clearing after an entry is opened.
+
 ## Deferred — backend
 
 1. Distributed rate limiting: the current limiter is per isolate; move to a
@@ -158,12 +183,8 @@ with 150 ids returned HTTP 500 before this change.
 
 ## Deferred — frontend / UI
 
-1. Admin entry point in the UI and registration-mode control (the API exists;
-   `/admin` currently shows static copy). Audit log viewer also missing.
-2. Cross-device notification read state (needs a WS event plus client handling).
-3. Mobile app parity with the new notifications/search/settings features.
-4. E2E coverage for presence, theme switching, notification read, channel
-   settings, pins, threads, leave/browse/join flows.
+1. Mobile app parity with the new notifications/search/settings features.
+2. E2E coverage for presence, channel settings and leave/browse/join flows.
 
 > Note: `docs/` is listed in `.gitignore`; this file was committed explicitly
 > with `git add -f`, other docs stay local.

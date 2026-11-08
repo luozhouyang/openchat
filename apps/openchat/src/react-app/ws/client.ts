@@ -27,6 +27,10 @@ class WsClient {
     },
     selfUserId: () => this.selfUserId,
     onLocal: (ev) => {
+      if (ev.type === "notifications.read") {
+        void queryClient.invalidateQueries({ queryKey: ["notifications"] });
+        return;
+      }
       if (ev.type !== "error") {
         return;
       }

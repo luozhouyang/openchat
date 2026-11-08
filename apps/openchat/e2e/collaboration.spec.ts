@@ -48,6 +48,9 @@ test("a mention lands in the notification bell", async ({ page, request }) => {
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByText("Mention", { exact: true })).toBeVisible();
   await expect(dialog.getByText(/hey @/)).toBeVisible();
+
+  await dialog.getByRole("button", { name: /Mention/ }).click();
+  await expect(page.getByRole("button", { name: "Notifications" })).not.toContainText("1");
 });
 
 test("global search finds hits in other channels", async ({ page, request }) => {

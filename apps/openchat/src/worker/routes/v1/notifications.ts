@@ -6,6 +6,7 @@ import {
   type NotificationsOutput,
   type NotificationItem,
 } from "protocol";
+import { userDoName } from "protocol";
 import { requireSession } from "@worker/auth/session";
 import { getDb } from "@worker/db/client";
 import { notifications } from "@worker/db/schema-d1";
@@ -68,6 +69,14 @@ notificationsV1.post(
       }
     } else {
       await db.update(notifications).set({ readAt }).where(eq(notifications.userId, userId));
+    }
+    // Best-effort fan-out so the user's other devices clear the badge without
+    // waiting for the next poll.
+    try {
+      const stub = c.env.USER_DO.get(c.env.USER_DO.idFromName(userDoName(userId)));
+      await stub.push({ events: [{ type: "notifications.read" }] });
+    } catch {
+      // The D1 read state is already authoritative.
     }
     return c.json({ ok: true });
   },
