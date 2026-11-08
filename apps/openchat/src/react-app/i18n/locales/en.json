@@ -103,7 +103,9 @@
     "joined": "Joined",
     "inviteOnly": "Invite only",
     "noBrowseChannels": "No channels to browse",
-    "joinChannelFailed": "Could not join the channel"
+    "joinChannelFailed": "Could not join the channel",
+    "reconnecting": "Connection lost, reconnecting…",
+    "disconnected": "Disconnected"
   },
   "teams": {
     "title": "Teams",

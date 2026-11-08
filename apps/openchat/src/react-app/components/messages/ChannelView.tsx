@@ -18,7 +18,7 @@ export function ChannelView({ channelId }: { channelId: string }) {
   const maxSeq = useMessageStore((s) => s.maxSeq(channelId));
   const [panel, setPanel] = useState<"members" | "pinned" | "search" | null>(null);
 
-  useQuery({
+  const history = useQuery({
     queryKey: ["history", channelId],
     queryFn: async () => {
       const res = await api.posts.list(channelId, { limit: 30 });
@@ -47,7 +47,7 @@ export function ChannelView({ channelId }: { channelId: string }) {
           onOpenPinned={() => setPanel("pinned")}
           onOpenSearch={() => setPanel("search")}
         />
-        <MessageList channelId={channelId} />
+        <MessageList channelId={channelId} loading={history.isLoading} />
         <TypingIndicator channelId={channelId} />
         <Composer channelId={channelId} />
       </div>

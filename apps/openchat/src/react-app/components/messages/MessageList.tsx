@@ -31,7 +31,13 @@ function sameDay(a: number, b: number): boolean {
   );
 }
 
-export function MessageList({ channelId }: { channelId: string }) {
+export function MessageList({
+  channelId,
+  loading = false,
+}: {
+  channelId: string;
+  loading?: boolean;
+}) {
   // list() derives a fresh array; shallow-compare so unchanged state stays snapshot-stable.
   const list = useMessageStore(useShallow((s) => s.list(channelId)));
   const { t } = useTranslation();
@@ -184,7 +190,13 @@ export function MessageList({ channelId }: { channelId: string }) {
           80;
       }}
     >
-      {items.length === 0 ? (
+      {items.length === 0 && loading ? (
+        <div className="space-y-3 p-4" aria-busy="true">
+          {[0, 1, 2, 3].map((row) => (
+            <div key={row} className="h-8 animate-pulse rounded bg-muted" />
+          ))}
+        </div>
+      ) : items.length === 0 ? (
         <div className="grid h-full place-items-center text-sm text-muted-foreground">
           {t("messages.emptyChannel")}
         </div>
