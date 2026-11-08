@@ -65,7 +65,17 @@
       "sendFailed": "Send failed",
       "sent": "Sent",
       "sentDescription": "A verification email has been resent. Check your inbox."
-    }
+    },
+    "forgotPassword": "Forgot password?",
+    "forgotPasswordTitle": "Reset your password",
+    "forgotPasswordHint": "Enter your email and we'll send a reset link.",
+    "sendResetLink": "Send reset link",
+    "resetLinkSent": "If that email exists, a reset link is on its way.",
+    "newPassword": "New password",
+    "resetPassword": "Reset password",
+    "resetPasswordDone": "Password updated. You can sign in now.",
+    "resetLinkInvalid": "This reset link is invalid or expired.",
+    "backToLogin": "Back to sign in"
   },
   "common": {
     "lang": {
@@ -190,7 +200,11 @@
     "leaveConfirm": "Leave this channel?",
     "leaveFailed": "Could not leave the channel",
     "scopeChannel": "This channel",
-    "scopeAll": "All channels"
+    "scopeAll": "All channels",
+    "addMember": "Add member",
+    "addMemberPlaceholder": "Search by name or email",
+    "noUsersFound": "No matching users",
+    "memberAdded": "Member added"
   },
   "presence": {
     "online": "Online",
@@ -219,7 +233,16 @@
     "push_unsupported": "unsupported in this environment",
     "pushEnable": "Enable push",
     "pushEnabled": "Push enabled",
-    "pushFailed": "Could not subscribe to push. Try again later."
+    "pushFailed": "Could not subscribe to push. Try again later.",
+    "displayName": "Display name",
+    "nickname": "Nickname",
+    "save": "Save",
+    "saved": "Saved",
+    "avatar": "Avatar",
+    "uploadAvatar": "Upload image",
+    "avatarHint": "PNG, JPEG or WebP up to 2 MB.",
+    "avatarUpdated": "Avatar updated",
+    "saveFailed": "Save failed"
   },
   "admin": {
     "title": "Admin console",

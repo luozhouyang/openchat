@@ -11,7 +11,7 @@ import * as schema from "@worker/db/schema-d1";
 import { users } from "@worker/db/schema-d1";
 import { getRegistrationMode } from "@worker/db/repos/settings";
 import { auditLog } from "@worker/audit";
-import { sendVerificationMail } from "@worker/email";
+import { sendPasswordResetMail, sendVerificationMail } from "@worker/email";
 
 export function makeAuth(env: Env) {
   return betterAuth({
@@ -26,7 +26,15 @@ export function makeAuth(env: Env) {
       schema,
       usePlural: true,
     }),
-    emailAndPassword: { enabled: true },
+    emailAndPassword: {
+      enabled: true,
+      // The config is rebuilt per request, so the closure over `env` is safe.
+      // better-auth looks up the account first and only calls this for known
+      // emails; unknown emails still get the generic 200 response.
+      sendResetPassword: async ({ user, url }) => {
+        await sendPasswordResetMail(env, user.email, url);
+      },
+    },
     // Registration gating: better-auth 1.7.x `hooks.before` short-circuits
     // matched endpoints before the handler runs (see better-auth
     // dist/api/dispatch.mjs — a thrown APIError becomes the route response).

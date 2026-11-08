@@ -65,7 +65,17 @@
       "sendFailed": "发送失败",
       "sent": "已发送",
       "sentDescription": "验证邮件已重新发送，请查收。"
-    }
+    },
+    "forgotPassword": "忘记密码？",
+    "forgotPasswordTitle": "重置密码",
+    "forgotPasswordHint": "输入邮箱，我们会发送重置链接。",
+    "sendResetLink": "发送重置链接",
+    "resetLinkSent": "如果该邮箱存在，重置链接已发送。",
+    "newPassword": "新密码",
+    "resetPassword": "重置密码",
+    "resetPasswordDone": "密码已更新，请重新登录。",
+    "resetLinkInvalid": "重置链接无效或已过期。",
+    "backToLogin": "返回登录"
   },
   "common": {
     "lang": {
@@ -190,7 +200,11 @@
     "leaveConfirm": "确定要离开这个频道吗？",
     "leaveFailed": "离开频道失败",
     "scopeChannel": "本频道",
-    "scopeAll": "全部频道"
+    "scopeAll": "全部频道",
+    "addMember": "添加成员",
+    "addMemberPlaceholder": "按姓名或邮箱搜索",
+    "noUsersFound": "没有匹配的用户",
+    "memberAdded": "成员已添加"
   },
   "presence": {
     "online": "在线",
@@ -219,7 +233,16 @@
     "push_unsupported": "当前环境不支持",
     "pushEnable": "开启推送",
     "pushEnabled": "推送已开启",
-    "pushFailed": "推送订阅失败，请稍后重试。"
+    "pushFailed": "推送订阅失败，请稍后重试。",
+    "displayName": "显示名称",
+    "nickname": "昵称",
+    "save": "保存",
+    "saved": "已保存",
+    "avatar": "头像",
+    "uploadAvatar": "上传图片",
+    "avatarHint": "支持 PNG、JPEG、WebP，最大 2 MB。",
+    "avatarUpdated": "头像已更新",
+    "saveFailed": "保存失败"
   },
   "admin": {
     "title": "管理控制台",

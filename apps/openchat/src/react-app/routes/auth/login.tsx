@@ -106,6 +106,14 @@ function LoginPage() {
                 </FormField>
               )}
             </form.Field>
+            <div className="-mt-2 text-right">
+              <Link
+                to="/auth/forgot-password"
+                className="text-sm text-primary underline-offset-4 hover:underline"
+              >
+                {t("auth.forgotPassword")}
+              </Link>
+            </div>
             {error && (
               <Alert variant="destructive">
                 <AlertTitle>{t("auth.login.failed")}</AlertTitle>

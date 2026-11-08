@@ -35,6 +35,10 @@ import type {
   SearchPostsOutput,
   MyThreadsOutput,
   NotificationsOutput,
+  UpdateProfileInput,
+  UpdateProfileOutput,
+  UploadAvatarOutput,
+  AddChannelMemberOutput,
   GlobalSearchOutput,
   PutStatusInput,
   RoleOutput,
@@ -135,6 +139,7 @@ export function createApi(opts: ApiFetchOptions = {}) {
           id: string;
           email: string;
           username: string | null;
+          name: string | null;
           nickname: string | null;
           avatarUrl: string | null;
           createdAt: string;
@@ -154,6 +159,15 @@ export function createApi(opts: ApiFetchOptions = {}) {
       }>("/api/v1/users/me/sidebar"),
 
     users: {
+      updateProfile: (input: UpdateProfileInput) =>
+        f<UpdateProfileOutput>("/api/v1/users/me", json("PATCH", input)),
+      /** Raw image bytes (PNG/JPEG/WebP, max 2 MB). */
+      uploadAvatar: (file: Blob) =>
+        f<UploadAvatarOutput>("/api/v1/users/me/avatar", {
+          method: "POST",
+          headers: { "content-type": file.type || "application/octet-stream" },
+          body: file,
+        }),
       autocomplete: (term: string, limit = 20) =>
         f<UserAutocompleteOutput>(
           `/api/v1/users/autocomplete?term=${encodeURIComponent(term)}&limit=${limit}`,
@@ -190,6 +204,10 @@ export function createApi(opts: ApiFetchOptions = {}) {
         f<CreateChannelOutput>("/api/v1/channels", json("POST", input)),
       listByTeam: (teamId: string) => f<ChannelsForTeamOutput>(`/api/v1/teams/${teamId}/channels`),
       get: (channelId: string) => f<ChannelDetailOutput>(`/api/v1/channels/${channelId}`),
+      addMember: (channelId: string, userId: string) =>
+        f<AddChannelMemberOutput>(`/api/v1/channels/${channelId}/members/${userId}`, {
+          method: "POST",
+        }),
       update: (channelId: string, input: UpdateChannelInput) =>
         f<UpdateChannelOutput>(`/api/v1/channels/${channelId}`, json("PUT", input)),
       listMembers: (channelId: string, query?: ListMembersQuery) =>

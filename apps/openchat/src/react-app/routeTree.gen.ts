@@ -17,7 +17,9 @@ import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as TeamIdIndexRouteImport } from './routes/$teamId/index'
 import { Route as TeamIdSettingsRouteImport } from './routes/$teamId/settings'
 import { Route as AuthCheckEmailRouteImport } from './routes/auth/check-email'
+import { Route as AuthForgotPasswordRouteImport } from './routes/auth/forgot-password'
 import { Route as AuthLoginRouteImport } from './routes/auth/login'
+import { Route as AuthResetPasswordRouteImport } from './routes/auth/reset-password'
 import { Route as AuthSignupRouteImport } from './routes/auth/signup'
 import { Route as AuthVerifyEmailRouteImport } from './routes/auth/verify-email'
 import { Route as DmIndexRouteImport } from './routes/dm/index'
@@ -67,9 +69,19 @@ const AuthCheckEmailRoute = AuthCheckEmailRouteImport.update({
   path: '/auth/check-email',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthForgotPasswordRoute = AuthForgotPasswordRouteImport.update({
+  id: '/auth/forgot-password',
+  path: '/auth/forgot-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthLoginRoute = AuthLoginRouteImport.update({
   id: '/auth/login',
   path: '/auth/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthResetPasswordRoute = AuthResetPasswordRouteImport.update({
+  id: '/auth/reset-password',
+  path: '/auth/reset-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthSignupRoute = AuthSignupRouteImport.update({
@@ -122,7 +134,9 @@ export interface FileRoutesByFullPath {
   '/settings': typeof SettingsRoute
   '/$teamId/settings': typeof TeamIdSettingsRoute
   '/auth/check-email': typeof AuthCheckEmailRoute
+  '/auth/forgot-password': typeof AuthForgotPasswordRoute
   '/auth/login': typeof AuthLoginRoute
+  '/auth/reset-password': typeof AuthResetPasswordRoute
   '/auth/signup': typeof AuthSignupRoute
   '/auth/verify-email': typeof AuthVerifyEmailRoute
   '/dm/$channelId': typeof DmChannelIdRouteWithChildren
@@ -139,7 +153,9 @@ export interface FileRoutesByTo {
   '/settings': typeof SettingsRoute
   '/$teamId/settings': typeof TeamIdSettingsRoute
   '/auth/check-email': typeof AuthCheckEmailRoute
+  '/auth/forgot-password': typeof AuthForgotPasswordRoute
   '/auth/login': typeof AuthLoginRoute
+  '/auth/reset-password': typeof AuthResetPasswordRoute
   '/auth/signup': typeof AuthSignupRoute
   '/auth/verify-email': typeof AuthVerifyEmailRoute
   '/dm/$channelId': typeof DmChannelIdRouteWithChildren
@@ -159,7 +175,9 @@ export interface FileRoutesById {
   '/settings': typeof SettingsRoute
   '/$teamId/settings': typeof TeamIdSettingsRoute
   '/auth/check-email': typeof AuthCheckEmailRoute
+  '/auth/forgot-password': typeof AuthForgotPasswordRoute
   '/auth/login': typeof AuthLoginRoute
+  '/auth/reset-password': typeof AuthResetPasswordRoute
   '/auth/signup': typeof AuthSignupRoute
   '/auth/verify-email': typeof AuthVerifyEmailRoute
   '/dm/$channelId': typeof DmChannelIdRouteWithChildren
@@ -180,7 +198,9 @@ export interface FileRouteTypes {
     | '/settings'
     | '/$teamId/settings'
     | '/auth/check-email'
+    | '/auth/forgot-password'
     | '/auth/login'
+    | '/auth/reset-password'
     | '/auth/signup'
     | '/auth/verify-email'
     | '/dm/$channelId'
@@ -197,7 +217,9 @@ export interface FileRouteTypes {
     | '/settings'
     | '/$teamId/settings'
     | '/auth/check-email'
+    | '/auth/forgot-password'
     | '/auth/login'
+    | '/auth/reset-password'
     | '/auth/signup'
     | '/auth/verify-email'
     | '/dm/$channelId'
@@ -216,7 +238,9 @@ export interface FileRouteTypes {
     | '/settings'
     | '/$teamId/settings'
     | '/auth/check-email'
+    | '/auth/forgot-password'
     | '/auth/login'
+    | '/auth/reset-password'
     | '/auth/signup'
     | '/auth/verify-email'
     | '/dm/$channelId'
@@ -235,7 +259,9 @@ export interface RootRouteChildren {
   DmRoute: typeof DmRouteWithChildren
   SettingsRoute: typeof SettingsRoute
   AuthCheckEmailRoute: typeof AuthCheckEmailRoute
+  AuthForgotPasswordRoute: typeof AuthForgotPasswordRoute
   AuthLoginRoute: typeof AuthLoginRoute
+  AuthResetPasswordRoute: typeof AuthResetPasswordRoute
   AuthSignupRoute: typeof AuthSignupRoute
   AuthVerifyEmailRoute: typeof AuthVerifyEmailRoute
   TeamsNewRoute: typeof TeamsNewRoute
@@ -299,11 +325,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthCheckEmailRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/auth/forgot-password': {
+      id: '/auth/forgot-password'
+      path: '/auth/forgot-password'
+      fullPath: '/auth/forgot-password'
+      preLoaderRoute: typeof AuthForgotPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/auth/login': {
       id: '/auth/login'
       path: '/auth/login'
       fullPath: '/auth/login'
       preLoaderRoute: typeof AuthLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth/reset-password': {
+      id: '/auth/reset-password'
+      path: '/auth/reset-password'
+      fullPath: '/auth/reset-password'
+      preLoaderRoute: typeof AuthResetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth/signup': {
@@ -422,7 +462,9 @@ const rootRouteChildren: RootRouteChildren = {
   DmRoute: DmRouteWithChildren,
   SettingsRoute: SettingsRoute,
   AuthCheckEmailRoute: AuthCheckEmailRoute,
+  AuthForgotPasswordRoute: AuthForgotPasswordRoute,
   AuthLoginRoute: AuthLoginRoute,
+  AuthResetPasswordRoute: AuthResetPasswordRoute,
   AuthSignupRoute: AuthSignupRoute,
   AuthVerifyEmailRoute: AuthVerifyEmailRoute,
   TeamsNewRoute: TeamsNewRoute,

@@ -1,11 +1,13 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, createFileRoute } from "@tanstack/react-router";
+import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api } from "@/lib/api";
 import { useMe } from "@/hooks/use-me";
 import { applyTheme, getTheme, type Theme } from "@/lib/theme";
 import { setLanguage } from "@/i18n";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeftIcon } from "lucide-react";
 
@@ -27,6 +29,46 @@ function SettingsPage() {
     typeof Notification === "undefined" ? "unsupported" : Notification.permission,
   );
   const [pushError, setPushError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const [name, setName] = useState("");
+  const [nickname, setNickname] = useState("");
+  const [profileStatus, setProfileStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [avatarStatus, setAvatarStatus] = useState<"idle" | "uploading" | "saved" | "error">(
+    "idle",
+  );
+
+  useEffect(() => {
+    if (!me) {
+      return;
+    }
+    setName(me.name ?? "");
+    setNickname(me.nickname ?? "");
+  }, [me?.id]);
+
+  async function saveProfile() {
+    setProfileStatus("saving");
+    try {
+      await api.users.updateProfile({
+        name: name.trim() || undefined,
+        nickname: nickname.trim() ? nickname.trim() : null,
+      });
+      await queryClient.invalidateQueries({ queryKey: ["me"] });
+      setProfileStatus("saved");
+    } catch {
+      setProfileStatus("error");
+    }
+  }
+
+  async function uploadAvatar(file: File) {
+    setAvatarStatus("uploading");
+    try {
+      await api.users.uploadAvatar(file);
+      await queryClient.invalidateQueries({ queryKey: ["me"] });
+      setAvatarStatus("saved");
+    } catch {
+      setAvatarStatus("error");
+    }
+  }
 
   function chooseTheme(next: Theme) {
     setTheme(next);
@@ -77,11 +119,83 @@ function SettingsPage() {
         <CardHeader>
           <CardTitle>{t("settings.profile")}</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-1 text-sm">
-          <div className="flex justify-between gap-4">
-            <span className="text-muted-foreground">{t("settings.name")}</span>
-            <span className="truncate">{me?.nickname ?? me?.username ?? "—"}</span>
+        <CardContent className="space-y-4 text-sm">
+          <div className="flex items-center gap-3">
+            {me?.avatarUrl ? (
+              <img src={me.avatarUrl} alt="" className="size-12 rounded-full object-cover" />
+            ) : (
+              <div className="grid size-12 place-items-center rounded-full bg-muted text-sm font-medium">
+                {(me?.nickname ?? me?.name ?? me?.username ?? "?").slice(0, 2).toUpperCase()}
+              </div>
+            )}
+            <div className="space-y-1">
+              <Button variant="outline" size="sm" render={<label />}>
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  className="hidden"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (file) {
+                      void uploadAvatar(file);
+                    }
+                    event.target.value = "";
+                  }}
+                />
+                {t("settings.uploadAvatar")}
+              </Button>
+              <p className="text-xs text-muted-foreground">{t("settings.avatarHint")}</p>
+              {avatarStatus === "saved" && (
+                <p className="text-xs text-muted-foreground">{t("settings.avatarUpdated")}</p>
+              )}
+              {avatarStatus === "error" && (
+                <p role="alert" className="text-xs text-destructive">
+                  {t("settings.saveFailed")}
+                </p>
+              )}
+            </div>
           </div>
+
+          <div className="space-y-2">
+            <label className="text-xs text-muted-foreground" htmlFor="profile-name">
+              {t("settings.displayName")}
+            </label>
+            <Input
+              id="profile-name"
+              value={name}
+              maxLength={80}
+              onChange={(event) => setName(event.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-xs text-muted-foreground" htmlFor="profile-nickname">
+              {t("settings.nickname")}
+            </label>
+            <Input
+              id="profile-nickname"
+              value={nickname}
+              maxLength={80}
+              onChange={(event) => setNickname(event.target.value)}
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              onClick={() => void saveProfile()}
+              disabled={profileStatus === "saving"}
+            >
+              {t("settings.save")}
+            </Button>
+            {profileStatus === "saved" && (
+              <span className="text-xs text-muted-foreground">{t("settings.saved")}</span>
+            )}
+            {profileStatus === "error" && (
+              <span role="alert" className="text-xs text-destructive">
+                {t("settings.saveFailed")}
+              </span>
+            )}
+          </div>
+
           <div className="flex justify-between gap-4">
             <span className="text-muted-foreground">{t("settings.username")}</span>
             <span className="truncate">{me?.username ?? "—"}</span>

@@ -118,6 +118,38 @@ with 150 ids returned HTTP 500 before this change.
 - `notifications.dm` labels added to the en/zh locales, so the existing inbox
   dialog renders DM entries without further UI work.
 
+## Implemented — round 4 (UI)
+
+### Password reset
+
+- better-auth `sendResetPassword` hook + `sendPasswordResetMail` (logs the URL in
+  dev, uses the EMAIL binding when configured).
+- New `/auth/forgot-password` page (always shows the generic confirmation, so it
+  cannot enumerate accounts) and `/auth/reset-password?token=...` page; the
+  login page links to it and both routes are in the public-path allowlist.
+- Worker tests cover no-enumeration and invalid-token behaviour; an e2e test
+  covers the page.
+
+### Profile editing and avatars
+
+- `PATCH /api/v1/users/me` updates display name / nickname; `GET /users/me`
+  now returns `name`.
+- `POST /api/v1/users/me/avatar` accepts PNG/JPEG/WebP up to 2 MB and stores the
+  object in R2 (`avatars/{userId}`); `GET /users/:id/avatar` serves it publicly
+  with cache headers. The settings page has an avatar preview/upload and the
+  name/nickname form; existing avatar renderers pick the new image up through
+  the users store.
+- Worker tests plus an e2e test cover the upload and persistence.
+
+### Channel member management
+
+- `POST /channels/:channelId/members/:userId` lets channel admins add another
+  team member (idempotent); `ChannelDetail.callerRole` exposes the caller role.
+- The members dialog shows an admin-only search + add section with inline
+  confirmation.
+- Worker tests cover admin add, duplicate add, non-team targets and 403 for
+  non-admins.
+
 ## Deferred — backend
 
 1. Distributed rate limiting: the current limiter is per isolate; move to a
@@ -126,15 +158,11 @@ with 150 ids returned HTTP 500 before this change.
 
 ## Deferred — frontend / UI
 
-1. Password reset / forgot-password pages (backend endpoint also missing).
-2. Profile editing and avatar upload UI (no `PATCH /users/:id` endpoint yet).
-3. Channel member management UI (adding other members; API only supports
-   self-join and admin removal).
-4. Admin entry point in the UI and registration-mode control (the API exists;
+1. Admin entry point in the UI and registration-mode control (the API exists;
    `/admin` currently shows static copy). Audit log viewer also missing.
-5. Cross-device notification read state (needs a WS event plus client handling).
-6. Mobile app parity with the new notifications/search/settings features.
-7. E2E coverage for presence, theme switching, notification read, channel
+2. Cross-device notification read state (needs a WS event plus client handling).
+3. Mobile app parity with the new notifications/search/settings features.
+4. E2E coverage for presence, theme switching, notification read, channel
    settings, pins, threads, leave/browse/join flows.
 
 > Note: `docs/` is listed in `.gitignore`; this file was committed explicitly

@@ -3,7 +3,14 @@ import { createRootRoute, Outlet, redirect, useRouterState } from "@tanstack/rea
 import { guardSession } from "@/lib/session-guard";
 import { wsClient } from "@/ws/client";
 
-const PUBLIC_PATHS = ["/auth/login", "/auth/signup", "/auth/check-email", "/auth/verify-email"];
+const PUBLIC_PATHS = [
+  "/auth/login",
+  "/auth/signup",
+  "/auth/check-email",
+  "/auth/verify-email",
+  "/auth/forgot-password",
+  "/auth/reset-password",
+];
 
 /**
  * App-level realtime connection (p10 §4.1): one socket per tab for the whole

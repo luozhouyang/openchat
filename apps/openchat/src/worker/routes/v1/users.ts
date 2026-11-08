@@ -28,6 +28,7 @@ import { syncUserChannels } from "@worker/user-do-sync";
 import { apiError } from "@worker/lib/errors";
 import { zodValidator } from "@worker/lib/validation";
 import { chunkItems } from "@worker/lib/chunks";
+import { UpdateProfileInput } from "protocol";
 
 export const usersV1 = new Hono<{ Bindings: Env }>();
 
@@ -44,12 +45,30 @@ usersV1.get("/users/me", requireSession, async (c) => {
       id: row.id,
       email: row.email,
       username: row.username ?? null,
+      name: row.name ?? null,
       nickname: row.nickname ?? null,
       avatarUrl: row.avatarUrl ?? row.image ?? null,
       createdAt: row.createdAt.toISOString(),
       permissions: [...(await resolvePermissions(db, row.id))],
     },
   });
+});
+
+usersV1.patch("/users/me", requireSession, zodValidator("json", UpdateProfileInput), async (c) => {
+  const db = getDb(c.env.DB);
+  const userId = c.get("session")!.user.id;
+  const body = c.req.valid("json");
+  const patch: { name?: string; nickname?: string | null } = {};
+  if (body.name !== undefined) {
+    patch.name = body.name;
+  }
+  if (body.nickname !== undefined) {
+    patch.nickname = body.nickname;
+  }
+  if (Object.keys(patch).length > 0) {
+    await db.update(users).set(patch).where(eq(users.id, userId));
+  }
+  return c.json({ ok: true });
 });
 
 usersV1.get("/users/me/workspaces", requireSession, async (c) => {

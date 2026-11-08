@@ -62,6 +62,7 @@ beforeEach(() => {
       id: "usr_alice",
       email: "alice@test.dev",
       username: "alice",
+      name: "Alice",
       nickname: "Alice",
       avatarUrl: null,
       createdAt: "2026-01-01T00:00:00.000Z",

@@ -161,10 +161,13 @@ channelsV1.get("/channels/:channelId", requireSession, requireChannelRole("membe
   const db = getDb(c.env.DB);
   const ch = (await getChannel(db, c.req.param("channelId")))!;
   const memberIds = await listChannelMemberIds(db, ch.id);
+  const membership = await getChannelMember(db, ch.id, c.get("session")!.user.id);
   const out: ChannelDetailOutput = {
     channel: {
       id: ch.id,
       teamId: ch.teamId,
+      // Roles are space-separated role names (see rbac.resolvePermissions).
+      callerRole: membership?.roles.split(" ").includes("channel_admin") ? "admin" : "member",
       displayName: ch.displayName,
       type: ch.type as ChannelType,
       purpose: ch.purpose,
@@ -195,6 +198,41 @@ channelsV1.post("/channels/:channelId/members", requireSession, async (c) => {
   }
   return c.json({ ok: true });
 });
+
+channelsV1.post(
+  "/channels/:channelId/members/:userId",
+  requireSession,
+  requireChannelRole("admin"),
+  async (c) => {
+    const db = getDb(c.env.DB);
+    const channelId = c.req.param("channelId");
+    const userId = c.req.param("userId");
+    const ch = (await getChannel(db, channelId))!; // requireChannelRole already 404s for missing channels
+    if (!ch.teamId) {
+      throw apiError("invalid", "not a team channel", 422);
+    }
+    // Membership is team-scoped: an admin may only add existing team members.
+    if (!(await getTeamMember(db, ch.teamId, userId))) {
+      throw apiError("invalid", "not a team member", 422);
+    }
+    // Idempotent: re-adding a channel member is a no-op success.
+    if (await getChannelMember(db, channelId, userId)) {
+      return c.json({ ok: true });
+    }
+    await joinChannel(db, { channelId, userId });
+    await syncChannelMember(c.env, channelId, userId, "channel_user");
+    await syncUserChannels(c.env, userId);
+    await createChannelBroadcaster(c.env, channelId).broadcast(
+      channelMemberAddedEvent.parse({
+        type: "channel.member_added",
+        channelId,
+        userId,
+        roles: "channel_user",
+      }),
+    );
+    return c.json({ ok: true });
+  },
+);
 
 channelsV1.delete(
   "/channels/:channelId/members/:userId",

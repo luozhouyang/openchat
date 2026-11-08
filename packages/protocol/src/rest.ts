@@ -103,6 +103,8 @@ export type ChannelsForTeamOutput = z.infer<typeof ChannelsForTeamOutput>;
 export const ChannelDetail = z.object({
   id: idSchema,
   teamId: z.string().nullable(),
+  /** Caller's channel role; drives member-management affordances. */
+  callerRole: z.enum(["admin", "member"]).optional(),
   displayName: z.string(),
   type: ChannelTypeSchema,
   purpose: z.string().nullable(),
@@ -129,6 +131,20 @@ export const ListMembersQuery = z.object({
 export type ListMembersQuery = z.infer<typeof ListMembersQuery>;
 export const ChannelsListOutput = z.object({ memberIds: z.array(idSchema) });
 export type ChannelsListOutput = z.infer<typeof ChannelsListOutput>;
+
+export const UpdateProfileInput = z.object({
+  name: z.string().trim().min(1).max(80).optional(),
+  nickname: z.string().trim().max(80).nullable().optional(),
+});
+export type UpdateProfileInput = z.infer<typeof UpdateProfileInput>;
+export const UpdateProfileOutput = z.object({ ok: z.boolean() });
+export type UpdateProfileOutput = z.infer<typeof UpdateProfileOutput>;
+
+export const UploadAvatarOutput = z.object({ avatarUrl: z.string() });
+export type UploadAvatarOutput = z.infer<typeof UploadAvatarOutput>;
+
+export const AddChannelMemberOutput = z.object({ ok: z.boolean() });
+export type AddChannelMemberOutput = z.infer<typeof AddChannelMemberOutput>;
 
 export const NotifyPropsInput = z.object({
   notifyProps: z.object({ pref: NotifPrefSchema }),
