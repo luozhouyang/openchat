@@ -205,6 +205,16 @@ with 150 ids returned HTTP 500 before this change.
 - Every message row has a 回复 action that opens a thread modal with the parent
   message, the reply list (`GET /channels/:id/posts?parentId=…`) and a reply
   composer that posts through `POST /channels/:id/posts` with `parentId`.
+- The modal markup was missing from the first commit and is restored in the
+  localization commit below.
+
+### Language
+
+- `apps/mobile/src/lib/i18n.ts` holds zh/en dictionaries, a persisted language
+  store (SecureStore) and `useT()`; every user-facing string in `App.tsx` now
+  goes through it, and the settings sheet has 中文/English buttons.
+- Jest tests cover translations and key parity. Theme switching remains the
+  last mobile parity item.
 
 ### Settings (push toggle)
 
@@ -221,8 +231,8 @@ with 150 ids returned HTTP 500 before this change.
 
 ## Deferred — frontend / UI
 
-1. Mobile parity: theme and language settings are still missing from
-   `apps/mobile` (they need mobile i18n and theme infrastructure).
+1. Mobile parity: theme switching is still missing from `apps/mobile` (needs a
+   mobile palette; language is done).
 2. E2E coverage for channel settings saves (the team settings path is covered).
 
 > Note: `docs/` is listed in `.gitignore`; this file was committed explicitly

@@ -1,12 +1,13 @@
 import type { NotificationKind } from "protocol";
+import type { TranslationKey } from "./i18n";
 
-const LABELS: Record<NotificationKind, string> = {
-  mention: "提及",
-  reply: "回复",
-  dm: "私信",
+const KIND_KEYS: Record<NotificationKind, TranslationKey> = {
+  mention: "kindMention",
+  reply: "kindReply",
+  dm: "kindDm",
 };
 
-/** Chinese labels for inbox rows; unknown kinds fall back to the raw value. */
-export function notificationLabel(kind: NotificationKind): string {
-  return LABELS[kind] ?? kind;
+/** Translation key for an inbox row kind. */
+export function notificationKindKey(kind: NotificationKind): TranslationKey {
+  return KIND_KEYS[kind] ?? "kindMention";
 }

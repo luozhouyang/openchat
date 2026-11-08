@@ -21,8 +21,9 @@ import { consumeDeepLink, registerPush } from "./src/lib/push";
 import { getDeviceId } from "./src/lib/secure";
 
 import { createMobilePlatform } from "./src/platform";
-import { notificationLabel } from "./src/lib/notifications";
+import { notificationKindKey } from "./src/lib/notifications";
 import { personLabel, presenceColor } from "./src/lib/people";
+import { loadLanguage, useLanguageStore, useT } from "./src/lib/i18n";
 import { useMessages } from "./src/stores/messages";
 import { closeRealtime, connectRealtime, sendActivity, sendFrame } from "./src/ws/client";
 
@@ -45,6 +46,10 @@ export default function App() {
       setRoute({ screen: "channel", teamId: "", channelId, title: "# 频道" });
     }
   }, [hasSession]);
+
+  useEffect(() => {
+    void loadLanguage();
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -113,6 +118,7 @@ export default function App() {
 }
 
 function LoginScreen({ onLoggedIn }: { onLoggedIn: () => void }) {
+  const t = useT();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -125,7 +131,7 @@ function LoginScreen({ onLoggedIn }: { onLoggedIn: () => void }) {
       await appClient.auth.signIn(email.trim(), password);
       onLoggedIn();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "登录失败");
+      setError(e instanceof Error ? e.message : t("loginFailed"));
     } finally {
       setBusy(false);
     }
@@ -137,10 +143,10 @@ function LoginScreen({ onLoggedIn }: { onLoggedIn: () => void }) {
       style={styles.flex}
     >
       <View style={[styles.flex, styles.center, styles.pad]}>
-        <Text style={styles.title}>登录 openchat</Text>
+        <Text style={styles.title}>{t("loginTitle")}</Text>
         <TextInput
           style={styles.input}
-          placeholder="邮箱"
+          placeholder={t("email")}
           autoCapitalize="none"
           keyboardType="email-address"
           value={email}
@@ -149,14 +155,14 @@ function LoginScreen({ onLoggedIn }: { onLoggedIn: () => void }) {
         />
         <TextInput
           style={styles.input}
-          placeholder="密码"
+          placeholder={t("password")}
           secureTextEntry
           value={password}
           onChangeText={setPassword}
           testID="login-password"
         />
         {error ? <Text style={styles.error}>{error}</Text> : null}
-        {busy ? <ActivityIndicator /> : <Button title="登录" onPress={() => void submit()} />}
+        {busy ? <ActivityIndicator /> : <Button title={t("login")} onPress={() => void submit()} />}
       </View>
     </KeyboardAvoidingView>
   );
@@ -167,6 +173,7 @@ function WorkspaceScreen({
 }: {
   onOpenChannel: (teamId: string, channelId: string, title: string) => void;
 }) {
+  const t = useT();
   const [error, setError] = useState<string | null>(null);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [inboxOpen, setInboxOpen] = useState(false);
@@ -246,7 +253,7 @@ function WorkspaceScreen({
         useTeamsStore.getState().loadAll(res);
         setError(null);
       } catch (e) {
-        setError(e instanceof Error ? e.message : "加载失败");
+        setError(e instanceof Error ? e.message : t("loadFailed"));
       }
     })();
     // Live updates arrive via the resident realtime connection's dispatcher.
@@ -282,14 +289,18 @@ function WorkspaceScreen({
   return (
     <View style={styles.flex}>
       <View style={styles.workspaceHeader}>
-        <Text style={styles.header}>频道</Text>
+        <Text style={styles.header}>{t("channels")}</Text>
         <View style={styles.headerActions}>
           <Button
-            title={unread > 0 ? `通知 (${unread})` : "通知"}
+            title={unread > 0 ? `${t("notifications")} (${unread})` : t("notifications")}
             onPress={() => setInboxOpen(true)}
             testID="open-inbox"
           />
-          <Button title="设置" onPress={() => setSettingsOpen(true)} testID="open-settings" />
+          <Button
+            title={t("settings")}
+            onPress={() => setSettingsOpen(true)}
+            testID="open-settings"
+          />
         </View>
       </View>
       {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -306,13 +317,13 @@ function WorkspaceScreen({
             }
           />
         )}
-        ListEmptyComponent={<Text style={styles.empty}>尚未加入任何频道</Text>}
+        ListEmptyComponent={<Text style={styles.empty}>{t("noChannels")}</Text>}
       />
       <Modal visible={inboxOpen} animationType="slide" onRequestClose={() => setInboxOpen(false)}>
         <View style={styles.flex}>
           <View style={styles.workspaceHeader}>
-            <Button title="关闭" onPress={() => setInboxOpen(false)} />
-            <Text style={styles.header}>通知</Text>
+            <Button title={t("close")} onPress={() => setInboxOpen(false)} />
+            <Text style={styles.header}>{t("notifications")}</Text>
           </View>
           <FlatList
             data={notifications}
@@ -323,11 +334,11 @@ function WorkspaceScreen({
                 style={styles.message}
                 testID={`notification-${item.id}`}
               >
-                <Text style={styles.messageUser}>{notificationLabel(item.kind)}</Text>
+                <Text style={styles.messageUser}>{t(notificationKindKey(item.kind))}</Text>
                 <Text numberOfLines={2}>{item.preview}</Text>
               </Pressable>
             )}
-            ListEmptyComponent={<Text style={styles.empty}>暂无通知</Text>}
+            ListEmptyComponent={<Text style={styles.empty}>{t("noNotifications")}</Text>}
           />
         </View>
       </Modal>
@@ -338,14 +349,21 @@ function WorkspaceScreen({
       >
         <View style={styles.flex}>
           <View style={styles.workspaceHeader}>
-            <Button title="关闭" onPress={() => setSettingsOpen(false)} />
-            <Text style={styles.header}>设置</Text>
+            <Button title={t("close")} onPress={() => setSettingsOpen(false)} />
+            <Text style={styles.header}>{t("settings")}</Text>
           </View>
           <View style={styles.settingRow}>
-            <Text style={styles.settingLabel}>推送通知</Text>
+            <Text style={styles.settingLabel}>{t("pushNotifications")}</Text>
             <Switch value={pushEnabled} onValueChange={(next) => void togglePush(next)} />
           </View>
-          <Text style={styles.empty}>主题与语言设置将在后续版本提供。</Text>
+          <View style={styles.settingRow}>
+            <Text style={styles.settingLabel}>{t("language")}</Text>
+            <View style={styles.headerActions}>
+              <Button title="中文" onPress={() => useLanguageStore.getState().setLang("zh")} />
+              <Button title="English" onPress={() => useLanguageStore.getState().setLang("en")} />
+            </View>
+          </View>
+          <Text style={styles.empty}>{t("themeLater")}</Text>
         </View>
       </Modal>
     </View>
@@ -393,6 +411,7 @@ function ChannelScreen({
   title: string;
   onBack: () => void;
 }) {
+  const t = useT();
   const [messages, setMessages] = useState<StoreMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [hasOlder, setHasOlder] = useState(true);
@@ -596,7 +615,7 @@ function ChannelScreen({
       <View style={styles.channelHeader}>
         <Button title="←" onPress={onBack} />
         <Text style={styles.header}>{title}</Text>
-        <Button title="搜索" onPress={() => setSearchOpen(true)} testID="open-search" />
+        <Button title={t("search")} onPress={() => setSearchOpen(true)} testID="open-search" />
       </View>
       <FlatList
         style={styles.flex}
@@ -605,7 +624,7 @@ function ChannelScreen({
         ListHeaderComponent={
           hasOlder ? (
             <Button
-              title={loadingOlder ? "加载中…" : "加载更早的消息"}
+              title={loadingOlder ? t("loading") : t("loadOlder")}
               onPress={() => void loadOlder()}
               testID="load-older"
             />
@@ -630,31 +649,80 @@ function ChannelScreen({
               testID={`open-thread-${item.id}`}
               hitSlop={8}
             >
-              <Text style={styles.replyLink}>回复</Text>
+              <Text style={styles.replyLink}>{t("reply")}</Text>
             </Pressable>
           </View>
         )}
-        ListEmptyComponent={<Text style={styles.empty}>暂无消息</Text>}
+        ListEmptyComponent={<Text style={styles.empty}>{t("noMessages")}</Text>}
       />
       <View style={styles.composer}>
         <TextInput
           style={[styles.input, styles.flex]}
-          placeholder="输入消息…"
+          placeholder={t("composer")}
           value={draft}
           onChangeText={setDraft}
           testID="composer-input"
         />
-        <Button title="发送" onPress={() => void send()} testID="composer-send" />
+        <Button title={t("send")} onPress={() => void send()} testID="composer-send" />
       </View>
+      <Modal
+        visible={threadParent !== null}
+        animationType="slide"
+        onRequestClose={() => setThreadParent(null)}
+      >
+        <View style={styles.flex}>
+          <View style={styles.channelHeader}>
+            <Button title={t("close")} onPress={() => setThreadParent(null)} />
+            <Text style={styles.header}>{t("thread")}</Text>
+          </View>
+          {threadParent ? (
+            <View style={styles.threadParent}>
+              <Text style={styles.messageUser}>
+                {personLabel(people[threadParent.userId], threadParent.userId)}
+              </Text>
+              <Text>{threadParent.content}</Text>
+            </View>
+          ) : null}
+          <FlatList
+            style={styles.flex}
+            data={threadReplies}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <View style={styles.message} testID={`thread-reply-${item.id}`}>
+                <Text style={styles.messageUser}>
+                  {personLabel(people[item.userId], item.userId)}
+                </Text>
+                <Text>{item.content}</Text>
+              </View>
+            )}
+            ListEmptyComponent={<Text style={styles.empty}>{t("noReplies")}</Text>}
+          />
+          <View style={styles.composer}>
+            <TextInput
+              style={[styles.input, styles.flex]}
+              placeholder={t("threadPlaceholder")}
+              value={threadDraft}
+              onChangeText={setThreadDraft}
+              testID="thread-input"
+            />
+            <Button
+              title={threadSending ? t("sending") : t("send")}
+              disabled={threadSending}
+              onPress={() => void sendThreadReply()}
+              testID="thread-send"
+            />
+          </View>
+        </View>
+      </Modal>
       <Modal visible={searchOpen} animationType="slide" onRequestClose={() => setSearchOpen(false)}>
         <View style={styles.flex}>
           <View style={styles.channelHeader}>
-            <Button title="关闭" onPress={() => setSearchOpen(false)} />
-            <Text style={styles.header}>搜索</Text>
+            <Button title={t("close")} onPress={() => setSearchOpen(false)} />
+            <Text style={styles.header}>{t("search")}</Text>
           </View>
           <TextInput
             style={[styles.input, styles.searchInput]}
-            placeholder="搜索本频道…"
+            placeholder={t("searchPlaceholder")}
             value={searchTerm}
             onChangeText={setSearchTerm}
             autoFocus
@@ -672,10 +740,10 @@ function ChannelScreen({
             ListEmptyComponent={
               <Text style={styles.empty}>
                 {searchTerm.trim().length === 0
-                  ? "输入关键词搜索"
+                  ? t("searchHint")
                   : searching
-                    ? "搜索中…"
-                    : "无结果"}
+                    ? t("searching")
+                    : t("noResults")}
               </Text>
             }
           />
