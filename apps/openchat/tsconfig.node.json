@@ -22,6 +22,7 @@
   },
   "include": [
     "vite.config.ts",
+    "vite.shared.ts",
     "vite.renderer.config.ts",
     "vitest.config.worker.ts",
     "vitest.config.app.ts",

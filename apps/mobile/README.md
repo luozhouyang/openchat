@@ -26,12 +26,12 @@ EXPO_PUBLIC_API_URL=http://localhost:8787 corepack pnpm exec expo start
 ## Architecture (spec docs/specs/p10 §3–§5)
 
 - `src/platform.ts` — `PlatformAdapter` implementation (AppState lifecycle,
-  SecureStore-backed token storage, ws serverUrl).
+  SecureStore-backed token storage, `deriveWsUrl` WS serverUrl).
 - `src/db/expo-driver.ts` — `SqliteDriver` over expo-sqlite (same SQL schema as
   web/desktop, from `packages/state`).
-- `src/lib/message-db.ts` — on-device message cache (hydrate / persist).
 - `src/ws/client.ts` — `RealtimeClient` + event dispatch + persistence.
-- `src/stores/messages.ts` — zustand message store (web parity semantics).
+- `src/stores/messages.ts` — zustand message store (web parity semantics);
+  persistence goes through the shared `packages/state` database services.
 - `src/lib/push.ts` — expo-notifications registration + notification deep link.
 - App lifecycle: background closes the socket, foreground reconnects + syncs.
 

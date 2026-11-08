@@ -49,3 +49,6 @@ apps/desktop/web-dist/
 
 # electron build output
 .vite/
+
+# pnpm local store (env artifact, regenerable)
+/.pnpm-store/

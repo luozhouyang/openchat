@@ -6,7 +6,9 @@
   "scripts": {
     "ready": "vp check && vp run -r test && vp run -r build",
     "dev": "vp run openchat#dev",
-    "db:generate": "vp run api#db:generate",
+    "db:generate": "vp run openchat#db:generate",
+    "db:apply": "vp run openchat#db:apply",
+    "db:apply:remote": "vp run openchat#db:apply:remote",
     "prepare": "vp config"
   },
   "devDependencies": {

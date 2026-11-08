@@ -13,6 +13,8 @@
     "types": "wrangler types",
     "check": "vp check",
     "db:generate": "drizzle-kit generate --config=drizzle.d1.config.ts && drizzle-kit generate --config=drizzle.user-do.config.ts && drizzle-kit generate --config=drizzle.channel-do.config.ts",
+    "db:apply": "wrangler d1 migrations apply openchat --local",
+    "db:apply:remote": "wrangler d1 migrations apply openchat --remote",
     "deploy": "vp build && wrangler deploy",
     "deploy:dry": "vp build && wrangler deploy --dry-run"
   },

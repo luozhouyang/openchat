@@ -53,7 +53,7 @@
       "\\.mjs$": "babel-jest"
     },
     "transformIgnorePatterns": [
-      "node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@sentry/react-native|native-base|react-native-svg|state|protocol|realtime|uuid|zod|better-auth|@better-auth/.*|@better-fetch|nanostores|\\.pnpm/)"
+      "node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@sentry/react-native|native-base|react-native-svg|state/|protocol/|realtime/|uuid|zod|better-auth|@better-auth/.*|@better-fetch|nanostores|\\.pnpm/)"
     ]
   }
 }
