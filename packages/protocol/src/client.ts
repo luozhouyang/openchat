@@ -35,6 +35,7 @@ import type {
   SearchPostsOutput,
   MyThreadsOutput,
   NotificationsOutput,
+  GlobalSearchOutput,
   PutStatusInput,
   RoleOutput,
   RolesListOutput,
@@ -237,6 +238,11 @@ export function createApi(opts: ApiFetchOptions = {}) {
 
     threads: {
       mine: (teamId: string) => f<MyThreadsOutput>(`/api/v1/users/me/teams/${teamId}/threads`),
+    },
+
+    search: {
+      global: (query: string, limit = 50) =>
+        f<GlobalSearchOutput>(`/api/v1/search?q=${encodeURIComponent(query)}&limit=${limit}`),
     },
 
     notifications: {

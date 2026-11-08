@@ -1,8 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import type { PostOutput } from "protocol";
+import type { ChannelSummary, PostOutput } from "protocol";
 import { api } from "@/lib/api";
 import { displayNameOf, useUsersStore } from "@/stores/users";
+import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { MentionText } from "./MentionText";
 
@@ -10,6 +12,13 @@ const timeFormatter = new Intl.DateTimeFormat(undefined, {
   dateStyle: "medium",
   timeStyle: "short",
 });
+
+type Scope = "channel" | "all";
+
+interface Result {
+  message: PostOutput;
+  channel?: ChannelSummary;
+}
 
 export function SearchDialog({
   channelId,
@@ -21,9 +30,11 @@ export function SearchDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const byId = useUsersStore((s) => s.byId);
   const [term, setTerm] = useState("");
-  const [results, setResults] = useState<PostOutput[]>([]);
+  const [scope, setScope] = useState<Scope>("channel");
+  const [results, setResults] = useState<Result[]>([]);
   const [searching, setSearching] = useState(false);
 
   useEffect(() => {
@@ -36,9 +47,16 @@ export function SearchDialog({
     setSearching(true);
     const handle = setTimeout(async () => {
       try {
-        const res = await api.posts.search(channelId, query);
-        if (active) {
-          setResults(res.messages);
+        if (scope === "channel") {
+          const res = await api.posts.search(channelId, query);
+          if (active) {
+            setResults(res.messages.map((message) => ({ message })));
+          }
+        } else {
+          const res = await api.search.global(query);
+          if (active) {
+            setResults(res.hits.map((hit) => ({ message: hit.message, channel: hit.channel })));
+          }
         }
       } catch {
         if (active) {
@@ -54,9 +72,12 @@ export function SearchDialog({
       active = false;
       clearTimeout(handle);
     };
-  }, [term, open, channelId]);
+  }, [term, open, channelId, scope]);
 
-  const authorKey = [...new Set(results.map((message) => message.userId))].join(",");
+  const authorKey = useMemo(
+    () => [...new Set(results.map((result) => result.message.userId))].join(","),
+    [results],
+  );
   useEffect(() => {
     const ids = authorKey ? authorKey.split(",") : [];
     if (ids.length > 0) {
@@ -64,13 +85,25 @@ export function SearchDialog({
     }
   }, [authorKey]);
 
-  function jumpTo(message: PostOutput) {
-    window.dispatchEvent(
-      new CustomEvent("openchat:jump-to-seq", {
-        detail: { channelId, seq: message.seq },
-      }),
-    );
+  async function openResult(result: Result) {
     onOpenChange(false);
+    if (scope === "channel" || !result.channel) {
+      window.dispatchEvent(
+        new CustomEvent("openchat:jump-to-seq", {
+          detail: { channelId, seq: result.message.seq },
+        }),
+      );
+      return;
+    }
+    sessionStorage.setItem(`openchat:jump:${result.channel.id}`, String(result.message.seq));
+    if (result.channel.teamId) {
+      await navigate({
+        to: "/$teamId/c/$channelId",
+        params: { teamId: result.channel.teamId, channelId: result.channel.id },
+      });
+    } else {
+      await navigate({ to: "/dm/$channelId", params: { channelId: result.channel.id } });
+    }
   }
 
   return (
@@ -79,6 +112,22 @@ export function SearchDialog({
         <DialogHeader>
           <DialogTitle>{t("channel.search")}</DialogTitle>
         </DialogHeader>
+        <div className="flex gap-1">
+          <Button
+            size="sm"
+            variant={scope === "channel" ? "default" : "outline"}
+            onClick={() => setScope("channel")}
+          >
+            {t("channel.scopeChannel")}
+          </Button>
+          <Button
+            size="sm"
+            variant={scope === "all" ? "default" : "outline"}
+            onClick={() => setScope("all")}
+          >
+            {t("channel.scopeAll")}
+          </Button>
+        </div>
         <input
           autoFocus
           value={term}
@@ -95,23 +144,28 @@ export function SearchDialog({
           ) : results.length === 0 ? (
             <p className="py-4 text-sm text-muted-foreground">{t("channel.noResults")}</p>
           ) : (
-            results.map((message) => (
+            results.map((result) => (
               <button
-                key={message.id}
+                key={`${result.channel?.id ?? channelId}:${result.message.id}`}
                 type="button"
-                onClick={() => jumpTo(message)}
+                onClick={() => void openResult(result)}
                 className="block w-full border-b py-2 text-left last:border-b-0 hover:bg-accent"
               >
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  {result.channel && (
+                    <span className="truncate font-medium text-foreground">
+                      #{result.channel.displayName}
+                    </span>
+                  )}
                   <span className="font-medium text-foreground">
-                    {displayNameOf(byId[message.userId], message.userId)}
+                    {displayNameOf(byId[result.message.userId], result.message.userId)}
                   </span>
-                  <time dateTime={new Date(message.createdAt).toISOString()}>
-                    {timeFormatter.format(new Date(message.createdAt))}
+                  <time dateTime={new Date(result.message.createdAt).toISOString()}>
+                    {timeFormatter.format(new Date(result.message.createdAt))}
                   </time>
                 </div>
                 <MentionText
-                  content={message.content}
+                  content={result.message.content}
                   className="line-clamp-2 whitespace-pre-wrap break-words text-sm"
                 />
               </button>

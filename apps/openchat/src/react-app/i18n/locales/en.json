@@ -188,7 +188,9 @@
     "saveFailed": "Failed to save",
     "leave": "Leave channel",
     "leaveConfirm": "Leave this channel?",
-    "leaveFailed": "Could not leave the channel"
+    "leaveFailed": "Could not leave the channel",
+    "scopeChannel": "This channel",
+    "scopeAll": "All channels"
   },
   "presence": {
     "online": "Online",

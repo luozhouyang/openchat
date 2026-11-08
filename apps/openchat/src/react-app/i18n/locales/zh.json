@@ -188,7 +188,9 @@
     "saveFailed": "保存失败",
     "leave": "离开频道",
     "leaveConfirm": "确定要离开这个频道吗？",
-    "leaveFailed": "离开频道失败"
+    "leaveFailed": "离开频道失败",
+    "scopeChannel": "本频道",
+    "scopeAll": "全部频道"
   },
   "presence": {
     "online": "在线",

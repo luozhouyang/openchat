@@ -223,6 +223,18 @@ export const SearchPostsQuery = z.object({
 export type SearchPostsQuery = z.infer<typeof SearchPostsQuery>;
 export const SearchPostsOutput = z.object({ messages: z.array(PostOutput) });
 export type SearchPostsOutput = z.infer<typeof SearchPostsOutput>;
+export const GlobalSearchQuery = z.object({
+  q: z.string().min(1).max(200),
+  limit: z.coerce.number().int().positive().max(100).optional(),
+});
+export type GlobalSearchQuery = z.infer<typeof GlobalSearchQuery>;
+export const GlobalSearchHit = z.object({
+  message: PostOutput,
+  channel: ChannelSummary,
+});
+export type GlobalSearchHit = z.infer<typeof GlobalSearchHit>;
+export const GlobalSearchOutput = z.object({ hits: z.array(GlobalSearchHit) });
+export type GlobalSearchOutput = z.infer<typeof GlobalSearchOutput>;
 export type ListPostsOutput = z.infer<typeof ListPostsOutput>;
 
 // ---- threads ----
