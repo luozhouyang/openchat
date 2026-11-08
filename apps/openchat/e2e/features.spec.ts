@@ -60,3 +60,15 @@ test("replying opens the thread panel and posts a reply", async ({ page, request
   await threadInput.press("Enter");
   await expect(page.getByText("thread answer")).toBeVisible();
 });
+
+test("channel settings save updates the sidebar name", async ({ page, request }) => {
+  await setupWorkspace(page, request, "channel-settings");
+  await expect(page.getByPlaceholder(/Enter to send/)).toBeVisible();
+
+  await page.getByRole("button", { name: "Channel settings" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Channel name").fill("Renamed Channel");
+  await dialog.getByRole("button", { name: "Save", exact: true }).click();
+
+  await expect(page.getByRole("link", { name: /Renamed Channel/ })).toBeVisible();
+});

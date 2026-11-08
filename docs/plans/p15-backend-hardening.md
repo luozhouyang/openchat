@@ -224,6 +224,12 @@ with 150 ids returned HTTP 500 before this change.
 - The settings sheet has 浅色/深色/跟随系统 buttons. This completes the mobile
   parity scope.
 
+### Channel settings e2e
+
+- `e2e/features.spec.ts` renames a channel through the settings dialog and
+  asserts the sidebar link follows. The dialog now ignores a late `initial`
+  refetch once the admin has typed, mirroring the profile form fix.
+
 ### Settings (push toggle)
 
 - The workspace header has a 设置 button opening a modal with a push-notification
@@ -239,8 +245,9 @@ with 150 ids returned HTTP 500 before this change.
 
 ## Deferred — frontend / UI
 
-1. E2E coverage for channel settings saves (the team settings path is covered).
-2. E2E coverage for channel settings saves (the team settings path is covered).
+All planned frontend and mobile-parity items for this objective are complete
+(admin console, cross-device notification read, mobile notifications/search/
+settings/presence/threads/i18n/theme, and the e2e coverage listed above).
 
 > Note: `docs/` is listed in `.gitignore`; this file was committed explicitly
 > with `git add -f`, other docs stay local.

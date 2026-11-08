@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -34,9 +34,15 @@ export function ChannelSettingsDialog({
   const [header, setHeader] = useState(initial?.header ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Once the admin edits a field, a late `initial` refetch must not clobber it.
+  const dirty = useRef(false);
 
   useEffect(() => {
-    if (!open || !initial) {
+    if (!open) {
+      dirty.current = false;
+      return;
+    }
+    if (!initial || dirty.current) {
       return;
     }
     setDisplayName(initial.displayName);
@@ -89,7 +95,10 @@ export function ChannelSettingsDialog({
             <span className="mb-1 block text-muted-foreground">{t("channel.displayName")}</span>
             <input
               value={displayName}
-              onChange={(event) => setDisplayName(event.target.value)}
+              onChange={(event) => {
+                dirty.current = true;
+                setDisplayName(event.target.value);
+              }}
               className="w-full rounded border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
             />
           </label>
@@ -97,7 +106,10 @@ export function ChannelSettingsDialog({
             <span className="mb-1 block text-muted-foreground">{t("channel.purpose")}</span>
             <input
               value={purpose}
-              onChange={(event) => setPurpose(event.target.value)}
+              onChange={(event) => {
+                dirty.current = true;
+                setPurpose(event.target.value);
+              }}
               className="w-full rounded border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
             />
           </label>
@@ -105,7 +117,10 @@ export function ChannelSettingsDialog({
             <span className="mb-1 block text-muted-foreground">{t("channel.header")}</span>
             <textarea
               value={header}
-              onChange={(event) => setHeader(event.target.value)}
+              onChange={(event) => {
+                dirty.current = true;
+                setHeader(event.target.value);
+              }}
               rows={3}
               className="w-full resize-none rounded border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
             />
