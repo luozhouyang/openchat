@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -37,13 +37,18 @@ function SettingsPage() {
     "idle",
   );
 
+  // Seed the form once per user; a later refetch or a fast typist must not be
+  // clobbered by the async `me` load.
+  const initializedFor = useRef<string | null>(null);
+  const profileDirty = useRef(false);
   useEffect(() => {
-    if (!me) {
+    if (!me || initializedFor.current === me.id || profileDirty.current) {
       return;
     }
+    initializedFor.current = me.id;
     setName(me.name ?? "");
     setNickname(me.nickname ?? "");
-  }, [me?.id]);
+  }, [me]);
 
   async function saveProfile() {
     setProfileStatus("saving");
@@ -164,7 +169,10 @@ function SettingsPage() {
               id="profile-name"
               value={name}
               maxLength={80}
-              onChange={(event) => setName(event.target.value)}
+              onChange={(event) => {
+                profileDirty.current = true;
+                setName(event.target.value);
+              }}
             />
           </div>
           <div className="space-y-2">
@@ -175,7 +183,10 @@ function SettingsPage() {
               id="profile-nickname"
               value={nickname}
               maxLength={80}
-              onChange={(event) => setNickname(event.target.value)}
+              onChange={(event) => {
+                profileDirty.current = true;
+                setNickname(event.target.value);
+              }}
             />
           </div>
           <div className="flex items-center gap-2">
