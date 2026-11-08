@@ -270,7 +270,22 @@
     "custom": "自定义",
     "save": "保存",
     "saved": "已保存",
-    "saveFailed": "保存失败"
+    "saveFailed": "保存失败",
+    "registration": "注册",
+    "registrationMode": "注册模式",
+    "modeOpen": "开放注册",
+    "modeInvite": "仅邀请",
+    "modeClosed": "关闭注册",
+    "modeHint": "控制谁可以创建账号。",
+    "modeSaved": "注册模式已更新",
+    "modeFailed": "更新失败",
+    "audit": "审计日志",
+    "auditEmpty": "暂无审计记录",
+    "auditActor": "操作者",
+    "auditAction": "操作",
+    "auditTarget": "对象",
+    "auditWhen": "时间",
+    "console": "管理后台"
   },
   "notifications": {
     "title": "通知",

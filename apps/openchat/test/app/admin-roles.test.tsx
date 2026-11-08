@@ -22,6 +22,11 @@ vi.mock("@/lib/api", () => ({
       list: vi.fn(),
       updatePermissions: vi.fn(),
     },
+    admin: {
+      settings: async () => ({ registrationMode: "open", openRegistration: true }),
+      setRegistrationMode: vi.fn(),
+      audit: async () => ({ entries: [] }),
+    },
     workspaces: async () => ({ teams: [], directs: [] }),
     sidebar: async () => ({ channels: [] }),
   },

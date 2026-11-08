@@ -27,7 +27,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ChevronsUpDownIcon, CircleIcon, LogOutIcon, SettingsIcon } from "lucide-react";
+import { ChevronsUpDownIcon, CircleIcon, LogOutIcon, SettingsIcon, ShieldIcon } from "lucide-react";
 
 const STATUSES = ["online", "away", "dnd", "offline"] as const;
 type PresenceStatus = (typeof STATUSES)[number];
@@ -133,6 +133,12 @@ export function UserMenu() {
                 <SettingsIcon />
                 {t("workspace.settings")}
               </DropdownMenuItem>
+              {user.role === "admin" && (
+                <DropdownMenuItem render={<Link to="/admin" />}>
+                  <ShieldIcon />
+                  {t("admin.console")}
+                </DropdownMenuItem>
+              )}
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => void signOut()}>
                 <LogOutIcon />

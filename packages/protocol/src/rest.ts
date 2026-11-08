@@ -132,6 +132,29 @@ export type ListMembersQuery = z.infer<typeof ListMembersQuery>;
 export const ChannelsListOutput = z.object({ memberIds: z.array(idSchema) });
 export type ChannelsListOutput = z.infer<typeof ChannelsListOutput>;
 
+export const RegistrationModeSchema = z.enum(["open", "invite", "closed"]);
+export type RegistrationMode = z.infer<typeof RegistrationModeSchema>;
+export const AdminSettingsOutput = z.object({
+  registrationMode: RegistrationModeSchema,
+  openRegistration: z.boolean(),
+});
+export type AdminSettingsOutput = z.infer<typeof AdminSettingsOutput>;
+export const AdminSettingsInput = z.object({ registrationMode: RegistrationModeSchema });
+export type AdminSettingsInput = z.infer<typeof AdminSettingsInput>;
+
+export const AuditEntry = z.object({
+  id: idSchema,
+  actorId: z.string(),
+  action: z.string(),
+  target: z.string().nullable(),
+  status: z.string(),
+  detail: z.unknown().nullable(),
+  createdAt: z.number(),
+});
+export type AuditEntry = z.infer<typeof AuditEntry>;
+export const AuditOutput = z.object({ entries: z.array(AuditEntry) });
+export type AuditOutput = z.infer<typeof AuditOutput>;
+
 export const UpdateProfileInput = z.object({
   name: z.string().trim().min(1).max(80).optional(),
   nickname: z.string().trim().max(80).nullable().optional(),

@@ -46,6 +46,7 @@ usersV1.get("/users/me", requireSession, async (c) => {
       email: row.email,
       username: row.username ?? null,
       name: row.name ?? null,
+      role: row.role ?? null,
       nickname: row.nickname ?? null,
       avatarUrl: row.avatarUrl ?? row.image ?? null,
       createdAt: row.createdAt.toISOString(),

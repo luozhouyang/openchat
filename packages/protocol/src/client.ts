@@ -39,6 +39,9 @@ import type {
   UpdateProfileOutput,
   UploadAvatarOutput,
   AddChannelMemberOutput,
+  AdminSettingsInput,
+  AdminSettingsOutput,
+  AuditOutput,
   GlobalSearchOutput,
   PutStatusInput,
   RoleOutput,
@@ -140,6 +143,7 @@ export function createApi(opts: ApiFetchOptions = {}) {
           email: string;
           username: string | null;
           name: string | null;
+          role: string | null;
           nickname: string | null;
           avatarUrl: string | null;
           createdAt: string;
@@ -297,6 +301,13 @@ export function createApi(opts: ApiFetchOptions = {}) {
         f<{ ok: true }>(`/api/v1/admin/teams/${teamId}/patch`, json("POST", input)),
       inviteEmail: (teamId: string, input: EmailInput) =>
         f<CreateInviteOutput>(`/api/v1/admin/teams/${teamId}/invite/email`, json("POST", input)),
+      settings: () => f<AdminSettingsOutput>("/api/v1/admin/settings"),
+      setRegistrationMode: (input: AdminSettingsInput) =>
+        f<AdminSettingsOutput>("/api/v1/admin/settings", json("PUT", input)),
+      audit: (limit = 50, before?: number) =>
+        f<AuditOutput>(
+          `/api/v1/admin/audit?limit=${limit}${before === undefined ? "" : `&before=${before}`}`,
+        ),
     },
 
     uploads: {

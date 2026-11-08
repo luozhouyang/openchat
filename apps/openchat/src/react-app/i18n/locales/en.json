@@ -270,7 +270,22 @@
     "custom": "Custom",
     "save": "Save",
     "saved": "Saved",
-    "saveFailed": "Failed to save"
+    "saveFailed": "Failed to save",
+    "registration": "Registration",
+    "registrationMode": "Registration mode",
+    "modeOpen": "Open",
+    "modeInvite": "Invite only",
+    "modeClosed": "Closed",
+    "modeHint": "Controls who can create an account.",
+    "modeSaved": "Registration mode updated",
+    "modeFailed": "Update failed",
+    "audit": "Audit log",
+    "auditEmpty": "No audit entries yet",
+    "auditActor": "Actor",
+    "auditAction": "Action",
+    "auditTarget": "Target",
+    "auditWhen": "When",
+    "console": "Admin console"
   },
   "notifications": {
     "title": "Notifications",
