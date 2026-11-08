@@ -11,6 +11,8 @@ export function ThreadPanel({ channelId, parentId }: { channelId: string; parent
   const { t } = useTranslation();
   // threadList() derives a fresh array; shallow-compare to keep snapshots stable.
   const messages = useMessageStore(useShallow((s) => s.threadList(channelId, parentId)));
+  const channelMessages = useMessageStore(useShallow((s) => s.list(channelId)));
+  const parent = channelMessages.find((message) => message.id === parentId);
 
   useQuery({
     queryKey: ["thread", parentId],
@@ -31,6 +33,11 @@ export function ThreadPanel({ channelId, parentId }: { channelId: string; parent
   return (
     <div className="flex h-full flex-col">
       <div className="border-b px-4 py-2 text-sm font-semibold">{t("messages.threadTitle")}</div>
+      {parent && (
+        <div className="border-b bg-muted/30">
+          <MessageRow message={parent} channelId={channelId} inThread />
+        </div>
+      )}
       <div className="flex-1 overflow-y-auto py-2">
         {messages.length === 0 ? (
           <div className="px-4 text-sm text-muted-foreground">{t("messages.emptyThread")}</div>

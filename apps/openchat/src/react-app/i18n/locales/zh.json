@@ -158,7 +158,8 @@
     "threadPlaceholder": "回复线程…",
     "typing": "{{names}} 正在输入…",
     "image": "图片",
-    "file": "文件"
+    "file": "文件",
+    "newMessages": "新消息"
   },
   "channel": {
     "members": "成员",

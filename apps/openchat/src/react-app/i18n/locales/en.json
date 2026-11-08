@@ -158,7 +158,8 @@
     "threadPlaceholder": "Reply to thread…",
     "typing": "{{names}} is typing…",
     "image": "Image",
-    "file": "File"
+    "file": "File",
+    "newMessages": "New messages"
   },
   "channel": {
     "members": "Members",

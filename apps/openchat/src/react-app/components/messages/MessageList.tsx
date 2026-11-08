@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
 import { appClient } from "@/app-client";
 import { useMessageStore } from "@/stores/messages";
+import { useSidebarStore } from "@/stores/sidebar";
 import type { StoreMessage } from "@/stores/messages";
 import { MessageRow } from "./MessageRow";
 
@@ -17,7 +18,8 @@ const dateFormatter = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }
 
 type ListItem =
   | { kind: "message"; key: string; message: StoreMessage; compact: boolean }
-  | { kind: "divider"; key: string; at: number };
+  | { kind: "divider"; key: string; at: number }
+  | { kind: "unread"; key: string };
 
 function sameDay(a: number, b: number): boolean {
   const first = new Date(a);
@@ -38,15 +40,26 @@ export function MessageList({ channelId }: { channelId: string }) {
   const autoScroll = useRef(true);
   const prevMaxSeq = useRef(0);
   const [highlightSeq, setHighlightSeq] = useState<number | null>(null);
+  // Snapshot the read marker before ChannelView marks the channel read.
+  const initialLastRead = useRef<number | null>(null);
+  if (initialLastRead.current === null) {
+    initialLastRead.current = useSidebarStore.getState().entries[channelId]?.lastReadSeq ?? 0;
+  }
 
   const maxSeq = useMessageStore((s) => s.maxSeq(channelId));
 
   const items = useMemo(() => {
     const out: ListItem[] = [];
+    const lastRead = initialLastRead.current ?? 0;
+    let unreadMarked = false;
     list.forEach((message, index) => {
       const prev = list[index - 1];
       if (!prev || !sameDay(prev.createdAt, message.createdAt)) {
         out.push({ kind: "divider", key: `divider-${message.id}`, at: message.createdAt });
+      }
+      if (!unreadMarked && lastRead > 0 && message.seq > lastRead) {
+        out.push({ kind: "unread", key: "unread-divider" });
+        unreadMarked = true;
       }
       const compact =
         prev !== undefined &&
@@ -192,7 +205,13 @@ export function MessageList({ channelId }: { channelId: string }) {
                   transform: `translateY(${vi.start}px)`,
                 }}
               >
-                {item.kind === "divider" ? (
+                {item.kind === "unread" ? (
+                  <div className="flex items-center gap-3 px-4 py-2 text-xs font-medium text-destructive">
+                    <span className="h-px flex-1 bg-destructive/40" />
+                    <span>{t("messages.newMessages")}</span>
+                    <span className="h-px flex-1 bg-destructive/40" />
+                  </div>
+                ) : item.kind === "divider" ? (
                   <div className="flex items-center gap-3 px-4 py-2 text-xs text-muted-foreground">
                     <span className="h-px flex-1 bg-border" />
                     <span>{dateFormatter.format(new Date(item.at))}</span>
