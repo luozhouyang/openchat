@@ -27,6 +27,7 @@ import type { Channel } from "@worker/db/types";
 import { syncUserChannels } from "@worker/user-do-sync";
 import { apiError } from "@worker/lib/errors";
 import { zodValidator } from "@worker/lib/validation";
+import { chunkItems } from "@worker/lib/chunks";
 
 export const usersV1 = new Hono<{ Bindings: Env }>();
 
@@ -138,17 +139,29 @@ usersV1.get("/users", requireSession, zodValidator("query", ListUsersQuery), asy
     return c.json({ users: [] } satisfies ListUsersOutput);
   }
   const db = getDb(c.env.DB);
-  const rows = await db
-    .select({
-      id: users.id,
-      username: users.username,
-      nickname: users.nickname,
-      name: users.name,
-      avatarUrl: users.avatarUrl,
-      image: users.image,
-    })
-    .from(users)
-    .where(inArray(users.id, ids));
+  const rows: Array<{
+    id: string;
+    username: string | null;
+    nickname: string | null;
+    name: string;
+    avatarUrl: string | null;
+    image: string | null;
+  }> = [];
+  for (const chunk of chunkItems(ids)) {
+    rows.push(
+      ...(await db
+        .select({
+          id: users.id,
+          username: users.username,
+          nickname: users.nickname,
+          name: users.name,
+          avatarUrl: users.avatarUrl,
+          image: users.image,
+        })
+        .from(users)
+        .where(inArray(users.id, chunk))),
+    );
+  }
   const out: ListUsersOutput = {
     users: rows.map((r) => ({
       id: r.id,

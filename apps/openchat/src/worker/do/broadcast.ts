@@ -6,6 +6,9 @@ export interface BroadcastDeps {
   onPushFailed: (userId: string) => void;
 }
 
+/** Subrequests per fan-out wave; keeps large channels under Workers limits. */
+const DELIVERY_BATCH = 50;
+
 export function createBroadcaster(deps: BroadcastDeps) {
   let buffer: { userId: string; events: unknown[]; pref?: "all" | "mention" | "none" }[] = [];
   let timer: ReturnType<typeof setTimeout> | null = null;
@@ -23,11 +26,23 @@ export function createBroadcaster(deps: BroadcastDeps) {
     }
   }
 
+  async function deliverAll(
+    items: { userId: string; events: unknown[]; pref?: "all" | "mention" | "none" }[],
+  ): Promise<void> {
+    for (let index = 0; index < items.length; index += DELIVERY_BATCH) {
+      await Promise.all(
+        items
+          .slice(index, index + DELIVERY_BATCH)
+          .map((item) => deliver(item.userId, item.events, item.pref)),
+      );
+    }
+  }
+
   async function flush() {
     const batch = buffer;
     buffer = [];
     timer = null;
-    await Promise.all(batch.map((b) => deliver(b.userId, b.events, b.pref)));
+    await deliverAll(batch);
   }
 
   return {
@@ -38,7 +53,9 @@ export function createBroadcaster(deps: BroadcastDeps) {
     ) {
       const list = [...targets];
       if (list.length < 200) {
-        await Promise.all(list.map((userId) => deliver(userId, [event], prefs?.get(userId))));
+        await deliverAll(
+          list.map((userId) => ({ userId, events: [event], pref: prefs?.get(userId) })),
+        );
         return;
       }
       for (const userId of list) {

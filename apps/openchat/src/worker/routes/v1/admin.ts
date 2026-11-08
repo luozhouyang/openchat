@@ -166,6 +166,11 @@ adminV1.post("/channels/:channelId/delete", async (c) => {
   const db = getDb(c.env.DB);
   const channelId = c.req.param("channelId");
   const memberIds = await listChannelMemberIds(db, channelId);
+  try {
+    await c.env.CHANNEL_DO.get(c.env.CHANNEL_DO.idFromName(channelDoName(channelId))).purge();
+  } catch {
+    // D1 rows must still be removed even if the DO is unreachable.
+  }
   await db.delete(channelMembers).where(eq(channelMembers.channelId, channelId));
   await db.delete(channels).where(eq(channels.id, channelId));
   const deleted = channelDeletedEvent.parse({ type: "channel.deleted", channelId });

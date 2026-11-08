@@ -6,6 +6,7 @@ import type { SessionContext } from "@worker/auth/session";
 import { requireSession } from "@worker/auth/session";
 import { zodValidator } from "@worker/lib/validation";
 import { apiError } from "@worker/lib/errors";
+import { chunkItems } from "@worker/lib/chunks";
 import { getDb } from "@worker/db/client";
 import * as schemaD1 from "@worker/db/schema-d1";
 
@@ -67,10 +68,16 @@ statusV1.post(
   zodValidator("json", StatusIdsInput),
   async (c) => {
     const body = c.req.valid("json");
-    const rows = await getDb(c.env.DB)
-      .select()
-      .from(schemaD1.userStatus)
-      .where(inArray(schemaD1.userStatus.userId, body.userIds));
+    const db = getDb(c.env.DB);
+    const rows: Array<typeof schemaD1.userStatus.$inferSelect> = [];
+    for (const chunk of chunkItems(body.userIds)) {
+      rows.push(
+        ...(await db
+          .select()
+          .from(schemaD1.userStatus)
+          .where(inArray(schemaD1.userStatus.userId, chunk))),
+      );
+    }
     const byId = new Map(rows.map((r) => [r.userId, r]));
     const statuses: Record<string, string> = {};
     for (const uid of body.userIds) {

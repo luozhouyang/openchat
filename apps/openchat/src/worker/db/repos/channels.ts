@@ -7,6 +7,7 @@ import type {
   Db,
 } from "@worker/db/types";
 import { channels, channelMembers, users } from "@worker/db/schema-d1";
+import { chunkItems } from "@worker/lib/chunks";
 
 export async function createChannel(
   db: Db,
@@ -63,12 +64,16 @@ export async function listChannelsForTeam(db: Db, teamId: string): Promise<Chann
   return db.select().from(channels).where(eq(channels.teamId, teamId));
 }
 
-/** One query for a set of teams (workspaces endpoint replaces the N×1 scan). */
+/** One query per chunk for a set of teams (workspaces endpoint replaces the N×1 scan). */
 export async function listChannelsForTeams(db: Db, teamIds: string[]): Promise<Channel[]> {
   if (teamIds.length === 0) {
     return [];
   }
-  return db.select().from(channels).where(inArray(channels.teamId, teamIds));
+  const rows: Channel[] = [];
+  for (const chunk of chunkItems(teamIds)) {
+    rows.push(...(await db.select().from(channels).where(inArray(channels.teamId, chunk))));
+  }
+  return rows;
 }
 
 export interface ChannelMemberWithName {
@@ -80,8 +85,8 @@ export interface ChannelMemberWithName {
 }
 
 /**
- * One JOIN for the member list (plus display-name source columns) of many
- * channels — replaces the per-DM/GM `listChannelMemberIds` + `memberNames`
+ * One JOIN per chunk for the member list (plus display-name source columns) of
+ * many channels — replaces the per-DM/GM `listChannelMemberIds` + `memberNames`
  * double round trip on hot read paths. Rows come in channel_members order;
  * group by channelId client-side. `email` is only a display fallback here,
  * never returned to the client (see the reaction of user-search on email).
@@ -93,17 +98,23 @@ export async function listChannelMembersWithNames(
   if (channelIds.length === 0) {
     return [];
   }
-  return db
-    .select({
-      channelId: channelMembers.channelId,
-      userId: channelMembers.userId,
-      nickname: users.nickname,
-      name: users.name,
-      email: users.email,
-    })
-    .from(channelMembers)
-    .innerJoin(users, eq(users.id, channelMembers.userId))
-    .where(inArray(channelMembers.channelId, channelIds));
+  const rows: ChannelMemberWithName[] = [];
+  for (const chunk of chunkItems(channelIds)) {
+    rows.push(
+      ...(await db
+        .select({
+          channelId: channelMembers.channelId,
+          userId: channelMembers.userId,
+          nickname: users.nickname,
+          name: users.name,
+          email: users.email,
+        })
+        .from(channelMembers)
+        .innerJoin(users, eq(users.id, channelMembers.userId))
+        .where(inArray(channelMembers.channelId, chunk))),
+    );
+  }
+  return rows;
 }
 
 export async function listChannelsForUser(db: Db, userId: string) {
@@ -149,5 +160,9 @@ export async function listChannelsByIds(db: Db, ids: string[]): Promise<Channel[
   if (ids.length === 0) {
     return [];
   }
-  return db.select().from(channels).where(inArray(channels.id, ids));
+  const rows: Channel[] = [];
+  for (const chunk of chunkItems(ids)) {
+    rows.push(...(await db.select().from(channels).where(inArray(channels.id, chunk))));
+  }
+  return rows;
 }

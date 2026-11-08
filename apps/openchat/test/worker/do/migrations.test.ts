@@ -125,10 +125,11 @@ async function readSchema(stub: DurableObjectStub): Promise<DoSchema> {
       .exec("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
       .toArray()
       .map((r) => String(r.name));
-    // Skip Cloudflare-internal tables: scheduling an alarm materializes the
-    // `_cf_METADATA` row in sqlite_master, and PRAGMA on internal tables is
-    // always "not authorized: SQLITE_AUTH" — they are not ours to assert.
-    const internalTables = (name: string) => name === "_cf_METADATA" || name.startsWith("sqlite_");
+    // Skip Cloudflare-internal tables: scheduling an alarm or writing KV
+    // storage materializes `_cf_METADATA` / `_cf_KV` rows in sqlite_master, and
+    // PRAGMA on internal tables is always "not authorized: SQLITE_AUTH" — they
+    // are not ours to assert.
+    const internalTables = (name: string) => name.startsWith("_cf_") || name.startsWith("sqlite_");
     const columns: Record<string, string[]> = {};
     for (const table of tables.filter((t) => !internalTables(t))) {
       columns[table] = sql

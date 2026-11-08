@@ -10,6 +10,7 @@ import { getDb } from "@worker/db/client";
 import { setThumbnail } from "@worker/db/repos/uploads";
 import { createBroadcaster } from "@worker/do/broadcast";
 import { createReactionBatcher } from "@worker/do/reaction-batch";
+import { chunkItems } from "@worker/lib/chunks";
 
 /**
  * Attachment payload as persisted on the message row. Kept structural (no
@@ -95,6 +96,9 @@ export class ChannelDO extends DurableObject<Env> {
   reactionBatcher = createReactionBatcher({
     getSnapshot: (seq) => this.reactionSnapshot(seq),
     broadcast: (event) => this.broadcast(event),
+    loadDirty: async () => (await this.ctx.storage.get<number[]>("reactionDirty")) ?? [],
+    saveDirty: (seqs) => this.ctx.storage.put("reactionDirty", seqs),
+    schedule: () => this.scheduleReactionFlush(),
   });
 
   constructor(ctx: DurableObjectState, env: Env) {
@@ -107,37 +111,137 @@ export class ChannelDO extends DurableObject<Env> {
   }
 
   /**
-   * dedup_tokens older than DEDUP_TOKEN_TTL_MS (module constant) are purged by
-   * `alarm()`. Message retention uses the reserved MESSAGE_RETENTION_MS
-   * constant; see module comments for the enforcement state.
+   * The alarm serves two schedules: the hourly housekeeping pass (dedup-token
+   * cleanup + message retention) and the short-delay reaction-broadcast flush.
+   * `housekeepingDueAt` keeps the hourly deadline stable when a reaction flush
+   * temporarily moves the alarm earlier.
    */
   private async ensureHousekeepingAlarm(): Promise<void> {
     try {
-      const existing = await this.ctx.storage.getAlarm();
-      if (existing !== null) {
-        return;
+      const stored = await this.ctx.storage.get<number>("housekeepingDueAt");
+      const dueAt = stored ?? nextUtcHourStart();
+      if (stored === undefined) {
+        await this.ctx.storage.put("housekeepingDueAt", dueAt);
       }
-      await this.ctx.storage.setAlarm(nextUtcHourStart());
+      const existing = await this.ctx.storage.getAlarm();
+      if (existing === null) {
+        await this.ctx.storage.setAlarm(dueAt);
+      }
     } catch (err) {
       console.error("ChannelDO: failed to arm housekeeping alarm", err);
     }
   }
 
+  /** Wakes the DO soon so pending reaction broadcasts survive eviction. */
+  private async scheduleReactionFlush(): Promise<void> {
+    try {
+      const at = Date.now() + 500;
+      const existing = await this.ctx.storage.getAlarm();
+      if (existing === null || existing > at) {
+        await this.ctx.storage.setAlarm(at);
+      }
+    } catch (err) {
+      console.error("ChannelDO: failed to schedule reaction flush", err);
+    }
+  }
+
   async alarm(): Promise<void> {
     try {
-      const cutoff = Date.now() - DEDUP_TOKEN_TTL_MS;
-      await this.db.delete(schema.dedupTokens).where(lt(schema.dedupTokens.createdAt, cutoff));
-      // Message retention (MESSAGE_RETENTION_MS) intentionally not enforced
-      // here yet — reserved constant, no message deletion.
+      // A reaction flush may move the alarm earlier than the hourly deadline;
+      // housekeeping then waits for the next hour so frequent flushes stay cheap.
+      const flushedReactions = await this.reactionBatcher.flush();
+      const now = Date.now();
+      if (!flushedReactions) {
+        await this.db
+          .delete(schema.dedupTokens)
+          .where(lt(schema.dedupTokens.createdAt, now - DEDUP_TOKEN_TTL_MS));
+        const dueAt = (await this.ctx.storage.get<number>("housekeepingDueAt")) ?? 0;
+        if (now >= dueAt) {
+          await this.purgeMessagesBefore(now - MESSAGE_RETENTION_MS);
+        }
+        await this.ctx.storage.put("housekeepingDueAt", nextUtcHourStart());
+      }
     } catch (err) {
       console.error("ChannelDO.alarm failed", err);
     } finally {
       try {
-        await this.ctx.storage.setAlarm(nextUtcHourStart());
+        const dueAt =
+          (await this.ctx.storage.get<number>("housekeepingDueAt")) ?? nextUtcHourStart();
+        await this.ctx.storage.setAlarm(Math.max(Date.now() + 1_000, dueAt));
       } catch (err) {
         console.error("ChannelDO: failed to re-arm alarm", err);
       }
     }
+  }
+
+  /**
+   * Hard-deletes messages older than `cutoff` with their reaction and thread
+   * rows. `seq` is AUTOINCREMENT, so deleted ids are never reused. Returns the
+   * number of messages removed (bounded per pass).
+   */
+  async purgeMessagesBefore(cutoff: number, limit = 500): Promise<{ deleted: number }> {
+    const rows = await this.db
+      .select({ id: schema.messages.id, seq: schema.messages.seq })
+      .from(schema.messages)
+      .where(lt(schema.messages.createdAt, cutoff))
+      .limit(limit);
+    if (rows.length === 0) {
+      return { deleted: 0 };
+    }
+    const ids = rows.map((row) => row.id);
+    const seqs = rows.map((row) => row.seq);
+    const lastMessage = this.db
+      .select()
+      .from(schema.meta)
+      .where(eq(schema.meta.key, "last_message_id"))
+      .get();
+    this.db.transaction((tx) => {
+      tx.delete(schema.reactions).where(inArray(schema.reactions.messageSeq, seqs)).run();
+      tx.delete(schema.threadSubscriptions)
+        .where(inArray(schema.threadSubscriptions.parentId, ids))
+        .run();
+      tx.delete(schema.threadMemberships)
+        .where(inArray(schema.threadMemberships.postId, ids))
+        .run();
+      tx.delete(schema.threads).where(inArray(schema.threads.postId, ids)).run();
+      tx.delete(schema.messages).where(inArray(schema.messages.id, ids)).run();
+    });
+    if (lastMessage && ids.includes(lastMessage.value)) {
+      this.refreshLastMessageMetaAfterPurge();
+    }
+    return { deleted: ids.length };
+  }
+
+  /** Recomputes sidebar meta after the message referenced by `last_message_id` is purged. */
+  private refreshLastMessageMetaAfterPurge(): void {
+    const newest = this.db
+      .select()
+      .from(schema.messages)
+      .where(isNull(schema.messages.deletedAt))
+      .orderBy(desc(schema.messages.seq))
+      .limit(1)
+      .get();
+    this.db.transaction((tx) => {
+      if (!newest) {
+        for (const key of [
+          "last_message_id",
+          "last_message_user_id",
+          "last_message_preview",
+          "last_message_at",
+        ]) {
+          tx.delete(schema.meta).where(eq(schema.meta.key, key)).run();
+        }
+        return;
+      }
+      for (const [key, value] of this.metaPairs(
+        newest.id,
+        newest.userId,
+        newest.content,
+        newest.createdAt,
+      )) {
+        this.metaSet(tx, key, value);
+      }
+    });
   }
 
   async membersAdd(body: { userId: string; role: string }): Promise<void> {
@@ -266,7 +370,7 @@ export class ChannelDO extends DurableObject<Env> {
       .returning();
     if (removed.length > 0) {
       await this.refreshReactionsFlag(messageSeq);
-      this.reactionBatcher.markDirty(messageSeq);
+      await this.reactionBatcher.markDirty(messageSeq);
     }
     return true;
   }
@@ -413,6 +517,38 @@ export class ChannelDO extends DurableObject<Env> {
     return { maxSeq, lastReadSeq: member.lastReadSeq, mentionCount: member.mentionCount };
   }
 
+  /**
+   * Parses `@[id]` tokens, keeps only channel members and reports whether a
+   * broadcast keyword (`@[channel]` / `@[all]`) is present.
+   */
+  private async resolveMentions(
+    content: string,
+  ): Promise<{ mentions: string[]; broadcast: boolean }> {
+    const pattern = /@\[([a-zA-Z0-9_-]+)\]/g;
+    const ids: string[] = [];
+    let broadcast = false;
+    for (const match of content.matchAll(pattern)) {
+      const value = match[1]!;
+      // Broadcast keywords are not user ids.
+      if (value === "channel" || value === "all") {
+        broadcast = true;
+        continue;
+      }
+      if (!ids.includes(value)) {
+        ids.push(value);
+      }
+    }
+    if (ids.length === 0) {
+      return { mentions: [], broadcast };
+    }
+    const rows = await this.db
+      .select({ userId: schema.memberState.userId })
+      .from(schema.memberState)
+      .where(inArray(schema.memberState.userId, ids));
+    const members = new Set(rows.map((row) => row.userId));
+    return { mentions: ids.filter((userId) => members.has(userId)), broadcast };
+  }
+
   async postMessage(
     senderUserId: string,
     body: {
@@ -455,32 +591,9 @@ export class ChannelDO extends DurableObject<Env> {
         return { error: "parent not found", status: 422 };
       }
     }
-    const mentionPattern = /@\[([a-zA-Z0-9_-]+)\]/g;
-    const mentions: string[] = [];
-    let broadcastMention = false;
-    for (const m of body.content.matchAll(mentionPattern)) {
-      // `@[channel]` / `@[all]` are broadcast mention keywords, not user ids.
-      if (m[1] === "channel" || m[1] === "all") {
-        broadcastMention = true;
-        continue;
-      }
-      if (!mentions.includes(m[1])) {
-        mentions.push(m[1]);
-      }
-    }
-    const validMentions: string[] = [];
-    if (mentions.length > 0) {
-      const memberRows = await this.db
-        .select({ userId: schema.memberState.userId })
-        .from(schema.memberState)
-        .where(inArray(schema.memberState.userId, mentions));
-      const found = new Set(memberRows.map((r) => r.userId));
-      for (const userId of mentions) {
-        if (found.has(userId)) {
-          validMentions.push(userId);
-        }
-      }
-    }
+    const { mentions: validMentions, broadcast: broadcastMention } = await this.resolveMentions(
+      body.content,
+    );
     const messageId = id("msg");
     // `postedAt` is stamped here so all transaction statements share one timestamp.
     const postedAt = Date.now();
@@ -575,16 +688,22 @@ export class ChannelDO extends DurableObject<Env> {
     const fullMessage = this.rowToMessage(outcome.msg);
     await this.broadcast({ type: "message.new", message: fullMessage });
     if (outcome.msg.parentId) {
-      await this.notifyThreadSubscribers(outcome.msg.parentId, senderUserId, fullMessage);
+      this.ctx.waitUntil(
+        this.notifyThreadSubscribers(outcome.msg.parentId, senderUserId, fullMessage).catch(
+          () => {},
+        ),
+      );
     }
-    await this.recordNotifications({
-      messageId: outcome.msg.id,
-      seq: outcome.msg.seq,
-      actorId: senderUserId,
-      content: fullMessage.content,
-      mentions: validMentions,
-      parentId: fullMessage.parentId,
-    });
+    this.ctx.waitUntil(
+      this.recordNotifications({
+        messageId: outcome.msg.id,
+        seq: outcome.msg.seq,
+        actorId: senderUserId,
+        content: fullMessage.content,
+        mentions: validMentions,
+        parentId: fullMessage.parentId,
+      }).catch(() => {}),
+    );
     return { messageId: outcome.msg.id, seq: outcome.msg.seq };
   }
 
@@ -740,10 +859,32 @@ export class ChannelDO extends DurableObject<Env> {
       return { error: "invalid", status: 422 };
     }
     const editedAt = Date.now();
-    await this.db
-      .update(schema.messages)
-      .set({ content: body.content, editedAt })
-      .where(eq(schema.messages.id, body.messageId));
+    const previousMentions: string[] = msg.mentions ? (JSON.parse(msg.mentions) as string[]) : [];
+    const previousBroadcast = /@\[(channel|all)\]/.test(msg.content);
+    const next = await this.resolveMentions(body.content);
+    const added = next.mentions.filter((userId) => !previousMentions.includes(userId));
+    const removed = previousMentions.filter((userId) => !next.mentions.includes(userId));
+    this.db.transaction((tx) => {
+      tx.update(schema.messages)
+        .set({
+          content: body.content,
+          mentions: next.mentions.length > 0 ? JSON.stringify(next.mentions) : null,
+          editedAt,
+        })
+        .where(eq(schema.messages.id, body.messageId))
+        .run();
+      for (const userId of added) {
+        this.adjustMentionCount(tx, userId, 1);
+      }
+      for (const userId of removed) {
+        this.adjustMentionCount(tx, userId, -1);
+      }
+      if (next.broadcast && !previousBroadcast) {
+        this.adjustMentionCountForAll(tx, msg.userId, 1);
+      } else if (!next.broadcast && previousBroadcast) {
+        this.adjustMentionCountForAll(tx, msg.userId, -1);
+      }
+    });
     this.refreshLastMessageMeta(body.messageId, { editedContent: body.content });
     await this.broadcast({
       type: "message.edit",
@@ -751,7 +892,84 @@ export class ChannelDO extends DurableObject<Env> {
       content: body.content,
       editedAt,
     });
+    this.ctx.waitUntil(
+      this.syncEditNotifications({
+        messageId: body.messageId,
+        seq: msg.seq,
+        actorId: msg.userId,
+        content: body.content,
+        added,
+        removed,
+      }).catch(() => {}),
+    );
     return { ok: true };
+  }
+
+  /** SQL-side mention counter adjustment; never drops below zero. */
+  private adjustMentionCount(tx: ChannelTx, userId: string, delta: 1 | -1): void {
+    tx.update(schema.memberState)
+      .set({
+        mentionCount:
+          delta > 0
+            ? sql`${schema.memberState.mentionCount} + 1`
+            : sql`max(${schema.memberState.mentionCount} - 1, 0)`,
+      })
+      .where(eq(schema.memberState.userId, userId))
+      .run();
+  }
+
+  private adjustMentionCountForAll(tx: ChannelTx, authorId: string, delta: 1 | -1): void {
+    tx.update(schema.memberState)
+      .set({
+        mentionCount:
+          delta > 0
+            ? sql`${schema.memberState.mentionCount} + 1`
+            : sql`max(${schema.memberState.mentionCount} - 1, 0)`,
+      })
+      .where(ne(schema.memberState.userId, authorId))
+      .run();
+  }
+
+  /** Best-effort D1 inbox sync after an edit changes the mention set. */
+  private async syncEditNotifications(input: {
+    messageId: string;
+    seq: number;
+    actorId: string;
+    content: string;
+    added: string[];
+    removed: string[];
+  }): Promise<void> {
+    if (input.added.length === 0 && input.removed.length === 0) {
+      return;
+    }
+    const db = getDb(this.env.DB);
+    const preview = input.content.trim().slice(0, 120) || "[file]";
+    for (const userId of input.added) {
+      await db
+        .insert(schemaD1.notifications)
+        .values({
+          id: id("ntf"),
+          userId,
+          kind: "mention",
+          channelId: this.channelId,
+          messageId: input.messageId,
+          seq: input.seq,
+          actorId: input.actorId,
+          preview,
+          createdAt: Date.now(),
+        })
+        .onConflictDoNothing();
+    }
+    for (const userId of input.removed) {
+      await db
+        .delete(schemaD1.notifications)
+        .where(
+          and(
+            eq(schemaD1.notifications.userId, userId),
+            eq(schemaD1.notifications.messageId, input.messageId),
+          ),
+        );
+    }
   }
 
   async updateAttachments(body: {
@@ -1169,7 +1387,7 @@ export class ChannelDO extends DurableObject<Env> {
       });
     }
     await this.refreshReactionsFlag(messageSeq);
-    this.reactionBatcher.markDirty(messageSeq);
+    await this.reactionBatcher.markDirty(messageSeq);
   }
 
   async getThread(
@@ -1325,8 +1543,7 @@ export class ChannelDO extends DurableObject<Env> {
   private async fetchOnlineMemberIds(ids: string[]): Promise<string[] | null> {
     try {
       const out: string[] = [];
-      for (let i = 0; i < ids.length; i += 900) {
-        const chunk = ids.slice(i, i + 900);
+      for (const chunk of chunkItems(ids)) {
         const rows = await getDb(this.env.DB)
           .select({ userId: schemaD1.userStatus.userId })
           .from(schemaD1.userStatus)
@@ -1373,6 +1590,15 @@ export class ChannelDO extends DurableObject<Env> {
         notifPref: (prefRows[0]?.notifPref as "all" | "mention" | "none" | undefined) ?? undefined,
       });
     } catch {}
+  }
+
+  /** Drops every byte this channel owns; used when the channel is deleted. */
+  async purge(): Promise<{ ok: true }> {
+    await this.ctx.storage.deleteAll();
+    // Recreate the empty schema so a stray RPC on this live instance does not
+    // fail with "no such table"; the channel is already gone from D1.
+    await migrate(this.db, migrations);
+    return { ok: true };
   }
 
   async fetch(_request: Request): Promise<Response> {

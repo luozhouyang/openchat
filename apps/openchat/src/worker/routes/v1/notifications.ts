@@ -9,6 +9,7 @@ import {
 import { requireSession } from "@worker/auth/session";
 import { getDb } from "@worker/db/client";
 import { notifications } from "@worker/db/schema-d1";
+import { chunkItems } from "@worker/lib/chunks";
 import { zodValidator } from "@worker/lib/validation";
 
 export const notificationsV1 = new Hono<{ Bindings: Env }>();
@@ -57,14 +58,17 @@ notificationsV1.post(
     const db = getDb(c.env.DB);
     const userId = c.get("session")!.user.id;
     const ids = c.req.valid("json").ids;
-    await db
-      .update(notifications)
-      .set({ readAt: Date.now() })
-      .where(
-        ids && ids.length > 0
-          ? and(eq(notifications.userId, userId), inArray(notifications.id, ids))
-          : eq(notifications.userId, userId),
-      );
+    const readAt = Date.now();
+    if (ids && ids.length > 0) {
+      for (const chunk of chunkItems(ids)) {
+        await db
+          .update(notifications)
+          .set({ readAt })
+          .where(and(eq(notifications.userId, userId), inArray(notifications.id, chunk)));
+      }
+    } else {
+      await db.update(notifications).set({ readAt }).where(eq(notifications.userId, userId));
+    }
     return c.json({ ok: true });
   },
 );

@@ -2,6 +2,7 @@ import { createApp } from "@worker/app";
 import { handleWsUpgrade } from "@worker/routes/ws";
 import { ensureSeedRoles } from "@worker/auth/rbac";
 import { getDb } from "@worker/db/client";
+import { runMaintenance } from "@worker/maintenance";
 import { UserDO } from "@worker/do/user";
 import { ChannelDO } from "@worker/do/channel";
 
@@ -31,5 +32,12 @@ export default {
       return handleWsUpgrade(request, env);
     }
     return app.fetch(request, env);
+  },
+  async scheduled(
+    _controller: ScheduledController,
+    env: Env,
+    ctx: ExecutionContext,
+  ): Promise<void> {
+    ctx.waitUntil(runMaintenance(env));
   },
 };

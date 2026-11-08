@@ -17,6 +17,8 @@ import { zodValidator } from "@worker/lib/validation";
 const MAX_CHANNELS = 50;
 /** Hits requested per channel before the global top-N cut. */
 const PER_CHANNEL = 10;
+/** Parallel channel scans per search request. */
+const SEARCH_CONCURRENCY = 8;
 
 export const searchV1 = new Hono<{ Bindings: Env }>();
 
@@ -44,27 +46,37 @@ searchV1.get("/search", requireSession, zodValidator("query", GlobalSearchQuery)
   const byId = new Map(rows.map((row) => [row.id, row]));
 
   const hits: GlobalSearchHit[] = [];
-  for (const channelId of channelIds) {
-    const channel = byId.get(channelId);
-    if (!channel) {
-      continue;
-    }
-    const stub = c.env.CHANNEL_DO.get(c.env.CHANNEL_DO.idFromName(channelDoName(channelId)));
-    const found = await stub.searchMessages({ query: term, limit: PER_CHANNEL }).catch(() => null);
-    if (!found) {
-      continue;
-    }
-    const summary: ChannelSummary = {
-      id: channel.id,
-      teamId: channel.teamId,
-      name: channel.name,
-      displayName: channel.displayName,
-      type: channel.type as ChannelSummary["type"],
-      member: true,
-      archivedAt: channel.archivedAt,
-    };
-    for (const message of found.messages as PostOutput[]) {
-      hits.push({ message, channel: summary });
+  // Bounded fan-out: sequential DO round trips would add seconds of latency
+  // for workspaces with many channels.
+  for (let index = 0; index < channelIds.length; index += SEARCH_CONCURRENCY) {
+    const slice = channelIds.slice(index, index + SEARCH_CONCURRENCY);
+    const batches = await Promise.all(
+      slice.map(async (channelId): Promise<GlobalSearchHit[]> => {
+        const channel = byId.get(channelId);
+        if (!channel) {
+          return [];
+        }
+        const stub = c.env.CHANNEL_DO.get(c.env.CHANNEL_DO.idFromName(channelDoName(channelId)));
+        const found = await stub
+          .searchMessages({ query: term, limit: PER_CHANNEL })
+          .catch(() => null);
+        if (!found) {
+          return [];
+        }
+        const summary: ChannelSummary = {
+          id: channel.id,
+          teamId: channel.teamId,
+          name: channel.name,
+          displayName: channel.displayName,
+          type: channel.type as ChannelSummary["type"],
+          member: true,
+          archivedAt: channel.archivedAt,
+        };
+        return (found.messages as PostOutput[]).map((message) => ({ message, channel: summary }));
+      }),
+    );
+    for (const batch of batches) {
+      hits.push(...batch);
     }
   }
 
