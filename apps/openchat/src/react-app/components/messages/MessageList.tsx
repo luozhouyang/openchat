@@ -1,13 +1,33 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
 import { appClient } from "@/app-client";
 import { useMessageStore } from "@/stores/messages";
+import type { StoreMessage } from "@/stores/messages";
 import { MessageRow } from "./MessageRow";
 
 /** Same-author messages inside this window render as one visual block. */
 const GROUP_WINDOW_MS = 5 * 60_000;
+/** Upper bound for loading history when jumping to a search hit. */
+const JUMP_MAX_PAGES = 40;
+const HIGHLIGHT_MS = 2_000;
+
+const dateFormatter = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
+
+type ListItem =
+  | { kind: "message"; key: string; message: StoreMessage; compact: boolean }
+  | { kind: "divider"; key: string; at: number };
+
+function sameDay(a: number, b: number): boolean {
+  const first = new Date(a);
+  const second = new Date(b);
+  return (
+    first.getFullYear() === second.getFullYear() &&
+    first.getMonth() === second.getMonth() &&
+    first.getDate() === second.getDate()
+  );
+}
 
 export function MessageList({ channelId }: { channelId: string }) {
   // list() derives a fresh array; shallow-compare so unchanged state stays snapshot-stable.
@@ -17,23 +37,30 @@ export function MessageList({ channelId }: { channelId: string }) {
   const loadingOlder = useRef(false);
   const autoScroll = useRef(true);
   const prevMaxSeq = useRef(0);
+  const [highlightSeq, setHighlightSeq] = useState<number | null>(null);
 
   const maxSeq = useMessageStore((s) => s.maxSeq(channelId));
 
-  const items = useMemo(
-    () =>
-      list.map((message, index) => {
-        const prev = list[index - 1];
-        const compact =
-          prev !== undefined &&
-          prev.userId === message.userId &&
-          !prev.deletedAt &&
-          !message.deletedAt &&
-          message.createdAt - prev.createdAt < GROUP_WINDOW_MS;
-        return { message, compact };
-      }),
-    [list],
-  );
+  const items = useMemo(() => {
+    const out: ListItem[] = [];
+    list.forEach((message, index) => {
+      const prev = list[index - 1];
+      if (!prev || !sameDay(prev.createdAt, message.createdAt)) {
+        out.push({ kind: "divider", key: `divider-${message.id}`, at: message.createdAt });
+      }
+      const compact =
+        prev !== undefined &&
+        sameDay(prev.createdAt, message.createdAt) &&
+        prev.userId === message.userId &&
+        !prev.deletedAt &&
+        !message.deletedAt &&
+        message.createdAt - prev.createdAt < GROUP_WINDOW_MS;
+      out.push({ kind: "message", key: message.id, message, compact });
+    });
+    return out;
+  }, [list]);
+
+  const firstMessageSeq = items.find((item) => item.kind === "message")?.message.seq ?? null;
 
   const virtualizer = useVirtualizer({
     count: items.length,
@@ -42,7 +69,7 @@ export function MessageList({ channelId }: { channelId: string }) {
     overscan: 10,
     // Message ids stay stable when older pages are prepended, so measurement
     // caches survive the index shift.
-    getItemKey: (index) => items[index]!.message.id,
+    getItemKey: (index) => items[index]!.key,
   });
 
   useEffect(() => {
@@ -58,21 +85,60 @@ export function MessageList({ channelId }: { channelId: string }) {
       if (!detail || detail.channelId !== channelId) {
         return;
       }
-      const index = items.findIndex((item) => item.message.seq === detail.seq);
-      if (index >= 0) {
-        virtualizer.scrollToIndex(index, { align: "center" });
-      }
+      void jumpTo(detail.seq);
     }
     window.addEventListener("openchat:jump-to-seq", onJump);
     return () => window.removeEventListener("openchat:jump-to-seq", onJump);
+    // jumpTo closes over the current store/virtualizer; re-register on change.
   }, [channelId, items, virtualizer]);
 
+  async function jumpTo(seq: number) {
+    const findIndex = () =>
+      useMessageStore
+        .getState()
+        .list(channelId)
+        .findIndex((message) => message.seq === seq);
+    let index = findIndex();
+    let pages = 0;
+    while (index < 0 && pages < JUMP_MAX_PAGES) {
+      const more = await appClient.channels.loadOlder(channelId);
+      pages += 1;
+      index = findIndex();
+      if (!more) {
+        break;
+      }
+    }
+    if (index < 0) {
+      return;
+    }
+    // The rendered list interleaves date dividers, so map the message index
+    // from the freshly loaded store rather than the pre-load closure.
+    const fresh = useMessageStore.getState().list(channelId);
+    const messageIndex = fresh.findIndex((message) => message.seq === seq);
+    let dividers = 0;
+    for (let i = 1; i <= messageIndex; i += 1) {
+      const prev = fresh[i - 1];
+      const current = fresh[i];
+      if (prev && current && !sameDay(prev.createdAt, current.createdAt)) {
+        dividers += 1;
+      }
+    }
+    const renderedIndex = messageIndex + dividers;
+    setHighlightSeq(seq);
+    window.setTimeout(() => setHighlightSeq(null), HIGHLIGHT_MS);
+    // Two frames: let the loaded page commit before the virtualizer scrolls.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        virtualizer.scrollToIndex(renderedIndex, { align: "center" });
+      });
+    });
+  }
+
   const loadOlder = useCallback(async () => {
-    if (loadingOlder.current || items.length === 0) {
+    if (loadingOlder.current || firstMessageSeq === null) {
       return;
     }
     loadingOlder.current = true;
-    const anchorSeq = items[0]!.message.seq;
     const scrollTop = parentRef.current?.scrollTop ?? 0;
     try {
       // Shared service: fetch page + apply history to store and local DB in
@@ -82,7 +148,7 @@ export function MessageList({ channelId }: { channelId: string }) {
       const idx = useMessageStore
         .getState()
         .list(channelId)
-        .findIndex((m) => m.seq === anchorSeq);
+        .findIndex((m) => m.seq === firstMessageSeq);
       if (idx >= 0 && parentRef.current) {
         const [offset] = virtualizer.getOffsetForIndex(idx) ?? [0];
         parentRef.current.scrollTop = scrollTop + offset;
@@ -90,7 +156,7 @@ export function MessageList({ channelId }: { channelId: string }) {
     } finally {
       loadingOlder.current = false;
     }
-  }, [channelId, items, virtualizer]);
+  }, [channelId, firstMessageSeq, virtualizer]);
 
   return (
     <div
@@ -126,7 +192,20 @@ export function MessageList({ channelId }: { channelId: string }) {
                   transform: `translateY(${vi.start}px)`,
                 }}
               >
-                <MessageRow message={item.message} channelId={channelId} compact={item.compact} />
+                {item.kind === "divider" ? (
+                  <div className="flex items-center gap-3 px-4 py-2 text-xs text-muted-foreground">
+                    <span className="h-px flex-1 bg-border" />
+                    <span>{dateFormatter.format(new Date(item.at))}</span>
+                    <span className="h-px flex-1 bg-border" />
+                  </div>
+                ) : (
+                  <MessageRow
+                    message={item.message}
+                    channelId={channelId}
+                    compact={item.compact}
+                    highlight={highlightSeq === item.message.seq}
+                  />
+                )}
               </div>
             );
           })}

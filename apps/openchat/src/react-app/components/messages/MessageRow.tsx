@@ -30,6 +30,8 @@ interface MessageRowProps {
   compact?: boolean;
   /** Inside a thread panel: no "reply in thread" action. */
   inThread?: boolean;
+  /** Transient highlight after jumping from search. */
+  highlight?: boolean;
 }
 
 export function MessageRow({
@@ -37,6 +39,7 @@ export function MessageRow({
   channelId,
   compact = false,
   inThread = false,
+  highlight = false,
 }: MessageRowProps) {
   const { t } = useTranslation();
   const me = useMe();
@@ -219,7 +222,7 @@ export function MessageRow({
     <div
       className={`group relative flex gap-3 px-4 hover:bg-accent/40 focus-within:bg-accent/40 ${
         compact ? "py-0.5" : "py-1.5"
-      } ${pending ? "opacity-60" : ""}`}
+      } ${pending ? "opacity-60" : ""} ${highlight ? "bg-primary/10 ring-2 ring-primary/30" : ""}`}
     >
       <div className="w-9 shrink-0 pt-0.5">
         {compact ? (
