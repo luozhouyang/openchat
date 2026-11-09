@@ -1,8 +1,19 @@
 import { DatabaseSync, type SQLInputValue } from "node:sqlite";
 
-/** node:sqlite (Node 22) rejects `undefined`; normalize optional bindings to NULL. */
+/**
+ * node:sqlite on Node 22 only accepts number/bigint/string/null/Uint8Array;
+ * normalize `undefined` to NULL and booleans to 0/1.
+ */
 function bindable(params: unknown[]): SQLInputValue[] {
-  return params.map((value) => (value === undefined ? null : value)) as SQLInputValue[];
+  return params.map((value) => {
+    if (value === undefined) {
+      return null;
+    }
+    if (typeof value === "boolean") {
+      return value ? 1 : 0;
+    }
+    return value;
+  }) as SQLInputValue[];
 }
 
 export interface SqliteRow {
