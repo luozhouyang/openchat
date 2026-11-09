@@ -1,5 +1,10 @@
 import { DatabaseSync, type SQLInputValue } from "node:sqlite";
 
+/** node:sqlite (Node 22) rejects `undefined`; normalize optional bindings to NULL. */
+function bindable(params: unknown[]): SQLInputValue[] {
+  return params.map((value) => (value === undefined ? null : value)) as SQLInputValue[];
+}
+
 export interface SqliteRow {
   [key: string]: unknown;
 }
@@ -23,16 +28,16 @@ export class NodeSqliteDriver implements SqliteDriver {
     this.db.exec(sql);
   }
   async run(sql: string, params: unknown[] = []) {
-    this.db.prepare(sql).run(...(params as SQLInputValue[]));
+    this.db.prepare(sql).run(...bindable(params));
   }
   async all<T = Record<string, unknown>>(sql: string, params: unknown[] = []): Promise<T[]> {
-    return this.db.prepare(sql).all(...(params as SQLInputValue[])) as T[];
+    return this.db.prepare(sql).all(...bindable(params)) as T[];
   }
   async get<T = Record<string, unknown>>(
     sql: string,
     params: unknown[] = [],
   ): Promise<T | undefined> {
-    return this.db.prepare(sql).get(...(params as SQLInputValue[])) as T | undefined;
+    return this.db.prepare(sql).get(...bindable(params)) as T | undefined;
   }
   async close() {
     this.db.close();
