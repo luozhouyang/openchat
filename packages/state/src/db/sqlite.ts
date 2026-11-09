@@ -147,13 +147,14 @@ export class SqliteMessageRepository implements MessageRepository {
       m.seq,
       m.id,
       m.userId,
-      m.parentId,
+      // node:sqlite (Node 22) rejects `undefined` bindings; normalize to NULL.
+      m.parentId ?? null,
       m.type,
       m.content,
       json(m.attachments),
       json(m.mentions),
-      m.editedAt,
-      m.deletedAt,
+      m.editedAt ?? null,
+      m.deletedAt ?? null,
       m.createdAt,
       m.isPinned ?? false,
     ];
